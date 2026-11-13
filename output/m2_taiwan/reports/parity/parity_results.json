@@ -1,0 +1,206 @@
+{
+  "model_id": "M2",
+  "timestamp_utc": "2026-11-13T16:41:29+00:00",
+  "champion": {
+    "module": "output/m2_taiwan/model/m2_taiwan_pd.py",
+    "module_sha256": "9d9c4e58426ba49be28c637592d01d4fe421d17094e7866841be03086db63eea",
+    "manifest_module_sha256": "9d9c4e58426ba49be28c637592d01d4fe421d17094e7866841be03086db63eea",
+    "migration_status": "AWAITING_HUMAN_APPROVAL",
+    "migration_iterations": 1,
+    "human_review": null,
+    "migrated_by": "Claude Opus 5.5 (Claude Code, migration-agent)",
+    "reference_dir": "output/m2_taiwan/model/reference"
+  },
+  "reference": {
+    "language": "R",
+    "version": "R version 4.6.1 (2026-06-24)",
+    "engine": "stats::glm (IRLS)",
+    "seed": 2026,
+    "script": "model.R"
+  },
+  "rebuild": {
+    "language": "Python",
+    "engine": "agent-generated IRLS mirroring glm.fit",
+    "module": "output/m2_taiwan/model/m2_taiwan_pd.py",
+    "iterations": 6,
+    "converged": true
+  },
+  "metrics": {
+    "auc_test_r": 0.7402449542619647,
+    "auc_test_py": 0.7402449542619647,
+    "ks_test_r": 0.3805857651791559,
+    "ks_test_py": 0.3805857651791559,
+    "deviance_r": 18587.8388471168,
+    "deviance_py": 18587.83884711683
+  },
+  "tolerances": {
+    "coef_abs": 1e-08,
+    "coef_rel": 1e-06,
+    "se_rel": 1e-06,
+    "pred_abs": 1e-10,
+    "deviance_abs": 1e-06,
+    "sklearn_coef_rel": 0.0001,
+    "sklearn_pred_abs": 1e-06
+  },
+  "boundary_tie_rows": {
+    "PD 0.50 0.500000": 0,
+    "80% approval 0.287721": 0
+  },
+  "checks": [
+    {
+      "check": "artefact: module SHA-256 differs from agent manifest",
+      "value": 0.0,
+      "tolerance": 0,
+      "pass": true
+    },
+    {
+      "check": "term names/order differ from R model.matrix",
+      "value": 0.0,
+      "tolerance": 0,
+      "pass": true
+    },
+    {
+      "check": "split: rows with different train/test membership",
+      "value": 0.0,
+      "tolerance": 0,
+      "pass": true
+    },
+    {
+      "check": "target: rows with different y",
+      "value": 0.0,
+      "tolerance": 0,
+      "pass": true
+    },
+    {
+      "check": "coef max abs diff",
+      "value": 1.354472090042691e-14,
+      "tolerance": 1e-08,
+      "pass": true
+    },
+    {
+      "check": "coef max rel diff",
+      "value": 3.106974551829694e-14,
+      "tolerance": 1e-06,
+      "pass": true
+    },
+    {
+      "check": "std error max rel diff",
+      "value": 5.0499449960581315e-15,
+      "tolerance": 1e-06,
+      "pass": true
+    },
+    {
+      "check": "PD max abs diff (all 30,000 rows)",
+      "value": 8.659739592076221e-15,
+      "tolerance": 1e-10,
+      "pass": true
+    },
+    {
+      "check": "residual deviance abs diff",
+      "value": 2.9103830456733704e-11,
+      "tolerance": 1e-06,
+      "pass": true
+    },
+    {
+      "check": "AIC abs diff",
+      "value": 2.9103830456733704e-11,
+      "tolerance": 1e-06,
+      "pass": true
+    },
+    {
+      "check": "test AUC abs diff",
+      "value": 0.0,
+      "tolerance": 1e-12,
+      "pass": true
+    },
+    {
+      "check": "test KS abs diff",
+      "value": 0.0,
+      "tolerance": 1e-12,
+      "pass": true
+    },
+    {
+      "check": "decisions differing at PD 0.50 cut-off 0.5000 (excl. 0 exact-tie rows)",
+      "value": 0.0,
+      "tolerance": 0,
+      "pass": true
+    },
+    {
+      "check": "decisions differing at 80% approval cut-off 0.2877 (excl. 0 exact-tie rows)",
+      "value": 0.0,
+      "tolerance": 0,
+      "pass": true
+    }
+  ],
+  "independent_crosscheck_sklearn": [
+    {
+      "check": "sklearn coef max rel diff vs R",
+      "value": 1.4143686225511213e-10,
+      "tolerance": 0.0001,
+      "pass": true
+    },
+    {
+      "check": "sklearn PD max abs diff vs R",
+      "value": 4.204153691844681e-11,
+      "tolerance": 1e-06,
+      "pass": true
+    }
+  ],
+  "agent_reported_checks": [
+    {
+      "check": "G-05 coefficient names: missing + extra",
+      "value": 0.0,
+      "tolerance": 0.0,
+      "pass": true
+    },
+    {
+      "check": "coefficient max rel diff",
+      "value": 3.106974551829694e-14,
+      "tolerance": 1e-06,
+      "pass": true
+    },
+    {
+      "check": "std error max rel diff",
+      "value": 5.0499449960581315e-15,
+      "tolerance": 1e-06,
+      "pass": true
+    },
+    {
+      "check": "rows: identical set",
+      "value": 0.0,
+      "tolerance": 0.0,
+      "pass": true
+    },
+    {
+      "check": "response values: rows differing",
+      "value": 0.0,
+      "tolerance": 0.0,
+      "pass": true
+    },
+    {
+      "check": "split membership: rows differing",
+      "value": 0.0,
+      "tolerance": 0.0,
+      "pass": true
+    },
+    {
+      "check": "prediction NA pattern: rows differing",
+      "value": 0.0,
+      "tolerance": 0.0,
+      "pass": true
+    },
+    {
+      "check": "prediction max abs diff (rows predicted by both)",
+      "value": 8.659739592076221e-15,
+      "tolerance": 1e-08,
+      "pass": true
+    },
+    {
+      "check": "binomial deviance abs diff",
+      "value": 3.637978807091713e-12,
+      "tolerance": 1e-06,
+      "pass": true
+    }
+  ],
+  "parity_pass": true
+}

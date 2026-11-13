@@ -1,0 +1,30 @@
+{
+  "stages": {
+    "facts": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:30:48Z",
+      "n_variables": 11,
+      "disclosures": [
+        "D-01:sex",
+        "D-01:education",
+        "D-01:marriage",
+        "D-02",
+        "D-04",
+        "D-05"
+      ]
+    },
+    "verify": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:32:43Z",
+      "iterations": 1
+    }
+  },
+  "iterations": [
+    {
+      "iteration": 1,
+      "file": "output/m2_taiwan/logs/documentation/extract_1.json",
+      "violations": [],
+      "verdict": "PASS"
+    }
+  ]
+}

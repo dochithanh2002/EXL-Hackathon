@@ -1,0 +1,42 @@
+   1 | # ---------------------------------------------------------------------------
+   2 | # LEGACY MODEL (as received) - Taiwan credit-card default "Traditional Score"
+   3 | # Source: Kaggle notebook netzone/default-credit-and-credit-score-prediction (v2),
+   4 | #         Apache-2.0. Code reproduced from the published notebook; lines the
+   5 | #         notebook described but did not print are marked [reconstructed].
+   6 | # This file is the INPUT to the R->Python migration agent. Do not edit.
+   7 | # ---------------------------------------------------------------------------
+   8 | library(caret)
+   9 | 
+  10 | raw.credit <- read.csv("data/taiwan_default.csv")
+  11 | colnames(raw.credit) <- tolower(colnames(raw.credit))
+  12 | 
+  13 | # id column is the client identifier, not important -> removed
+  14 | raw.credit$id <- NULL
+  15 | 
+  16 | # For education, we will merge 0, 4, 5, 6 to 4 (others)        [reconstructed]
+  17 | raw.credit$education[raw.credit$education %in% c(0, 4, 5, 6)] <- 4
+  18 | # For marriage, we will merge 0 to 3 (others)                  [reconstructed]
+  19 | raw.credit$marriage[raw.credit$marriage == 0] <- 3
+  20 | 
+  21 | # Assume -2, -1 and 0 have the same meaning. Merge them to 0.   (verbatim)
+  22 | for (i in seq(6, 11, 1)) {
+  23 |   raw.credit[which(raw.credit[[i]] %in% c(-2, -1, 0)),][[i]] <- 0
+  24 | }
+  25 | 
+  26 | # convert to factor (sex, education, marriage, target)         [reconstructed]
+  27 | raw.credit$sex <- as.factor(raw.credit$sex)
+  28 | raw.credit$education <- as.factor(raw.credit$education)
+  29 | raw.credit$marriage <- as.factor(raw.credit$marriage)
+  30 | raw.credit$default.payment.next.month <- as.factor(raw.credit$default.payment.next.month)
+  31 | 
+  32 | # training (70%) and testing (30%)                              (verbatim)
+  33 | intraining <- createDataPartition(y=raw.credit$default.payment.next.month, p=0.7, list=F)
+  34 | train.batch <- raw.credit[intraining,]
+  35 | test.batch <- raw.credit[-intraining,]
+  36 | 
+  37 | # Traditional Score using Logistic Regression                   (verbatim)
+  38 | glm.final <- glm(default.payment.next.month ~ limit_bal+sex+education+marriage+
+  39 |                    pay_0+pay_2+pay_3+pay_5+pay_6+pay_amt1+pay_amt2, data=train.batch,
+  40 |                  family=binomial)
+  41 | 
+  42 | test.batch$glm_scor1 <- predict(glm.final, type="response", test.batch)

@@ -1,0 +1,188 @@
+{
+  "model_id": "M2",
+  "started_utc": "2026-11-13T15:59:48Z",
+  "finished_utc": "2026-11-13T15:59:48Z",
+  "documentation": {
+    "status": "APPROVED",
+    "verify_iterations": 1,
+    "model_card": "runs/M2/doc/output/MODEL_CARD_M2.md",
+    "review": {
+      "reviewer": "Thanh",
+      "decision": "approve",
+      "comment": "Approved by user instruction in Claude Code session; reviewed via factory reports",
+      "ts_utc": "2026-11-13T15:55:31Z",
+      "artefact_sha256": {
+        "MODEL_CARD_M2.md": "7b8c57a580d83128c79c04266b913a960cbeb59a6288b04bd5aabe856d8937e7",
+        "inventory_M2.json": "51eeaa29ecf9640de3b44878f8a186b4dbc9139c7aaada7572f19955d9bd7834"
+      }
+    }
+  },
+  "migration": {
+    "status": "APPROVED",
+    "iterations": 1,
+    "verdict": "PASS",
+    "module": "runs/M2/output/m2_taiwan_pd.py",
+    "review": {
+      "reviewer": "Thanh",
+      "decision": "approve",
+      "comment": "Approved by user instruction in Claude Code session; reviewed via factory reports",
+      "ts_utc": "2026-11-13T15:55:29Z",
+      "artefact_sha256": {
+        "HUMAN_REVIEW.md": "c7214888db20b19f163b7b8049e2f9d76ce37a36aa691f39e70568104c925dda",
+        "MIGRATION_REPORT.md": "901c466bf01b729c202485c612becfb8e1926ca1f78d026353185fcb667818d7",
+        "m2_taiwan_pd.py": "ed70c5e3cb53ffecc226e00f9fa02b8851c9b2e34ac47da519d362c8d49851e1",
+        "manifest.json": "26d47122dacadd557470f8d3f9afce243a7df92b726e53e673b3cf3ff5b9feeb",
+        "requirements.txt": "0b9884fba4f5400a9c5c29fb25b50c4dc3c378aec18317f2248da15d0d53838b"
+      }
+    }
+  },
+  "parity_recheck": {
+    "pass": true,
+    "checks_passed": 14,
+    "checks": 14
+  },
+  "validation": {
+    "overall_rag": "AMBER",
+    "discrimination": "GREEN",
+    "calibration": "GREEN",
+    "stability": "AMBER",
+    "test_auc": 0.7402449184143001,
+    "report": "reports/m2/validation_report_M2.html",
+    "areas": {
+      "discrimination": "GREEN",
+      "calibration": "GREEN",
+      "stability": "AMBER"
+    },
+    "headline": {
+      "name": "test AUC",
+      "value": 0.7402449184143001
+    }
+  },
+  "fairness": {
+    "overall_rag": "RED",
+    "statistical_rag": "GREEN",
+    "legal_rag": "RED",
+    "recommended_variant": "B_no_sex_marriage"
+  },
+  "monitoring": {
+    "revalidation_required": true,
+    "batches": {
+      "2005-09 cohort": "AMBER",
+      "2005-08 re-score": "RED"
+    }
+  },
+  "llm_usage": {
+    "migration": {
+      "calls": 3,
+      "live_calls": 0,
+      "cached_calls": 3,
+      "total_input_tokens": 0,
+      "output_tokens": 0,
+      "cost_usd": 0
+    },
+    "documentation": {
+      "calls": 1,
+      "live_calls": 0,
+      "cached_calls": 1,
+      "total_input_tokens": 0,
+      "output_tokens": 0,
+      "cost_usd": 0
+    }
+  },
+  "paths": {
+    "parity_report": "reports/m2/parity/parity_report_M2.md",
+    "fairness": "reports/m2/fairness/fairness_results.json",
+    "monitoring_report": "reports/m2/monitoring/MONITORING_REPORT.md"
+  },
+  "config": "legacy_models/m2_taiwan/migration.yaml",
+  "awaiting_human": [],
+  "steps": [
+    {
+      "cmd": "/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/.venv/bin/python -m r2py_agent discover .",
+      "exit": 0,
+      "seconds": 0.4,
+      "tail": [
+        "8 model files found -> reports/inventory/DISCOVERY.md"
+      ]
+    },
+    {
+      "cmd": "/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/.venv/bin/python -m r2py_agent document legacy_models/m2_taiwan/migration.yaml",
+      "exit": 0,
+      "seconds": 0.3,
+      "tail": [
+        "DONE -> /Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/runs/M2/doc/output  (status: APPROVED)"
+      ]
+    },
+    {
+      "cmd": "/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/.venv/bin/python -m r2py_agent run legacy_models/m2_taiwan/migration.yaml",
+      "exit": 0,
+      "seconds": 0.3,
+      "tail": [
+        "DONE -> /Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/runs/M2/output  (status: APPROVED)"
+      ]
+    },
+    {
+      "cmd": "Rscript src/m2/seed_sensitivity.R",
+      "exit": 0,
+      "seconds": 10.5,
+      "tail": [
+        "n_seeds                mean                  sd                p2_5 ",
+        "       2.000000e+02        7.589913e-01        5.379275e-03        7.479825e-01 ",
+        "             median               p97_5   reported_notebook reported_percentile ",
+        "       7.591947e-01        7.689134e-01        7.542000e-01        1.850000e-01"
+      ]
+    },
+    {
+      "cmd": "/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/.venv/bin/python -m src.m2.parity",
+      "exit": 0,
+      "seconds": 2.1,
+      "tail": [
+        "PASS  test KS abs diff                                                       0.000e+00  (tol 1e-12)",
+        "PASS  decisions differing at PD 0.50 cut-off 0.5000 (excl. 0 exact-tie rows) 0.000e+00  (tol 0e+00)",
+        "PASS  decisions differing at 80% approval cut-off 0.2877 (excl. 0 exact-tie rows) 0.000e+00  (tol 0e+00)",
+        "PASS  sklearn coef max rel diff vs R                                         1.414e-10  (tol 1e-04)",
+        "PASS  sklearn PD max abs diff vs R                                           4.204e-11  (tol 1e-06)",
+        "PARITY: PASS"
+      ]
+    },
+    {
+      "cmd": "/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/.venv/bin/python -m src.m2.validate",
+      "exit": 0,
+      "seconds": 6.3,
+      "tail": [
+        "{'discrimination': 'GREEN', 'calibration': 'GREEN', 'stability': 'AMBER'} overall: AMBER"
+      ]
+    },
+    {
+      "cmd": "/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/.venv/bin/python -m src.m2.fairness",
+      "exit": 0,
+      "seconds": 5.9,
+      "tail": [
+        "  mar_g  pd_0.50        DIR 0.990 (excl small 0.990) SPD 0.009 EOd 0.010 AUCrange 0.014 calgap 1.19pp (Other) flags []",
+        "  mar_g  approve_80pct  DIR 0.990 (excl small 0.997) SPD 0.008 EOd 0.012 AUCrange 0.014 calgap 1.19pp (Other) flags []",
+        "",
+        "proxy AUC: {'sex=female': 0.5876437537388866, 'age<=25': 0.7787131274986456, 'age>=56': 0.5191955381095527, 'marital=single': 0.5616784683400349} ",
+        "statistical: GREEN legal: RED overall: RED ",
+        "recommendation: {'variant': 'B_no_sex_marriage', 'auc_change': 0.0015011926518023744, 'sex_dir_change': 0.02412068056167438, 'new_flags': {'age_g': ['calibration gap 2.3pp > 2.0pp (46-55)']}}"
+      ]
+    },
+    {
+      "cmd": "/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/.venv/bin/python -m src.m2.report",
+      "exit": 0,
+      "seconds": 1.2,
+      "tail": [
+        "wrote /Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/reports/m2/validation_report_M2.md and .html"
+      ]
+    },
+    {
+      "cmd": "/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/.venv/bin/python -m src.m2.monitor",
+      "exit": 0,
+      "seconds": 2.6,
+      "tail": [
+        "2005-09 cohort     AMBER  max_group_cal_gap_pp = 1.5899 (AMBER; amber/red at 1.5/2.0)",
+        "2005-08 re-score   RED    max_csi = 0.6175 (RED; amber/red at 0.1/0.25), driven by pay_0",
+        "RE-VALIDATION REQUIRED"
+      ]
+    }
+  ]
+}

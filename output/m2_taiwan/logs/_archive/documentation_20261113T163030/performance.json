@@ -1,0 +1,20 @@
+{
+  "test": {
+    "n": 8999,
+    "event_rate": 0.2211,
+    "auc": 0.7402,
+    "gini": 0.4805,
+    "ks": 0.3806,
+    "brier": 0.1409,
+    "mean_predicted": 0.2187
+  },
+  "train": {
+    "n": 21001,
+    "event_rate": 0.2212,
+    "auc": 0.7675,
+    "gini": 0.5349,
+    "ks": 0.4222,
+    "brier": 0.1374,
+    "mean_predicted": 0.2212
+  }
+}

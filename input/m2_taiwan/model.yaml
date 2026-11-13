@@ -1,0 +1,51 @@
+# Model request: M2. One file per legacy model. Everything here is owned by humans (model owner / MRM).
+# Thresholds, parity tolerances and agent limits are NOT set here: they live in agent/config/thresholds.yaml.
+model_id: M2
+model_name: Taiwan Card-Default Logistic PD (Traditional Score)
+model_type: binary_pd                # selects the threshold set in agent/config/thresholds.yaml
+
+legacy:
+  language: R
+  script: model.R                    # paths in this file are relative to this folder
+  model_object: glm.final            # fitted object to migrate
+  train_object: train.batch
+  test_object: test.batch
+  seed: 2026                         # harness sets this; the original notebook had none
+
+data:
+  path: data/taiwan_default.csv
+  id_column: ID
+  protected_attributes: [SEX, MARRIAGE, AGE, EDUCATION]
+
+target_python:
+  module_name: m2_taiwan_pd
+  allowed_packages: [numpy, pandas, statsmodels, scipy]
+
+# Evidence the Documentation agent may read besides the script (console output is stripped, G-11).
+supporting_docs:
+  - docs/netzone_results.txt
+
+# Governance fields. The Documentation agent copies these into the inventory record and never infers them.
+governance:
+  owner: Retail Credit Risk Modelling (simulated)
+  developer: Third party (public Kaggle notebook author)
+  domain: Credit risk
+  business_use: Account management - credit-limit reviews and collections prioritisation (simulated bank)
+  materiality_tier: Tier 2 (medium)
+  regulatory_framework: [PRA SS1/23, UK Equality Act 2010, FCA Consumer Duty, UK GDPR Art. 22]
+  last_independent_validation: none on record
+  data_source:
+    dataset: "UCI #350 Default of Credit Card Clients (Yeh & Lien, 2009)"
+    source_url: https://archive.ics.uci.edu/dataset/350
+    licence: CC BY 4.0
+    population: 30,000 credit-card clients, Taiwan bank
+    observation_window: Apr-Sep 2005 (6 monthly snapshots)
+
+# Independent validation suite (agent/validators/<suite>/) and the steps the Validation agent runs, in order.
+validation:
+  suite: m2_taiwan
+  steps: [seed_sensitivity, parity, validate, fairness, report]
+  monitoring_steps: [monitor]
+
+tracking:
+  experiment: m2-taiwan-default        # MLflow experiment (Azure ML if agent/config/azure.env is set)

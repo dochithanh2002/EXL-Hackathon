@@ -1,0 +1,279 @@
+{
+  "summary": "Poisson GLM (log link) for motor TPL claim frequency, GLM1 of the Noll/Salzmann/Wuthrich case study. The script reads the OpenML CSV with both double and single quotes as quote characters (strings such as 'D' and 'B12' arrive without quotes), caps ClaimNb at 4 and Exposure at 1, and engineers nine features: AreaGLM (integer code of Area's alphabetical factor levels A..F -> 1..6), VehPowerGLM (factor of pmin(VehPower, 9)), VehAgeGLM (lookup: VehAge 0 -> 1, 1..10 -> 2, 11..110 -> 3; reference 2), DrivAgeGLM (lookup on DrivAge-17: 18-20 -> 1, 21-25 -> 2, 26-30 -> 3, 31-40 -> 4, 41-50 -> 5, 51-70 -> 6, 71-100 -> 7; reference 5), BonusMalusGLM (pmin(BonusMalus, 150)), DensityGLM (log Density), VehBrand (reference B1), Region (reference R24), VehGas (reference Diesel). A random 90/10 split (set.seed(100), sample without replacement) gives learn/test. glm(ClaimNb ~ ..., offset = log(Exposure), family = poisson()) is fitted on learn: 49 coefficients, treatment contrasts, the offset is the log of the CAPPED exposure and is also used by predict(type='response') on newdata. No rows are dropped and there are no missing values.",
+  "preprocessing": [
+    {
+      "order": 1,
+      "r_code": "dat <- read.csv(\"data/fremtpl2/freMTPL2freq.csv\", quote = \"\\\"'\", stringsAsFactors = FALSE)",
+      "description": "Read the CSV; both \" and ' are quote characters, so single-quoted string values (Area, VehBrand, VehGas, Region) lose their quotes. Header names are already syntactic (make.names leaves them unchanged). Keep all 678,013 rows in file order.",
+      "columns": [
+        "*"
+      ],
+      "rule_ids": [
+        "R-IO-01",
+        "R-IO-03"
+      ]
+    },
+    {
+      "order": 2,
+      "r_code": "dat$ClaimNb <- pmin(dat$ClaimNb, 4)",
+      "description": "Cap the response at 4.",
+      "columns": [
+        "ClaimNb"
+      ],
+      "rule_ids": [
+        "R-REC-02"
+      ]
+    },
+    {
+      "order": 3,
+      "r_code": "dat$Exposure <- pmin(dat$Exposure, 1)",
+      "description": "Cap exposure at 1 year (this capped value feeds the offset).",
+      "columns": [
+        "Exposure"
+      ],
+      "rule_ids": [
+        "R-REC-02",
+        "R-EST-03"
+      ]
+    },
+    {
+      "order": 4,
+      "r_code": "dat$AreaGLM <- as.integer(factor(dat$Area))",
+      "description": "Integer code of Area within its sorted factor levels (A=1 .. F=6); numeric term.",
+      "columns": [
+        "Area",
+        "AreaGLM"
+      ],
+      "rule_ids": [
+        "R-FAC-01"
+      ]
+    },
+    {
+      "order": 5,
+      "r_code": "dat$VehPowerGLM <- as.factor(pmin(dat$VehPower, 9))",
+      "description": "Cap VehPower at 9 and make a factor; levels 4..9 (numeric order), reference 4.",
+      "columns": [
+        "VehPower",
+        "VehPowerGLM"
+      ],
+      "rule_ids": [
+        "R-FAC-01",
+        "R-FAC-02"
+      ]
+    },
+    {
+      "order": 6,
+      "r_code": "VehAgeGLM <- cbind(c(0:110), c(1, rep(2, 10), rep(3, 100))); dat$VehAgeGLM <- as.factor(VehAgeGLM[dat$VehAge + 1, 2]); dat[, \"VehAgeGLM\"] <- relevel(dat[, \"VehAgeGLM\"], ref = \"2\")",
+      "description": "Band VehAge: 0 -> 1, 1..10 -> 2, 11..110 -> 3 (row VehAge+1 of the lookup; outside 0..110 would be NA). Factor relevelled so 2 is the reference: levels ['2','1','3'].",
+      "columns": [
+        "VehAge",
+        "VehAgeGLM"
+      ],
+      "rule_ids": [
+        "R-IDX-01",
+        "R-FAC-01",
+        "R-FAC-02"
+      ]
+    },
+    {
+      "order": 7,
+      "r_code": "DrivAgeGLM <- cbind(c(18:100), c(rep(1, 3), rep(2, 5), rep(3, 5), rep(4, 10), rep(5, 10), rep(6, 20), rep(7, 30))); dat$DrivAgeGLM <- as.factor(DrivAgeGLM[dat$DrivAge - 17, 2]); relevel(ref = \"5\")",
+      "description": "Band DrivAge (row DrivAge-17 of the lookup): 18-20 -> 1, 21-25 -> 2, 26-30 -> 3, 31-40 -> 4, 41-50 -> 5, 51-70 -> 6, 71-100 -> 7. Reference 5: levels ['5','1','2','3','4','6','7'].",
+      "columns": [
+        "DrivAge",
+        "DrivAgeGLM"
+      ],
+      "rule_ids": [
+        "R-IDX-01",
+        "R-FAC-01",
+        "R-FAC-02",
+        "GOV-01"
+      ]
+    },
+    {
+      "order": 8,
+      "r_code": "dat$BonusMalusGLM <- as.integer(pmin(dat$BonusMalus, 150))",
+      "description": "Cap BonusMalus at 150; numeric term.",
+      "columns": [
+        "BonusMalus",
+        "BonusMalusGLM"
+      ],
+      "rule_ids": [
+        "R-REC-02"
+      ]
+    },
+    {
+      "order": 9,
+      "r_code": "dat$DensityGLM <- as.numeric(log(dat$Density))",
+      "description": "Natural log of Density; numeric term.",
+      "columns": [
+        "Density",
+        "DensityGLM"
+      ],
+      "rule_ids": [
+        "R-REC-02"
+      ]
+    },
+    {
+      "order": 10,
+      "r_code": "dat$VehBrand <- relevel(as.factor(dat$VehBrand), ref = \"B1\"); dat$Region <- relevel(as.factor(dat$Region), ref = \"R24\"); dat$VehGas <- as.factor(dat$VehGas)",
+      "description": "Factors with references B1, R24 and Diesel; level order as captured in xlevels (string sort, e.g. B1, B10, B11, ..., B2).",
+      "columns": [
+        "VehBrand",
+        "Region",
+        "VehGas"
+      ],
+      "rule_ids": [
+        "R-FAC-01",
+        "R-FAC-02"
+      ]
+    },
+    {
+      "order": 11,
+      "r_code": "set.seed(100); ll <- sample(c(1:nrow(dat)), round(0.9 * nrow(dat)), replace = FALSE); learn <- dat[ll, ]; test <- dat[-ll, ]",
+      "description": "Random 90/10 split. Not re-implemented: membership comes from the harness.",
+      "columns": [
+        "*"
+      ],
+      "rule_ids": [
+        "R-RNG-01"
+      ]
+    }
+  ],
+  "model": {
+    "r_function": "glm",
+    "family": "poisson",
+    "link": "log",
+    "response": "ClaimNb",
+    "formula": "ClaimNb ~ VehPowerGLM + VehAgeGLM + DrivAgeGLM + BonusMalusGLM + VehBrand + VehGas + DensityGLM + Region + AreaGLM, offset = log(Exposure)",
+    "terms": [
+      "(Intercept)",
+      "VehPowerGLM5",
+      "VehPowerGLM6",
+      "VehPowerGLM7",
+      "VehPowerGLM8",
+      "VehPowerGLM9",
+      "VehAgeGLM1",
+      "VehAgeGLM3",
+      "DrivAgeGLM1",
+      "DrivAgeGLM2",
+      "DrivAgeGLM3",
+      "DrivAgeGLM4",
+      "DrivAgeGLM6",
+      "DrivAgeGLM7",
+      "BonusMalusGLM",
+      "VehBrandB10",
+      "VehBrandB11",
+      "VehBrandB12",
+      "VehBrandB13",
+      "VehBrandB14",
+      "VehBrandB2",
+      "VehBrandB3",
+      "VehBrandB4",
+      "VehBrandB5",
+      "VehBrandB6",
+      "VehGasRegular",
+      "DensityGLM",
+      "RegionR11",
+      "RegionR21",
+      "RegionR22",
+      "RegionR23",
+      "RegionR25",
+      "RegionR26",
+      "RegionR31",
+      "RegionR41",
+      "RegionR42",
+      "RegionR43",
+      "RegionR52",
+      "RegionR53",
+      "RegionR54",
+      "RegionR72",
+      "RegionR73",
+      "RegionR74",
+      "RegionR82",
+      "RegionR83",
+      "RegionR91",
+      "RegionR93",
+      "RegionR94",
+      "AreaGLM"
+    ],
+    "factor_levels": {
+      "VehPowerGLM": [
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ],
+      "VehAgeGLM": [
+        "2",
+        "1",
+        "3"
+      ],
+      "DrivAgeGLM": [
+        "5",
+        "1",
+        "2",
+        "3",
+        "4",
+        "6",
+        "7"
+      ],
+      "VehBrand": [
+        "B1",
+        "B10",
+        "B11",
+        "B12",
+        "B13",
+        "B14",
+        "B2",
+        "B3",
+        "B4",
+        "B5",
+        "B6"
+      ],
+      "VehGas": [
+        "Diesel",
+        "Regular"
+      ],
+      "Region": [
+        "R24",
+        "R11",
+        "R21",
+        "R22",
+        "R23",
+        "R25",
+        "R26",
+        "R31",
+        "R41",
+        "R42",
+        "R43",
+        "R52",
+        "R53",
+        "R54",
+        "R72",
+        "R73",
+        "R74",
+        "R82",
+        "R83",
+        "R91",
+        "R93",
+        "R94"
+      ]
+    }
+  },
+  "randomness": "set.seed(100) then sample() of round(0.9*n) row numbers without replacement (learn); the rest is test. Seeded, but sample()'s algorithm depends on the R version. The harness supplies the captured membership (R-RNG-01).",
+  "protected_attributes_used": [
+    "DrivAge (as DrivAgeGLM)"
+  ],
+  "risks": [
+    "The offset log(Exposure) is not a formula term and is easy to drop; it must be applied both in fitting and in predict (R-EST-03).",
+    "The exposure in the offset is the capped value (pmin(Exposure, 1)).",
+    "Lookup-table banding is positional (VehAge+1, DrivAge-17); out-of-range ages would give NA classes in R.",
+    "Factor level orders come from relevel(); VehBrand/Region level order is R string sort (B10 before B2) and must be taken from xlevels.",
+    "Driver age is a protected characteristic used as a rating factor (GOV-01: migrate faithfully, flag for validation).",
+    "The response is capped at 4, which changes the Poisson likelihood for the affected policies."
+  ],
+  "escalations": []
+}

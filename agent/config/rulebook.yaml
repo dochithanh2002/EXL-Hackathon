@@ -1,0 +1,135 @@
+# R -> Python migration rulebook (v1.0)
+# Each rule: what to detect in R, the required Python translation, and the pitfall it prevents.
+# severity: MUST = violation blocks the migration; SHOULD = reviewer is warned.
+# The agent cites rule ids in its plan; guardrails.py enforces the MUST rules it can check statically.
+version: "1.4"   # 1.1: R-EST-02 amended after M2 run; 1.2: row identity and NA handling; 1.3: R-IO-04 from M1 run; 1.4: agent-run review (see CHANGELOG.md)
+rules:
+  # ---------------- Data loading ----------------
+  - id: R-IO-01
+    severity: MUST
+    detect: "read.csv(...) with default check.names=TRUE"
+    python: "pd.read_csv(path); then apply R's make.names() exactly: keep letters, digits, '.' and '_'; replace every other character with '.'; prefix 'X' if the name does not start with a letter or a dot not followed by a digit; de-duplicate with make.unique ('.1', '.2', ...). E.g. 'default payment next month' -> 'default.payment.next.month', 'LIMIT_BAL' stays 'LIMIT_BAL'."
+    pitfall: "R silently renames columns with spaces or symbols. Python keeps the raw names, so any later reference to the R name raises KeyError or, worse, matches the wrong column."
+  - id: R-IO-02
+    severity: MUST
+    detect: "colnames(df) <- tolower(colnames(df))"
+    python: "df.columns = [c.lower() for c in df.columns]"
+    pitfall: "Apply this after the make.names step, in the same order as R."
+  - id: R-IO-03
+    severity: MUST
+    detect: "rows of the loaded data"
+    python: "Keep the index as the raw file's 0-based row position (pd.read_csv gives RangeIndex 0..n-1). If R drops rows (subsetting, na.omit, filter), drop the same rows with boolean masks and keep the surviving index labels. Never sort, reset_index, deduplicate or append rows unless the R code does so explicitly."
+    pitfall: "The harness matches rows by original row number (R rownames). Reordering or reset_index breaks parity; dropping a row R kept fails G-07."
+
+  - id: R-IO-04
+    severity: MUST
+    detect: "read.csv(..., quote = ...) / string columns that need cleaning after load"
+    python: "Select text columns with pd.api.types.is_string_dtype(s) (or dtype == object for older pandas), never `df.dtypes == object` alone. Reproduce R's quote handling: pandas has one quotechar, so strip any extra quote character R removes (e.g. quote = \"\\\"'\" removes surrounding single quotes)."
+    pitfall: "pandas >= 3 reads text as the 'str' dtype, so a dtype == object filter selects nothing and the cleaning silently does not happen. Learned on M1, iteration 1."
+
+  # ---------------- Indexing ----------------
+  - id: R-IDX-01
+    severity: MUST
+    detect: "positional column access: df[[i]], df[, i], seq(a, b) over column positions"
+    python: "Resolve each position to a column NAME using the column order at that point in the R script (R is 1-based, after any column deletions). Then use names in Python, never iloc positions."
+    pitfall: "Off-by-one errors (1- vs 0-based), and positions that shift after a column is dropped (e.g. id removed)."
+  - id: R-IDX-02
+    severity: MUST
+    detect: "df[which(cond), ][[i]] <- value  /  df$x[cond] <- value"
+    python: "df.loc[cond, col] = value"
+    pitfall: "Chained assignment in pandas (df[cond][col] = v) silently does nothing."
+
+  # ---------------- Recoding ----------------
+  - id: R-REC-01
+    severity: MUST
+    detect: "x %in% c(...)"
+    python: "s.isin([...])"
+    pitfall: "Type mismatch: R numeric vs Python int. Make sure the dtype is numeric before calling isin."
+  - id: R-REC-02
+    severity: MUST
+    detect: "recodes executed in sequence"
+    python: "Apply the recodes in exactly the R order. Each recode sees the result of the one before it."
+    pitfall: "Reordering overlapping recodes changes the result."
+
+  # ---------------- Factors / design matrix ----------------
+  - id: R-FAC-01
+    severity: MUST
+    detect: "as.factor(x) / factor(x)"
+    python: "Treat as categorical with levels = sorted unique values in R ordering (numeric codes sort numerically, strings sort by locale). The reference level is the FIRST level unless relevel() or factor(levels=) says otherwise."
+    pitfall: "pd.get_dummies(drop_first=True) drops the alphabetically first string level, which differs from R when codes are numeric-as-strings ('10' < '2')."
+  - id: R-FAC-02
+    severity: MUST
+    detect: "factor in a glm/lm formula (contr.treatment)"
+    python: "Build treatment-coded dummies explicitly, named '<var><level>' exactly as R's model.matrix names them (e.g. 'sex2', 'education4'). Use the level set captured from model$xlevels, not the levels observed in the Python data."
+    pitfall: "A level missing from the train split, or an extra level in the test split, silently changes the columns."
+  - id: R-FAC-03
+    severity: MUST
+    detect: "factor response in a binomial glm"
+    python: "y = 1 for every level except the first, so the event is the second level ('1' for a 0/1 factor). Cast to float."
+    pitfall: "Modelling P(y=0) flips the sign of every coefficient."
+  - id: R-FAC-04
+    severity: MUST
+    detect: "intercept"
+    python: "Add a column named '(Intercept)' of 1.0 as the first design column, unless the formula has -1 or +0."
+    pitfall: "statsmodels adds no intercept by default."
+
+  # ---------------- Sampling / randomness ----------------
+  - id: R-RNG-01
+    severity: MUST
+    detect: "set.seed, sample(), caret::createDataPartition, any random split"
+    python: "NEVER re-implement the random split. R and NumPy random-number generators produce different streams. The generated code must accept the train/test membership supplied by the harness (captured from R)."
+    pitfall: "A re-randomised split can never reach parity. It also hides reproducibility defects in the source."
+
+  # ---------------- Estimation ----------------
+  - id: R-EST-01
+    severity: MUST
+    detect: "glm(..., family=binomial)"
+    python: "An unpenalised binomial MLE via IRLS that mirrors glm.fit (see R-EST-02). statsmodels GLM is acceptable only when SE parity is not required."
+    pitfall: "sklearn LogisticRegression applies L2 regularisation (C=1.0) by default, which changes every coefficient. Forbidden for parity work."
+  - id: R-EST-02
+    severity: MUST
+    detect: "glm convergence control (default epsilon=1e-8 on relative deviance change, maxit=25)"
+    python: "Reproduce glm.fit's numerical path: mustart from family$initialize, the stopping rule |dev - dev_old| / (|dev| + 0.1) < epsilon, the same maxit, and standard errors from the QR of the LAST iteration's weighted design (summary.glm), and the family's numerical guards (binomial logit: linkinv clamps eta to +-30 / mu to [DBL_EPSILON, 1-DBL_EPSILON], mu.eta floored at DBL_EPSILON). An IRLS in numpy is the reference pattern."
+    pitfall: "A fully converged fit (e.g. statsmodels at tol=1e-12) matches R's coefficients to ~1e-10, but R's standard errors only to ~1e-5, because R stops early and takes SEs from weights one iterate behind. Learned on M2, iteration 1."
+  - id: R-EST-03
+    severity: MUST
+    detect: "glm(..., family=poisson / Gamma / gaussian, offset=, weights=)"
+    python: "Use the matching sm.families.* with the same link. Pass offset= and var_weights= / freq_weights= to match R prior weights."
+    pitfall: "Dropping the offset (exposure) in frequency models."
+  - id: R-EST-04
+    severity: MUST
+    detect: "lm(...)"
+    python: "statsmodels OLS on an explicit design matrix with the same names."
+    pitfall: "sklearn LinearRegression gives no standard errors, so SE parity can't be checked."
+
+  - id: R-NA-01
+    severity: MUST
+    detect: "every glm/lm (default na.action = na.omit applies even when the data has no missing values today)"
+    python: "Fit only on training rows complete in every formula variable and the response, as R does. predict() returns NaN for any row with a missing input, exactly where R predict() returns NA. Never impute, fillna or drop those rows to obtain a prediction."
+    pitfall: "Imputing (e.g. fillna(0)) gives a prediction R never made; parity compares the NA pattern row by row and fails it."
+
+  # ---------------- Prediction ----------------
+  - id: R-PRED-01
+    severity: MUST
+    detect: "predict(model, newdata, type='response')"
+    python: "result.predict(X_new), which returns the mean response (probability) for GLMs. Build X_new with the SAME design function and the same captured levels."
+    pitfall: "type='link' returns log-odds. Building X_new from a separate get_dummies call misaligns columns."
+
+  # ---------------- Packages / environment ----------------
+  - id: R-PKG-01
+    severity: MUST
+    detect: "library(caret) / dplyr / data.table helpers"
+    python: "Use only the packages allowed in the migration config. Replace dplyr verbs with pandas. Remove caret entirely: the split comes from the harness under R-RNG-01."
+    pitfall: "Pulling in heavy or unvetted dependencies creates supply-chain and licence risk."
+
+  # ---------------- Governance ----------------
+  - id: GOV-01
+    severity: MUST
+    detect: "protected attributes used in the R model"
+    python: "Migrate FAITHFULLY, even when the R model uses protected attributes. Never add, remove or 'fix' a feature during migration. Record every protected attribute used in the migration report so validation can assess it."
+    pitfall: "Silently 'improving' a model during migration destroys the parity proof and the audit trail."
+  - id: GOV-02
+    severity: MUST
+    detect: "ambiguity: R code the agent cannot map with confidence"
+    python: "Stop and ESCALATE with a specific question for a human. Do not guess."
+    pitfall: "A plausible-looking translation that is wrong."

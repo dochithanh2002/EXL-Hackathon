@@ -1,0 +1,99 @@
+# Model Risk Factory: every barrier, tolerance and traffic-light threshold, in ONE file.
+#
+# Governance
+#   * Owned by Model Risk Management. A change needs MRM sign-off and an entry in agent/CHANGELOG.md.
+#   * Agents read this file; they may never edit it. Its SHA-256 is recorded at intake and re-checked
+#     before packaging (guardrail G-12): a change mid-run escalates the run.
+#   * model.yaml selects a set by `model_type` (binary_pd | poisson_frequency). There are no per-model
+#     overrides, so a model owner cannot relax a threshold for their own model.
+#   * Convention for RAG pairs: `green` / `amber` are the boundaries; beyond `amber` is RED.
+#     `direction: higher_is_worse` unless stated otherwise.
+version: "1.0"
+
+# ------------------------------------------------------------------------------------------------
+# 1. Migration agent: R -> Python parity (frozen; the agent may not relax these)
+parity_tolerances:
+  coef_rel: 1.0e-6        # max relative difference of any coefficient
+  se_rel: 1.0e-6          # max relative difference of any standard error
+  pred_abs: 1.0e-8        # max absolute difference of any prediction (response scale)
+  deviance_abs: 1.0e-6    # absolute difference of the family deviance
+
+# Validator's independent parity re-check (its own code, stricter on predictions)
+validator_parity:
+  coef_abs: 1.0e-8
+  coef_rel: 1.0e-6
+  se_rel: 1.0e-6
+  pred_abs: 1.0e-10
+  deviance_abs: 1.0e-6
+  crosscheck_coef_rel: 1.0e-4   # vs an independent library fit (statsmodels / scikit-learn)
+  crosscheck_pred_abs: 1.0e-6
+
+# ------------------------------------------------------------------------------------------------
+# 2. Agent barriers (bounded loops, sandbox)
+agent_limits:
+  max_repair_iterations: 3       # G-08: migration candidates before escalation to a human
+  max_doc_iterations: 2          # documentation extracts before escalation
+  exec_timeout_s: 600            # G-06: sandboxed candidate run
+  r_capture_timeout_s: 1800      # legacy R script under the capture harness
+
+# ------------------------------------------------------------------------------------------------
+# 3. Documentation agent
+documentation:
+  significance_level: 0.05       # D-05: terms with p above this must be disclosed as non-significant
+
+# ------------------------------------------------------------------------------------------------
+# 4. Independent validation (traffic lights per area)
+validation:
+  binary_pd:
+    auc:        {green: 0.70, amber: 0.65, direction: lower_is_worse}   # test AUC
+    psi:        {green: 0.10, amber: 0.25}                             # score / characteristic stability
+    hl_p_min: 0.05               # Hosmer-Lemeshow p-value below this = calibration concern
+    cal_gap_pp: 2.0              # |mean predicted PD - observed default rate| in percentage points
+    band_test_p: 0.05            # binomial test per score band
+    stability_csi_red_capped_at_amber_if_score_psi_green: true   # a RED characteristic (CSI) with a GREEN score PSI
+                                                                 # rates stability AMBER: the score itself did not move
+    spec_linearity_p: 0.05       # specification AMBER if a linearity test on a key input rejects at this level ...
+    spec_challenger_auc_gap: 0.02  # ... or a GBM challenger beats the champion's test AUC by more than this
+    bootstrap_resamples: 1000
+  poisson_frequency:
+    ae_dev:     {green: 0.05, amber: 0.10}   # |actual / expected - 1| on the test set
+    gini_min: 0.20                           # Lorenz Gini: GREEN needs loss < null loss AND gini above this
+    max_deciles_flagged: 1                   # calibration GREEN allows at most this many mis-calibrated deciles
+    stability_psi_amber: 0.10                # PSI / CSI learn->test below this = AMBER (no time axis: never GREEN)
+    challenger_loss_gap: 0.20                # GLM loss minus GBM loss (x100) above this = specification AMBER
+    lr_test_p: 0.05                          # likelihood-ratio drop tests
+    term_significance: 0.05
+    repeated_splits: 10
+
+# ------------------------------------------------------------------------------------------------
+# 5. Fairness
+fairness:
+  binary_pd:
+    pd_cutoff: 0.50                  # policy cut-off: approve if PD below this
+    approval_rate_policy: 0.80       # second cut-off: approve this share of applicants
+    dir_min: 0.80                    # disparate impact ratio (4/5ths rule)
+    cal_gap_pp: 2.0                  # within-group calibration gap, percentage points
+    small_group_n: 200               # groups smaller than this are reported but excluded from flags
+  poisson_frequency:
+    ae_band: [0.90, 1.10]            # every age band with enough exposure must have a 95% CI touching this band
+    min_exposure: 500                # policy-years; smaller bands are reported but not rated
+    young_driver_max_age: 25
+
+# ------------------------------------------------------------------------------------------------
+# 6. Ongoing monitoring: re-validation triggers (RED in any metric raises a trigger in the inventory)
+monitoring:
+  binary_pd:
+    score_psi:            {amber: 0.10, red: 0.25}
+    max_csi:              {amber: 0.10, red: 0.25}
+    auc_drop:             {amber: 0.03, red: 0.05}     # absolute drop from validated test AUC
+    citl_pp:              {amber: 1.0,  red: 2.0}      # calibration-in-the-large gap, percentage points
+    min_dir:              {amber: 0.85, red: 0.80, direction: lower_is_worse}
+    max_group_cal_gap_pp: {amber: 1.5,  red: 2.0}
+    min_group_n: 200
+  poisson_frequency:
+    freq_psi:             {amber: 0.10, red: 0.25}
+    max_csi:              {amber: 0.10, red: 0.25}
+    ae_dev:               {amber: 0.05, red: 0.10}
+    loss_increase_rel:    {amber: 0.02, red: 0.05}
+    max_age_band_ae_dev:  {amber: 0.10, red: 0.20}
+    min_exposure: 500

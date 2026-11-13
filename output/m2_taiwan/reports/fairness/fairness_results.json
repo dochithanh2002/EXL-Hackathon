@@ -1,0 +1,2040 @@
+{
+  "model_id": "M2",
+  "timestamp_utc": "2026-11-13T16:41:45+00:00",
+  "favourable_outcome": "approved (PD < cut-off)",
+  "champion": {
+    "module": "output/m2_taiwan/model/m2_taiwan_pd.py",
+    "module_sha256": "9d9c4e58426ba49be28c637592d01d4fe421d17094e7866841be03086db63eea",
+    "manifest_module_sha256": "9d9c4e58426ba49be28c637592d01d4fe421d17094e7866841be03086db63eea",
+    "migration_status": "AWAITING_HUMAN_APPROVAL",
+    "migration_iterations": 1,
+    "human_review": null,
+    "migrated_by": "Claude Opus 5.5 (Claude Code, migration-agent)",
+    "reference_dir": "output/m2_taiwan/model/reference"
+  },
+  "variants": {
+    "A_baseline": {
+      "terms": [
+        "(Intercept)",
+        "limit_bal",
+        "sex2",
+        "education2",
+        "education3",
+        "education4",
+        "marriage2",
+        "marriage3",
+        "pay_0",
+        "pay_2",
+        "pay_3",
+        "pay_5",
+        "pay_6",
+        "pay_amt1",
+        "pay_amt2"
+      ],
+      "test_auc": 0.7402449542619647,
+      "cutoffs": {
+        "pd_0.50": 0.5,
+        "approve_80pct": 0.28772137273360776
+      },
+      "attrs": {
+        "sex_g": {
+          "pd_0.50": {
+            "summary": {
+              "disparate_impact_ratio": 0.9612436043891253,
+              "disparate_impact_ratio_excl_small": 0.9612436043891253,
+              "statistical_parity_diff": 0.03525517255605748,
+              "equal_opportunity_diff": 0.017007540851420977,
+              "equalised_odds_diff": 0.0613682092555331,
+              "auc_range": 0.03121177822368537,
+              "max_abs_cal_gap_pp": 0.746406107273137,
+              "max_abs_cal_gap_pp_excl_small": 0.746406107273137,
+              "lowest_approval_group": "Male",
+              "highest_approval_group": "Female",
+              "worst_calibrated_group": "Female",
+              "small_groups": []
+            },
+            "flags": [],
+            "table": [
+              {
+                "group": "Male",
+                "n": 3575.0,
+                "default_rate": 0.23888111888111888,
+                "approval_rate": 0.8744055944055944,
+                "approval_good_payers": 0.9470782800441014,
+                "approval_defaulters": 0.6428571428571429,
+                "bad_rate_approved": 0.17562380038387715,
+                "mean_pd": 0.24409163571787326,
+                "auc": 0.7574578243465043,
+                "cal_gap_pp": 0.5210516836754386,
+                "approval_ci_lo": 0.8631388491680506,
+                "approval_ci_hi": 0.8848685507682864,
+                "dir_vs_best": 0.9612436043891253,
+                "small_group": false
+              },
+              {
+                "group": "Female",
+                "n": 5424.0,
+                "default_rate": 0.20943952802359883,
+                "approval_rate": 0.9096607669616519,
+                "approval_good_payers": 0.9640858208955224,
+                "approval_defaulters": 0.704225352112676,
+                "bad_rate_approved": 0.16214025131738954,
+                "mean_pd": 0.20197546695086746,
+                "auc": 0.726246046122819,
+                "cal_gap_pp": -0.746406107273137,
+                "approval_ci_lo": 0.9017389018998336,
+                "approval_ci_hi": 0.9170027503989364,
+                "dir_vs_best": 1.0,
+                "small_group": false
+              }
+            ]
+          },
+          "approve_80pct": {
+            "summary": {
+              "disparate_impact_ratio": 0.9332749238339301,
+              "disparate_impact_ratio_excl_small": 0.9332749238339301,
+              "statistical_parity_diff": 0.05545660828846666,
+              "equal_opportunity_diff": 0.03956521485735598,
+              "equalised_odds_diff": 0.06366271398885115,
+              "auc_range": 0.03121177822368537,
+              "max_abs_cal_gap_pp": 0.746406107273137,
+              "max_abs_cal_gap_pp_excl_small": 0.746406107273137,
+              "lowest_approval_group": "Male",
+              "highest_approval_group": "Female",
+              "worst_calibrated_group": "Female",
+              "small_groups": []
+            },
+            "flags": [],
+            "table": [
+              {
+                "group": "Male",
+                "n": 3575.0,
+                "default_rate": 0.23888111888111888,
+                "approval_rate": 0.7756643356643357,
+                "approval_good_payers": 0.8636530687247336,
+                "approval_defaulters": 0.4953161592505855,
+                "bad_rate_approved": 0.15254237288135594,
+                "mean_pd": 0.24409163571787326,
+                "auc": 0.7574578243465043,
+                "cal_gap_pp": 0.5210516836754386,
+                "approval_ci_lo": 0.7616983011496664,
+                "approval_ci_hi": 0.789038562979777,
+                "dir_vs_best": 0.9332749238339301,
+                "small_group": false
+              },
+              {
+                "group": "Female",
+                "n": 5424.0,
+                "default_rate": 0.20943952802359883,
+                "approval_rate": 0.8311209439528023,
+                "approval_good_payers": 0.9032182835820896,
+                "approval_defaulters": 0.5589788732394366,
+                "bad_rate_approved": 0.14086069210292812,
+                "mean_pd": 0.20197546695086746,
+                "auc": 0.726246046122819,
+                "cal_gap_pp": -0.746406107273137,
+                "approval_ci_lo": 0.8209168805268517,
+                "approval_ci_hi": 0.8408563001790849,
+                "dir_vs_best": 1.0,
+                "small_group": false
+              }
+            ]
+          }
+        },
+        "age_g": {
+          "pd_0.50": {
+            "summary": {
+              "disparate_impact_ratio": 0.9482921165882487,
+              "disparate_impact_ratio_excl_small": 0.9482921165882487,
+              "statistical_parity_diff": 0.04693851676347294,
+              "equal_opportunity_diff": 0.027981709348682826,
+              "equalised_odds_diff": 0.06808097887707021,
+              "auc_range": 0.0642579990127532,
+              "max_abs_cal_gap_pp": 1.5899410249300638,
+              "max_abs_cal_gap_pp_excl_small": 1.5899410249300638,
+              "lowest_approval_group": "21-25",
+              "highest_approval_group": "26-35",
+              "worst_calibrated_group": "21-25",
+              "small_groups": []
+            },
+            "flags": [],
+            "table": [
+              {
+                "group": "21-25",
+                "n": 1164.0,
+                "default_rate": 0.2654639175257732,
+                "approval_rate": 0.8608247422680413,
+                "approval_good_payers": 0.935672514619883,
+                "approval_defaulters": 0.6537216828478964,
+                "bad_rate_approved": 0.20159680638722555,
+                "mean_pd": 0.24956450727647256,
+                "auc": 0.7364446715494237,
+                "cal_gap_pp": -1.5899410249300638,
+                "approval_ci_lo": 0.8397504441374058,
+                "approval_ci_hi": 0.8795251836532124,
+                "dir_vs_best": 0.9482921165882487,
+                "small_group": false
+              },
+              {
+                "group": "26-35",
+                "n": 3903.0,
+                "default_rate": 0.20420189597745325,
+                "approval_rate": 0.9077632590315142,
+                "approval_good_payers": 0.9626529298132647,
+                "approval_defaulters": 0.6938519447929736,
+                "bad_rate_approved": 0.15608241603161163,
+                "mean_pd": 0.20543242912024703,
+                "auc": 0.7381913906059507,
+                "cal_gap_pp": 0.12305331427937827,
+                "approval_ci_lo": 0.8982798126909954,
+                "approval_ci_hi": 0.9164447975926671,
+                "dir_vs_best": 1.0,
+                "small_group": false
+              },
+              {
+                "group": "36-45",
+                "n": 2579.0,
+                "default_rate": 0.21054672353625437,
+                "approval_rate": 0.9077161690577743,
+                "approval_good_payers": 0.9636542239685658,
+                "approval_defaulters": 0.6979742173112339,
+                "bad_rate_approved": 0.1618966253737719,
+                "mean_pd": 0.21276943469738033,
+                "auc": 0.7214783980433233,
+                "cal_gap_pp": 0.2222711161125962,
+                "approval_ci_lo": 0.8959312126405815,
+                "approval_ci_hi": 0.9182882888573037,
+                "dir_vs_best": 0.9999481252702492,
+                "small_group": false
+              },
+              {
+                "group": "46-55",
+                "n": 1110.0,
+                "default_rate": 0.2531531531531532,
+                "approval_rate": 0.8684684684684685,
+                "approval_good_payers": 0.9493365500603136,
+                "approval_defaulters": 0.6298932384341637,
+                "bad_rate_approved": 0.18360995850622408,
+                "mean_pd": 0.2396731173594124,
+                "auc": 0.7779192011985456,
+                "cal_gap_pp": -1.348003579374077,
+                "approval_ci_lo": 0.8473080982031781,
+                "approval_ci_hi": 0.8870871694901815,
+                "dir_vs_best": 0.9567125126820301,
+                "small_group": false
+              },
+              {
+                "group": "56+",
+                "n": 243.0,
+                "default_rate": 0.24691358024691357,
+                "approval_rate": 0.8641975308641975,
+                "approval_good_payers": 0.9398907103825137,
+                "approval_defaulters": 0.6333333333333333,
+                "bad_rate_approved": 0.18095238095238095,
+                "mean_pd": 0.2513462582439185,
+                "auc": 0.7136612021857924,
+                "cal_gap_pp": 0.4432677997004919,
+                "approval_ci_lo": 0.8154179829716033,
+                "approval_ci_hi": 0.9016410540788775,
+                "dir_vs_best": 0.9520076102068763,
+                "small_group": false
+              }
+            ]
+          },
+          "approve_80pct": {
+            "summary": {
+              "disparate_impact_ratio": 0.9140082742165968,
+              "disparate_impact_ratio_excl_small": 0.9140082742165968,
+              "statistical_parity_diff": 0.07120811112783987,
+              "equal_opportunity_diff": 0.045629850543938755,
+              "equalised_odds_diff": 0.08127006523573727,
+              "auc_range": 0.0642579990127532,
+              "max_abs_cal_gap_pp": 1.5899410249300638,
+              "max_abs_cal_gap_pp_excl_small": 1.5899410249300638,
+              "lowest_approval_group": "21-25",
+              "highest_approval_group": "26-35",
+              "worst_calibrated_group": "21-25",
+              "small_groups": []
+            },
+            "flags": [],
+            "table": [
+              {
+                "group": "21-25",
+                "n": 1164.0,
+                "default_rate": 0.2654639175257732,
+                "approval_rate": 0.756872852233677,
+                "approval_good_payers": 0.8526315789473684,
+                "approval_defaulters": 0.4919093851132686,
+                "bad_rate_approved": 0.17253121452894438,
+                "mean_pd": 0.24956450727647256,
+                "auc": 0.7364446715494237,
+                "cal_gap_pp": -1.5899410249300638,
+                "approval_ci_lo": 0.7314101270537446,
+                "approval_ci_hi": 0.7806456174924336,
+                "dir_vs_best": 0.9140082742165968,
+                "small_group": false
+              },
+              {
+                "group": "26-35",
+                "n": 3903.0,
+                "default_rate": 0.20420189597745325,
+                "approval_rate": 0.8280809633615168,
+                "approval_good_payers": 0.8982614294913072,
+                "approval_defaulters": 0.5545796737766625,
+                "bad_rate_approved": 0.13675742574257427,
+                "mean_pd": 0.20543242912024703,
+                "auc": 0.7381913906059507,
+                "cal_gap_pp": 0.12305331427937827,
+                "approval_ci_lo": 0.8159224162855615,
+                "approval_ci_hi": 0.8395943059690599,
+                "dir_vs_best": 1.0,
+                "small_group": false
+              },
+              {
+                "group": "36-45",
+                "n": 2579.0,
+                "default_rate": 0.21054672353625437,
+                "approval_rate": 0.8181465684373789,
+                "approval_good_payers": 0.8894891944990176,
+                "approval_defaulters": 0.5506445672191529,
+                "bad_rate_approved": 0.14170616113744075,
+                "mean_pd": 0.21276943469738033,
+                "auc": 0.7214783980433233,
+                "cal_gap_pp": 0.2222711161125962,
+                "approval_ci_lo": 0.8027899393697474,
+                "approval_ci_hi": 0.8325568043097723,
+                "dir_vs_best": 0.9880031115752134,
+                "small_group": false
+              },
+              {
+                "group": "46-55",
+                "n": 1110.0,
+                "default_rate": 0.2531531531531532,
+                "approval_rate": 0.7783783783783784,
+                "approval_good_payers": 0.8817852834740652,
+                "approval_defaulters": 0.47330960854092524,
+                "bad_rate_approved": 0.15393518518518517,
+                "mean_pd": 0.2396731173594124,
+                "auc": 0.7779192011985456,
+                "cal_gap_pp": -1.348003579374077,
+                "approval_ci_lo": 0.753007462942725,
+                "approval_ci_hi": 0.801829059593334,
+                "dir_vs_best": 0.93997859245384,
+                "small_group": false
+              },
+              {
+                "group": "56+",
+                "n": 243.0,
+                "default_rate": 0.24691358024691357,
+                "approval_rate": 0.7983539094650206,
+                "approval_good_payers": 0.8852459016393442,
+                "approval_defaulters": 0.5333333333333333,
+                "bad_rate_approved": 0.16494845360824742,
+                "mean_pd": 0.2513462582439185,
+                "auc": 0.7136612021857924,
+                "cal_gap_pp": 0.4432677997004919,
+                "approval_ci_lo": 0.7434416307493209,
+                "approval_ci_hi": 0.8439796142920336,
+                "dir_vs_best": 0.964101271238235,
+                "small_group": false
+              }
+            ]
+          }
+        },
+        "edu_g": {
+          "pd_0.50": {
+            "summary": {
+              "disparate_impact_ratio": 0.8566529492455418,
+              "disparate_impact_ratio_excl_small": 0.9160823416635913,
+              "statistical_parity_diff": 0.1433470507544582,
+              "equal_opportunity_diff": 0.06244260789715339,
+              "equalised_odds_diff": 0.38211382113821135,
+              "auc_range": 0.16844559029744677,
+              "max_abs_cal_gap_pp": 1.4397593829417528,
+              "max_abs_cal_gap_pp_excl_small": 0.5612927484788532,
+              "lowest_approval_group": "High school",
+              "highest_approval_group": "Other/unknown",
+              "worst_calibrated_group": "Other/unknown",
+              "small_groups": [
+                "Other/unknown"
+              ]
+            },
+            "flags": [],
+            "table": [
+              {
+                "group": "Graduate school",
+                "n": 3160.0,
+                "default_rate": 0.19240506329113924,
+                "approval_rate": 0.935126582278481,
+                "approval_good_payers": 0.9741379310344828,
+                "approval_defaulters": 0.7713815789473685,
+                "bad_rate_approved": 0.1587140439932318,
+                "mean_pd": 0.19052779404950548,
+                "auc": 0.7168912926909751,
+                "cal_gap_pp": -0.18772692416337555,
+                "approval_ci_lo": 0.9259994271973222,
+                "approval_ci_hi": 0.9431970584927325,
+                "dir_vs_best": 0.935126582278481,
+                "small_group": false
+              },
+              {
+                "group": "University",
+                "n": 4245.0,
+                "default_rate": 0.23627797408716136,
+                "approval_rate": 0.8763250883392226,
+                "approval_good_payers": 0.9494139420111043,
+                "approval_defaulters": 0.6400797607178464,
+                "bad_rate_approved": 0.17258064516129032,
+                "mean_pd": 0.2349155293922467,
+                "auc": 0.7490011458530024,
+                "cal_gap_pp": -0.13624446949146718,
+                "approval_ci_lo": 0.8660799209702917,
+                "approval_ci_hi": 0.8858897453029816,
+                "dir_vs_best": 0.8763250883392226,
+                "small_group": false
+              },
+              {
+                "group": "High school",
+                "n": 1458.0,
+                "default_rate": 0.25308641975308643,
+                "approval_rate": 0.8566529492455418,
+                "approval_good_payers": 0.9375573921028466,
+                "approval_defaulters": 0.6178861788617886,
+                "bad_rate_approved": 0.18254603682946358,
+                "mean_pd": 0.2474734922682979,
+                "auc": 0.7437145537662906,
+                "cal_gap_pp": -0.5612927484788532,
+                "approval_ci_lo": 0.8377272731184756,
+                "approval_ci_hi": 0.8737041158911133,
+                "dir_vs_best": 0.8566529492455418,
+                "small_group": false
+              },
+              {
+                "group": "Other/unknown",
+                "n": 136.0,
+                "default_rate": 0.07352941176470588,
+                "approval_rate": 1.0,
+                "approval_good_payers": 1.0,
+                "approval_defaulters": 1.0,
+                "bad_rate_approved": 0.07352941176470588,
+                "mean_pd": 0.05913181793528836,
+                "auc": 0.5805555555555556,
+                "cal_gap_pp": -1.4397593829417528,
+                "approval_ci_lo": 0.9725289184334275,
+                "approval_ci_hi": 0.9999999999999999,
+                "dir_vs_best": 1.0,
+                "small_group": true
+              }
+            ]
+          },
+          "approve_80pct": {
+            "summary": {
+              "disparate_impact_ratio": 0.7745567240766142,
+              "disparate_impact_ratio_excl_small": 0.9069063810329899,
+              "statistical_parity_diff": 0.22378560477689025,
+              "equal_opportunity_diff": 0.13406795224977042,
+              "equalised_odds_diff": 0.4176151761517615,
+              "auc_range": 0.16844559029744677,
+              "max_abs_cal_gap_pp": 1.4397593829417528,
+              "max_abs_cal_gap_pp_excl_small": 0.5612927484788532,
+              "lowest_approval_group": "High school",
+              "highest_approval_group": "Other/unknown",
+              "worst_calibrated_group": "Other/unknown",
+              "small_groups": [
+                "Other/unknown"
+              ]
+            },
+            "flags": [],
+            "table": [
+              {
+                "group": "Graduate school",
+                "n": 3160.0,
+                "default_rate": 0.19240506329113924,
+                "approval_rate": 0.8477848101265822,
+                "approval_good_payers": 0.9020376175548589,
+                "approval_defaulters": 0.6200657894736842,
+                "bad_rate_approved": 0.14072415080253825,
+                "mean_pd": 0.19052779404950548,
+                "auc": 0.7168912926909751,
+                "cal_gap_pp": -0.18772692416337555,
+                "approval_ci_lo": 0.8348378177165305,
+                "approval_ci_hi": 0.8598872279368295,
+                "dir_vs_best": 0.8540646976090014,
+                "small_group": false
+              },
+              {
+                "group": "University",
+                "n": 4245.0,
+                "default_rate": 0.23627797408716136,
+                "approval_rate": 0.7882214369846878,
+                "approval_good_payers": 0.8797038864898211,
+                "approval_defaulters": 0.49252243270189433,
+                "bad_rate_approved": 0.14763897190675435,
+                "mean_pd": 0.2349155293922467,
+                "auc": 0.7490011458530024,
+                "cal_gap_pp": -0.13624446949146718,
+                "approval_ci_lo": 0.7756727729590909,
+                "approval_ci_hi": 0.8002489088470748,
+                "dir_vs_best": 0.7940601142956855,
+                "small_group": false
+              },
+              {
+                "group": "High school",
+                "n": 1458.0,
+                "default_rate": 0.25308641975308643,
+                "approval_rate": 0.7688614540466392,
+                "approval_good_payers": 0.8659320477502296,
+                "approval_defaulters": 0.4823848238482385,
+                "bad_rate_approved": 0.15878679750223015,
+                "mean_pd": 0.2474734922682979,
+                "auc": 0.7437145537662906,
+                "cal_gap_pp": -0.5612927484788532,
+                "approval_ci_lo": 0.7465327949696263,
+                "approval_ci_hi": 0.7897770213606792,
+                "dir_vs_best": 0.7745567240766142,
+                "small_group": false
+              },
+              {
+                "group": "Other/unknown",
+                "n": 136.0,
+                "default_rate": 0.07352941176470588,
+                "approval_rate": 0.9926470588235294,
+                "approval_good_payers": 1.0,
+                "approval_defaulters": 0.9,
+                "bad_rate_approved": 0.06666666666666667,
+                "mean_pd": 0.05913181793528836,
+                "auc": 0.5805555555555556,
+                "cal_gap_pp": -1.4397593829417528,
+                "approval_ci_lo": 0.9595261451733299,
+                "approval_ci_hi": 0.9987008774007824,
+                "dir_vs_best": 1.0,
+                "small_group": true
+              }
+            ]
+          }
+        },
+        "mar_g": {
+          "pd_0.50": {
+            "summary": {
+              "disparate_impact_ratio": 0.9722163365987737,
+              "disparate_impact_ratio_excl_small": 0.9722163365987737,
+              "statistical_parity_diff": 0.0252081143468198,
+              "equal_opportunity_diff": 0.012031999311842734,
+              "equalised_odds_diff": 0.06857699805068229,
+              "auc_range": 0.018128788016552266,
+              "max_abs_cal_gap_pp": 2.1251969441169,
+              "max_abs_cal_gap_pp_excl_small": 0.9604353628263479,
+              "lowest_approval_group": "Married",
+              "highest_approval_group": "Single",
+              "worst_calibrated_group": "Other",
+              "small_groups": [
+                "Other"
+              ]
+            },
+            "flags": [],
+            "table": [
+              {
+                "group": "Married",
+                "n": 4054.0,
+                "default_rate": 0.23162308830784412,
+                "approval_rate": 0.882091761223483,
+                "approval_good_payers": 0.9534510433386838,
+                "approval_defaulters": 0.645367412140575,
+                "bad_rate_approved": 0.16946308724832215,
+                "mean_pd": 0.2370105405493648,
+                "auc": 0.7505453874122432,
+                "cal_gap_pp": 0.5387452241520679,
+                "approval_ci_lo": 0.8718005657653749,
+                "approval_ci_hi": 0.8916594963523776,
+                "dir_vs_best": 0.9722163365987737,
+                "small_group": false
+              },
+              {
+                "group": "Single",
+                "n": 4822.0,
+                "default_rate": 0.21277478224802987,
+                "approval_rate": 0.9072998755703028,
+                "approval_good_payers": 0.9610115911485775,
+                "approval_defaulters": 0.7085769980506823,
+                "bad_rate_approved": 0.16617142857142858,
+                "mean_pd": 0.2031704286197664,
+                "auc": 0.7324165993956909,
+                "cal_gap_pp": -0.9604353628263479,
+                "approval_ci_lo": 0.898786740941146,
+                "approval_ci_hi": 0.9151645499590776,
+                "dir_vs_best": 1.0,
+                "small_group": false
+              },
+              {
+                "group": "Other",
+                "n": 123.0,
+                "default_rate": 0.2032520325203252,
+                "approval_rate": 0.8861788617886179,
+                "approval_good_payers": 0.9489795918367347,
+                "approval_defaulters": 0.64,
+                "bad_rate_approved": 0.14678899082568808,
+                "mean_pd": 0.2245040019614942,
+                "auc": 0.7469387755102042,
+                "cal_gap_pp": 2.1251969441169,
+                "approval_ci_lo": 0.8179878504398732,
+                "approval_ci_hi": 0.9309777885933779,
+                "dir_vs_best": 0.9767210220673636,
+                "small_group": true
+              }
+            ]
+          },
+          "approve_80pct": {
+            "summary": {
+              "disparate_impact_ratio": 0.9513155957589332,
+              "disparate_impact_ratio_excl_small": 0.9513155957589332,
+              "statistical_parity_diff": 0.040294371075507596,
+              "equal_opportunity_diff": 0.021703677267783772,
+              "equalised_odds_diff": 0.08822612085769987,
+              "auc_range": 0.018128788016552266,
+              "max_abs_cal_gap_pp": 2.1251969441169,
+              "max_abs_cal_gap_pp_excl_small": 0.9604353628263479,
+              "lowest_approval_group": "Married",
+              "highest_approval_group": "Single",
+              "worst_calibrated_group": "Other",
+              "small_groups": [
+                "Other"
+              ]
+            },
+            "flags": [],
+            "table": [
+              {
+                "group": "Married",
+                "n": 4054.0,
+                "default_rate": 0.23162308830784412,
+                "approval_rate": 0.7873704982733103,
+                "approval_good_payers": 0.8760834670947031,
+                "approval_defaulters": 0.49307774227902024,
+                "bad_rate_approved": 0.1450501253132832,
+                "mean_pd": 0.2370105405493648,
+                "auc": 0.7505453874122432,
+                "cal_gap_pp": 0.5387452241520679,
+                "approval_ci_lo": 0.7745059626710913,
+                "approval_ci_hi": 0.7996909207163725,
+                "dir_vs_best": 0.9513155957589332,
+                "small_group": false
+              },
+              {
+                "group": "Single",
+                "n": 4822.0,
+                "default_rate": 0.21277478224802987,
+                "approval_rate": 0.8276648693488179,
+                "approval_good_payers": 0.8977871443624869,
+                "approval_defaulters": 0.5682261208576999,
+                "bad_rate_approved": 0.14607867702330243,
+                "mean_pd": 0.2031704286197664,
+                "auc": 0.7324165993956909,
+                "cal_gap_pp": -0.9604353628263479,
+                "approval_ci_lo": 0.8167450981987956,
+                "approval_ci_hi": 0.8380629667820358,
+                "dir_vs_best": 1.0,
+                "small_group": false
+              },
+              {
+                "group": "Other",
+                "n": 123.0,
+                "default_rate": 0.2032520325203252,
+                "approval_rate": 0.7967479674796748,
+                "approval_good_payers": 0.8775510204081632,
+                "approval_defaulters": 0.48,
+                "bad_rate_approved": 0.12244897959183673,
+                "mean_pd": 0.2245040019614942,
+                "auc": 0.7469387755102042,
+                "cal_gap_pp": 2.1251969441169,
+                "approval_ci_lo": 0.7171530793084262,
+                "approval_ci_hi": 0.8583678854223877,
+                "dir_vs_best": 0.9626456274585297,
+                "small_group": true
+              }
+            ]
+          }
+        }
+      }
+    },
+    "B_no_sex_marriage": {
+      "terms": [
+        "(Intercept)",
+        "limit_bal",
+        "education2",
+        "education3",
+        "education4",
+        "pay_0",
+        "pay_2",
+        "pay_3",
+        "pay_5",
+        "pay_6",
+        "pay_amt1",
+        "pay_amt2"
+      ],
+      "test_auc": 0.7417461110661024,
+      "cutoffs": {
+        "pd_0.50": 0.5,
+        "approve_80pct": 0.2909808988253633
+      },
+      "attrs": {
+        "sex_g": {
+          "pd_0.50": {
+            "summary": {
+              "disparate_impact_ratio": 0.9776909365144659,
+              "disparate_impact_ratio_excl_small": 0.9776909365144659,
+              "statistical_parity_diff": 0.020137384739154607,
+              "equal_opportunity_diff": 0.007862424372075627,
+              "equalised_odds_diff": 0.025018966256555752,
+              "auc_range": 0.025819309522163825,
+              "max_abs_cal_gap_pp": 0.8108559786994873,
+              "max_abs_cal_gap_pp_excl_small": 0.8108559786994873,
+              "lowest_approval_group": "Male",
+              "highest_approval_group": "Female",
+              "worst_calibrated_group": "Male",
+              "small_groups": []
+            },
+            "flags": [],
+            "table": [
+              {
+                "group": "Male",
+                "n": 3575.0,
+                "default_rate": 0.23888111888111888,
+                "approval_rate": 0.8825174825174825,
+                "approval_good_payers": 0.9529584711503124,
+                "approval_defaulters": 0.65807962529274,
+                "bad_rate_approved": 0.17812995245641838,
+                "mean_pd": 0.230772559094124,
+                "auc": 0.7557250528674969,
+                "cal_gap_pp": -0.8108559786994873,
+                "approval_ci_lo": 0.8715493629968454,
+                "approval_ci_hi": 0.8926643982380749,
+                "dir_vs_best": 0.9776909365144659,
+                "small_group": false
+              },
+              {
+                "group": "Female",
+                "n": 5424.0,
+                "default_rate": 0.20943952802359883,
+                "approval_rate": 0.9026548672566371,
+                "approval_good_payers": 0.960820895522388,
+                "approval_defaulters": 0.6830985915492958,
+                "bad_rate_approved": 0.15849673202614378,
+                "mean_pd": 0.21105185810818355,
+                "auc": 0.7299057433453331,
+                "cal_gap_pp": 0.16123300845847233,
+                "approval_ci_lo": 0.8944786701378272,
+                "approval_ci_hi": 0.9102610997183896,
+                "dir_vs_best": 1.0,
+                "small_group": false
+              }
+            ]
+          },
+          "approve_80pct": {
+            "summary": {
+              "disparate_impact_ratio": 0.9573956043956044,
+              "disparate_impact_ratio_excl_small": 0.9573956043956044,
+              "statistical_parity_diff": 0.035189471295665964,
+              "equal_opportunity_diff": 0.020872072931922503,
+              "equalised_odds_diff": 0.03877362535870965,
+              "auc_range": 0.025819309522163825,
+              "max_abs_cal_gap_pp": 0.8108559786994873,
+              "max_abs_cal_gap_pp_excl_small": 0.8108559786994873,
+              "lowest_approval_group": "Male",
+              "highest_approval_group": "Female",
+              "worst_calibrated_group": "Male",
+              "small_groups": []
+            },
+            "flags": [],
+            "table": [
+              {
+                "group": "Male",
+                "n": 3575.0,
+                "default_rate": 0.23888111888111888,
+                "approval_rate": 0.7907692307692308,
+                "approval_good_payers": 0.87651598676957,
+                "approval_defaulters": 0.5175644028103045,
+                "bad_rate_approved": 0.1563494870887867,
+                "mean_pd": 0.230772559094124,
+                "auc": 0.7557250528674969,
+                "cal_gap_pp": -0.8108559786994873,
+                "approval_ci_lo": 0.7771267628371511,
+                "approval_ci_hi": 0.803787463710344,
+                "dir_vs_best": 0.9573956043956044,
+                "small_group": false
+              },
+              {
+                "group": "Female",
+                "n": 5424.0,
+                "default_rate": 0.20943952802359883,
+                "approval_rate": 0.8259587020648967,
+                "approval_good_payers": 0.8973880597014925,
+                "approval_defaulters": 0.5563380281690141,
+                "bad_rate_approved": 0.14107142857142857,
+                "mean_pd": 0.21105185810818355,
+                "auc": 0.7299057433453331,
+                "cal_gap_pp": 0.16123300845847233,
+                "approval_ci_lo": 0.8156386941817723,
+                "approval_ci_hi": 0.8358173099875462,
+                "dir_vs_best": 1.0,
+                "small_group": false
+              }
+            ]
+          }
+        },
+        "age_g": {
+          "pd_0.50": {
+            "summary": {
+              "disparate_impact_ratio": 0.9348833062190396,
+              "disparate_impact_ratio_excl_small": 0.9348833062190396,
+              "statistical_parity_diff": 0.05935996397015819,
+              "equal_opportunity_diff": 0.03541975436298661,
+              "equalised_odds_diff": 0.0705894973984873,
+              "auc_range": 0.06584613148240948,
+              "max_abs_cal_gap_pp": 2.3275721891107355,
+              "max_abs_cal_gap_pp_excl_small": 2.3275721891107355,
+              "lowest_approval_group": "21-25",
+              "highest_approval_group": "36-45",
+              "worst_calibrated_group": "46-55",
+              "small_groups": []
+            },
+            "flags": [
+              "calibration gap 2.3pp > 2.0pp (46-55)"
+            ],
+            "table": [
+              {
+                "group": "21-25",
+                "n": 1164.0,
+                "default_rate": 0.2654639175257732,
+                "approval_rate": 0.852233676975945,
+                "approval_good_payers": 0.9321637426900585,
+                "approval_defaulters": 0.6310679611650486,
+                "bad_rate_approved": 0.19657258064516128,
+                "mean_pd": 0.26403424279693977,
+                "auc": 0.7385624254811788,
+                "cal_gap_pp": -0.142967472883343,
+                "approval_ci_lo": 0.830688926247591,
+                "approval_ci_hi": 0.8714610913575361,
+                "dir_vs_best": 0.9348833062190396,
+                "small_group": false
+              },
+              {
+                "group": "26-35",
+                "n": 3903.0,
+                "default_rate": 0.20420189597745325,
+                "approval_rate": 0.9034076351524468,
+                "approval_good_payers": 0.9613650998068255,
+                "approval_defaulters": 0.6775407779171895,
+                "bad_rate_approved": 0.15314804310833807,
+                "mean_pd": 0.2098885663182516,
+                "auc": 0.7394929553113292,
+                "cal_gap_pp": 0.5686670340798339,
+                "approval_ci_lo": 0.893739372755179,
+                "approval_ci_hi": 0.9122825555461886,
+                "dir_vs_best": 0.9910201152948364,
+                "small_group": false
+              },
+              {
+                "group": "36-45",
+                "n": 2579.0,
+                "default_rate": 0.21054672353625437,
+                "approval_rate": 0.9115936409461032,
+                "approval_good_payers": 0.9675834970530451,
+                "approval_defaulters": 0.7016574585635359,
+                "bad_rate_approved": 0.1620586984262016,
+                "mean_pd": 0.2055432780864579,
+                "auc": 0.7263054159566116,
+                "cal_gap_pp": -0.5003445449796473,
+                "approval_ci_lo": 0.9000159805447754,
+                "approval_ci_hi": 0.9219469303824763,
+                "dir_vs_best": 1.0,
+                "small_group": false
+              },
+              {
+                "group": "46-55",
+                "n": 1110.0,
+                "default_rate": 0.2531531531531532,
+                "approval_rate": 0.8747747747747747,
+                "approval_good_payers": 0.9517490952955368,
+                "approval_defaulters": 0.6476868327402135,
+                "bad_rate_approved": 0.1874356333676622,
+                "mean_pd": 0.22987743126204582,
+                "auc": 0.7757277343967992,
+                "cal_gap_pp": -2.3275721891107355,
+                "approval_ci_lo": 0.8540018492037544,
+                "approval_ci_hi": 0.8929625306506161,
+                "dir_vs_best": 0.9596104398741574,
+                "small_group": false
+              },
+              {
+                "group": "56+",
+                "n": 243.0,
+                "default_rate": 0.24691358024691357,
+                "approval_rate": 0.8683127572016461,
+                "approval_good_payers": 0.9344262295081968,
+                "approval_defaulters": 0.6666666666666666,
+                "bad_rate_approved": 0.1895734597156398,
+                "mean_pd": 0.2385439559615695,
+                "auc": 0.7098816029143897,
+                "cal_gap_pp": -0.8369624285344074,
+                "approval_ci_lo": 0.8200081643561761,
+                "approval_ci_hi": 0.9051532346948754,
+                "dir_vs_best": 0.9525217357818142,
+                "small_group": false
+              }
+            ]
+          },
+          "approve_80pct": {
+            "summary": {
+              "disparate_impact_ratio": 0.8944985215376009,
+              "disparate_impact_ratio_excl_small": 0.8944985215376009,
+              "statistical_parity_diff": 0.08795198863674214,
+              "equal_opportunity_diff": 0.058189432323441315,
+              "equalised_odds_diff": 0.10482933719537268,
+              "auc_range": 0.06584613148240948,
+              "max_abs_cal_gap_pp": 2.3275721891107355,
+              "max_abs_cal_gap_pp_excl_small": 2.3275721891107355,
+              "lowest_approval_group": "21-25",
+              "highest_approval_group": "36-45",
+              "worst_calibrated_group": "46-55",
+              "small_groups": []
+            },
+            "flags": [
+              "calibration gap 2.3pp > 2.0pp (46-55)"
+            ],
+            "table": [
+              {
+                "group": "21-25",
+                "n": 1164.0,
+                "default_rate": 0.2654639175257732,
+                "approval_rate": 0.7457044673539519,
+                "approval_good_payers": 0.8421052631578947,
+                "approval_defaulters": 0.47896440129449835,
+                "bad_rate_approved": 0.17050691244239632,
+                "mean_pd": 0.26403424279693977,
+                "auc": 0.7385624254811788,
+                "cal_gap_pp": -0.142967472883343,
+                "approval_ci_lo": 0.7199074990140609,
+                "approval_ci_hi": 0.7698849522909791,
+                "dir_vs_best": 0.8944985215376009,
+                "small_group": false
+              },
+              {
+                "group": "26-35",
+                "n": 3903.0,
+                "default_rate": 0.20420189597745325,
+                "approval_rate": 0.8229566999743787,
+                "approval_good_payers": 0.8934320669671604,
+                "approval_defaulters": 0.548306148055207,
+                "bad_rate_approved": 0.13605230386052303,
+                "mean_pd": 0.2098885663182516,
+                "auc": 0.7394929553113292,
+                "cal_gap_pp": 0.5686670340798339,
+                "approval_ci_lo": 0.8106655512231256,
+                "approval_ci_hi": 0.8346127216405606,
+                "dir_vs_best": 0.9871652694111268,
+                "small_group": false
+              },
+              {
+                "group": "36-45",
+                "n": 2579.0,
+                "default_rate": 0.21054672353625437,
+                "approval_rate": 0.833656455990694,
+                "approval_good_payers": 0.900294695481336,
+                "approval_defaulters": 0.583793738489871,
+                "bad_rate_approved": 0.1474418604651163,
+                "mean_pd": 0.2055432780864579,
+                "auc": 0.7263054159566116,
+                "cal_gap_pp": -0.5003445449796473,
+                "approval_ci_lo": 0.8187899895373631,
+                "approval_ci_hi": 0.8475303918596222,
+                "dir_vs_best": 1.0,
+                "small_group": false
+              },
+              {
+                "group": "46-55",
+                "n": 1110.0,
+                "default_rate": 0.2531531531531532,
+                "approval_rate": 0.7936936936936937,
+                "approval_good_payers": 0.8950542822677925,
+                "approval_defaulters": 0.49466192170818507,
+                "bad_rate_approved": 0.15777525539160045,
+                "mean_pd": 0.22987743126204582,
+                "auc": 0.7757277343967992,
+                "cal_gap_pp": -2.3275721891107355,
+                "approval_ci_lo": 0.7688947646584088,
+                "approval_ci_hi": 0.8164667445543912,
+                "dir_vs_best": 0.9520632725749005,
+                "small_group": false
+              },
+              {
+                "group": "56+",
+                "n": 243.0,
+                "default_rate": 0.24691358024691357,
+                "approval_rate": 0.8065843621399177,
+                "approval_good_payers": 0.8907103825136612,
+                "approval_defaulters": 0.55,
+                "bad_rate_approved": 0.1683673469387755,
+                "mean_pd": 0.2385439559615695,
+                "auc": 0.7098816029143897,
+                "cal_gap_pp": -0.8369624285344074,
+                "approval_ci_lo": 0.752308535091876,
+                "approval_ci_hi": 0.8513174339506192,
+                "dir_vs_best": 0.9675260790506268,
+                "small_group": false
+              }
+            ]
+          }
+        },
+        "edu_g": {
+          "pd_0.50": {
+            "summary": {
+              "disparate_impact_ratio": 0.8545953360768176,
+              "disparate_impact_ratio_excl_small": 0.9132638694632207,
+              "statistical_parity_diff": 0.1454046639231824,
+              "equal_opportunity_diff": 0.06519742883379243,
+              "equalised_odds_diff": 0.38211382113821135,
+              "auc_range": 0.13596715606048482,
+              "max_abs_cal_gap_pp": 1.2843486138415918,
+              "max_abs_cal_gap_pp_excl_small": 0.600337637047324,
+              "lowest_approval_group": "High school",
+              "highest_approval_group": "Other/unknown",
+              "worst_calibrated_group": "Other/unknown",
+              "small_groups": [
+                "Other/unknown"
+              ]
+            },
+            "flags": [],
+            "table": [
+              {
+                "group": "Graduate school",
+                "n": 3160.0,
+                "default_rate": 0.19240506329113924,
+                "approval_rate": 0.9357594936708861,
+                "approval_good_payers": 0.9749216300940439,
+                "approval_defaulters": 0.7713815789473685,
+                "bad_rate_approved": 0.158606695975651,
+                "mean_pd": 0.19045783775700387,
+                "auc": 0.7169792654883683,
+                "cal_gap_pp": -0.19472255341353717,
+                "approval_ci_lo": 0.9266705275262249,
+                "approval_ci_hi": 0.9437902439611973,
+                "dir_vs_best": 0.9357594936708861,
+                "small_group": false
+              },
+              {
+                "group": "University",
+                "n": 4245.0,
+                "default_rate": 0.23627797408716136,
+                "approval_rate": 0.8744405182567727,
+                "approval_good_payers": 0.9503392967304133,
+                "approval_defaulters": 0.6291126620139581,
+                "bad_rate_approved": 0.16998922413793102,
+                "mean_pd": 0.23543228426174873,
+                "auc": 0.75104652113985,
+                "cal_gap_pp": -0.08456898254126377,
+                "approval_ci_lo": 0.8641327450200715,
+                "approval_ci_hi": 0.8840711889651354,
+                "dir_vs_best": 0.8744405182567727,
+                "small_group": false
+              },
+              {
+                "group": "High school",
+                "n": 1458.0,
+                "default_rate": 0.25308641975308643,
+                "approval_rate": 0.8545953360768176,
+                "approval_good_payers": 0.9348025711662076,
+                "approval_defaulters": 0.6178861788617886,
+                "bad_rate_approved": 0.18298555377207062,
+                "mean_pd": 0.2470830433826132,
+                "auc": 0.7430227378490497,
+                "cal_gap_pp": -0.600337637047324,
+                "approval_ci_lo": 0.8355687631921986,
+                "approval_ci_hi": 0.8717582139577196,
+                "dir_vs_best": 0.8545953360768176,
+                "small_group": false
+              },
+              {
+                "group": "Other/unknown",
+                "n": 136.0,
+                "default_rate": 0.07352941176470588,
+                "approval_rate": 1.0,
+                "approval_good_payers": 1.0,
+                "approval_defaulters": 1.0,
+                "bad_rate_approved": 0.07352941176470588,
+                "mean_pd": 0.060685925626289966,
+                "auc": 0.6150793650793652,
+                "cal_gap_pp": -1.2843486138415918,
+                "approval_ci_lo": 0.9725289184334275,
+                "approval_ci_hi": 0.9999999999999999,
+                "dir_vs_best": 1.0,
+                "small_group": true
+              }
+            ]
+          },
+          "approve_80pct": {
+            "summary": {
+              "disparate_impact_ratio": 0.7752476756591983,
+              "disparate_impact_ratio_excl_small": 0.8989905905083561,
+              "statistical_parity_diff": 0.22309973372064873,
+              "equal_opportunity_diff": 0.13498622589531684,
+              "equalised_odds_diff": 0.41219512195121955,
+              "auc_range": 0.13596715606048482,
+              "max_abs_cal_gap_pp": 1.2843486138415918,
+              "max_abs_cal_gap_pp_excl_small": 0.600337637047324,
+              "lowest_approval_group": "High school",
+              "highest_approval_group": "Other/unknown",
+              "worst_calibrated_group": "Other/unknown",
+              "small_groups": [
+                "Other/unknown"
+              ]
+            },
+            "flags": [],
+            "table": [
+              {
+                "group": "Graduate school",
+                "n": 3160.0,
+                "default_rate": 0.19240506329113924,
+                "approval_rate": 0.8560126582278481,
+                "approval_good_payers": 0.908307210031348,
+                "approval_defaulters": 0.6365131578947368,
+                "bad_rate_approved": 0.1430683918669131,
+                "mean_pd": 0.19045783775700387,
+                "auc": 0.7169792654883683,
+                "cal_gap_pp": -0.19472255341353717,
+                "approval_ci_lo": 0.8433392390433481,
+                "approval_ci_hi": 0.8678215219757877,
+                "dir_vs_best": 0.8623534927332396,
+                "small_group": false
+              },
+              {
+                "group": "University",
+                "n": 4245.0,
+                "default_rate": 0.23627797408716136,
+                "approval_rate": 0.7879858657243817,
+                "approval_good_payers": 0.878161628624306,
+                "approval_defaulters": 0.4965104685942173,
+                "bad_rate_approved": 0.14887892376681613,
+                "mean_pd": 0.23543228426174873,
+                "auc": 0.75104652113985,
+                "cal_gap_pp": -0.08456898254126377,
+                "approval_ci_lo": 0.7754324264425979,
+                "approval_ci_hi": 0.8000185388275597,
+                "dir_vs_best": 0.7938227980630808,
+                "small_group": false
+              },
+              {
+                "group": "High school",
+                "n": 1458.0,
+                "default_rate": 0.25308641975308643,
+                "approval_rate": 0.7695473251028807,
+                "approval_good_payers": 0.8650137741046832,
+                "approval_defaulters": 0.4878048780487805,
+                "bad_rate_approved": 0.16042780748663102,
+                "mean_pd": 0.2470830433826132,
+                "auc": 0.7430227378490497,
+                "cal_gap_pp": -0.600337637047324,
+                "approval_ci_lo": 0.7472392570347666,
+                "approval_ci_hi": 0.790438696582096,
+                "dir_vs_best": 0.7752476756591983,
+                "small_group": false
+              },
+              {
+                "group": "Other/unknown",
+                "n": 136.0,
+                "default_rate": 0.07352941176470588,
+                "approval_rate": 0.9926470588235294,
+                "approval_good_payers": 1.0,
+                "approval_defaulters": 0.9,
+                "bad_rate_approved": 0.06666666666666667,
+                "mean_pd": 0.060685925626289966,
+                "auc": 0.6150793650793652,
+                "cal_gap_pp": -1.2843486138415918,
+                "approval_ci_lo": 0.9595261451733299,
+                "approval_ci_hi": 0.9987008774007824,
+                "dir_vs_best": 1.0,
+                "small_group": true
+              }
+            ]
+          }
+        },
+        "mar_g": {
+          "pd_0.50": {
+            "summary": {
+              "disparate_impact_ratio": 0.9909275336967558,
+              "disparate_impact_ratio_excl_small": 0.9909275336967558,
+              "statistical_parity_diff": 0.00815054417786265,
+              "equal_opportunity_diff": 0.010570969961018029,
+              "equalised_odds_diff": 0.02295897713755457,
+              "auc_range": 0.015810225821298096,
+              "max_abs_cal_gap_pp": 1.8235056083849206,
+              "max_abs_cal_gap_pp_excl_small": 1.1710304109346232,
+              "lowest_approval_group": "Married",
+              "highest_approval_group": "Single",
+              "worst_calibrated_group": "Other",
+              "small_groups": [
+                "Other"
+              ]
+            },
+            "flags": [],
+            "table": [
+              {
+                "group": "Married",
+                "n": 4054.0,
+                "default_rate": 0.23162308830784412,
+                "approval_rate": 0.8902318697582634,
+                "approval_good_payers": 0.9595505617977528,
+                "approval_defaulters": 0.6602768903088392,
+                "bad_rate_approved": 0.171792740371294,
+                "mean_pd": 0.21991278419849788,
+                "auc": 0.7489140969953691,
+                "cal_gap_pp": -1.1710304109346232,
+                "approval_ci_lo": 0.8802370429033178,
+                "approval_ci_hi": 0.8994878236365688,
+                "dir_vs_best": 0.9909275336967558,
+                "small_group": false
+              },
+              {
+                "group": "Single",
+                "n": 4822.0,
+                "default_rate": 0.21277478224802987,
+                "approval_rate": 0.8983824139361261,
+                "approval_good_payers": 0.9565331928345627,
+                "approval_defaulters": 0.6832358674463938,
+                "bad_rate_approved": 0.1618190212373038,
+                "mean_pd": 0.2179568307966108,
+                "auc": 0.7360265088725795,
+                "cal_gap_pp": 0.5182048548580925,
+                "approval_ci_lo": 0.8895345779437221,
+                "approval_ci_hi": 0.9065959871374029,
+                "dir_vs_best": 1.0,
+                "small_group": false
+              },
+              {
+                "group": "Other",
+                "n": 123.0,
+                "default_rate": 0.2032520325203252,
+                "approval_rate": 0.8943089430894309,
+                "approval_good_payers": 0.9489795918367347,
+                "approval_defaulters": 0.68,
+                "bad_rate_approved": 0.15454545454545454,
+                "mean_pd": 0.2214870886041744,
+                "auc": 0.7518367346938776,
+                "cal_gap_pp": 1.8235056083849206,
+                "approval_ci_lo": 0.827545863784844,
+                "approval_ci_hi": 0.9371874729122648,
+                "dir_vs_best": 0.9954657718322336,
+                "small_group": true
+              }
+            ]
+          },
+          "approve_80pct": {
+            "summary": {
+              "disparate_impact_ratio": 0.9785834689727437,
+              "disparate_impact_ratio_excl_small": 0.9946357138387248,
+              "statistical_parity_diff": 0.01743701800352715,
+              "equal_opportunity_diff": 0.0171520293510663,
+              "equalised_odds_diff": 0.07165692007797275,
+              "auc_range": 0.015810225821298096,
+              "max_abs_cal_gap_pp": 1.8235056083849206,
+              "max_abs_cal_gap_pp_excl_small": 1.1710304109346232,
+              "lowest_approval_group": "Other",
+              "highest_approval_group": "Single",
+              "worst_calibrated_group": "Other",
+              "small_groups": [
+                "Other"
+              ]
+            },
+            "flags": [],
+            "table": [
+              {
+                "group": "Married",
+                "n": 4054.0,
+                "default_rate": 0.23162308830784412,
+                "approval_rate": 0.8098174642328564,
+                "approval_good_payers": 0.8947030497592295,
+                "approval_defaulters": 0.5282215122470714,
+                "bad_rate_approved": 0.1510813280536095,
+                "mean_pd": 0.21991278419849788,
+                "auc": 0.7489140969953691,
+                "cal_gap_pp": -1.1710304109346232,
+                "approval_ci_lo": 0.797445587535658,
+                "approval_ci_hi": 0.821602726227994,
+                "dir_vs_best": 0.9946357138387248,
+                "small_group": false
+              },
+              {
+                "group": "Single",
+                "n": 4822.0,
+                "default_rate": 0.21277478224802987,
+                "approval_rate": 0.814184985483202,
+                "approval_good_payers": 0.8851422550052687,
+                "approval_defaulters": 0.5516569200779727,
+                "bad_rate_approved": 0.14416709118695872,
+                "mean_pd": 0.2179568307966108,
+                "auc": 0.7360265088725795,
+                "cal_gap_pp": 0.5182048548580925,
+                "approval_ci_lo": 0.8029578645898323,
+                "approval_ci_hi": 0.8249118939202689,
+                "dir_vs_best": 1.0,
+                "small_group": false
+              },
+              {
+                "group": "Other",
+                "n": 123.0,
+                "default_rate": 0.2032520325203252,
+                "approval_rate": 0.7967479674796748,
+                "approval_good_payers": 0.8775510204081632,
+                "approval_defaulters": 0.48,
+                "bad_rate_approved": 0.12244897959183673,
+                "mean_pd": 0.2214870886041744,
+                "auc": 0.7518367346938776,
+                "cal_gap_pp": 1.8235056083849206,
+                "approval_ci_lo": 0.7171530793084262,
+                "approval_ci_hi": 0.8583678854223877,
+                "dir_vs_best": 0.9785834689727437,
+                "small_group": true
+              }
+            ]
+          }
+        }
+      }
+    },
+    "C_no_sex_marriage_education": {
+      "terms": [
+        "(Intercept)",
+        "limit_bal",
+        "pay_0",
+        "pay_2",
+        "pay_3",
+        "pay_5",
+        "pay_6",
+        "pay_amt1",
+        "pay_amt2"
+      ],
+      "test_auc": 0.7400285060629155,
+      "cutoffs": {
+        "pd_0.50": 0.5,
+        "approve_80pct": 0.2897227976359111
+      },
+      "attrs": {
+        "sex_g": {
+          "pd_0.50": {
+            "summary": {
+              "disparate_impact_ratio": 0.9776909365144659,
+              "disparate_impact_ratio_excl_small": 0.9776909365144659,
+              "statistical_parity_diff": 0.020137384739154607,
+              "equal_opportunity_diff": 0.007629215416851798,
+              "equalised_odds_diff": 0.025899247946696624,
+              "auc_range": 0.02694549006049718,
+              "max_abs_cal_gap_pp": 0.8573380302787481,
+              "max_abs_cal_gap_pp_excl_small": 0.8573380302787481,
+              "lowest_approval_group": "Male",
+              "highest_approval_group": "Female",
+              "worst_calibrated_group": "Male",
+              "small_groups": []
+            },
+            "flags": [],
+            "table": [
+              {
+                "group": "Male",
+                "n": 3575.0,
+                "default_rate": 0.23888111888111888,
+                "approval_rate": 0.8825174825174825,
+                "approval_good_payers": 0.9529584711503124,
+                "approval_defaulters": 0.65807962529274,
+                "bad_rate_approved": 0.17812995245641838,
+                "mean_pd": 0.2303077385783314,
+                "auc": 0.7546223018641549,
+                "cal_gap_pp": -0.8573380302787481,
+                "approval_ci_lo": 0.8715493629968454,
+                "approval_ci_hi": 0.8926643982380749,
+                "dir_vs_best": 0.9776909365144659,
+                "small_group": false
+              },
+              {
+                "group": "Female",
+                "n": 5424.0,
+                "default_rate": 0.20943952802359883,
+                "approval_rate": 0.9026548672566371,
+                "approval_good_payers": 0.9605876865671642,
+                "approval_defaulters": 0.6839788732394366,
+                "bad_rate_approved": 0.15870098039215685,
+                "mean_pd": 0.21115190743690784,
+                "auc": 0.7276768118036577,
+                "cal_gap_pp": 0.1712379413309012,
+                "approval_ci_lo": 0.8944786701378272,
+                "approval_ci_hi": 0.9102610997183896,
+                "dir_vs_best": 1.0,
+                "small_group": false
+              }
+            ]
+          },
+          "approve_80pct": {
+            "summary": {
+              "disparate_impact_ratio": 0.9579480934336928,
+              "disparate_impact_ratio_excl_small": 0.9579480934336928,
+              "statistical_parity_diff": 0.03472538523423485,
+              "equal_opportunity_diff": 0.021006375920836873,
+              "equalised_odds_diff": 0.03643170498400239,
+              "auc_range": 0.02694549006049718,
+              "max_abs_cal_gap_pp": 0.8573380302787481,
+              "max_abs_cal_gap_pp_excl_small": 0.8573380302787481,
+              "lowest_approval_group": "Male",
+              "highest_approval_group": "Female",
+              "worst_calibrated_group": "Male",
+              "small_groups": []
+            },
+            "flags": [],
+            "table": [
+              {
+                "group": "Male",
+                "n": 3575.0,
+                "default_rate": 0.23888111888111888,
+                "approval_rate": 0.791048951048951,
+                "approval_good_payers": 0.8761484748254318,
+                "approval_defaulters": 0.5199063231850117,
+                "bad_rate_approved": 0.157001414427157,
+                "mean_pd": 0.2303077385783314,
+                "auc": 0.7546223018641549,
+                "cal_gap_pp": -0.8573380302787481,
+                "approval_ci_lo": 0.7774127299686555,
+                "approval_ci_hi": 0.8040603366236183,
+                "dir_vs_best": 0.9579480934336928,
+                "small_group": false
+              },
+              {
+                "group": "Female",
+                "n": 5424.0,
+                "default_rate": 0.20943952802359883,
+                "approval_rate": 0.8257743362831859,
+                "approval_good_payers": 0.8971548507462687,
+                "approval_defaulters": 0.5563380281690141,
+                "bad_rate_approved": 0.14110292475999106,
+                "mean_pd": 0.21115190743690784,
+                "auc": 0.7276768118036577,
+                "cal_gap_pp": 0.1712379413309012,
+                "approval_ci_lo": 0.8154502482711736,
+                "approval_ci_hi": 0.8356372853075513,
+                "dir_vs_best": 1.0,
+                "small_group": false
+              }
+            ]
+          }
+        },
+        "age_g": {
+          "pd_0.50": {
+            "summary": {
+              "disparate_impact_ratio": 0.9347360652116349,
+              "disparate_impact_ratio_excl_small": 0.9347360652116349,
+              "statistical_parity_diff": 0.059443576121702035,
+              "equal_opportunity_diff": 0.03658934500626154,
+              "equalised_odds_diff": 0.06690625614618528,
+              "auc_range": 0.06041710342236539,
+              "max_abs_cal_gap_pp": 2.2736736085796627,
+              "max_abs_cal_gap_pp_excl_small": 2.2736736085796627,
+              "lowest_approval_group": "21-25",
+              "highest_approval_group": "36-45",
+              "worst_calibrated_group": "46-55",
+              "small_groups": []
+            },
+            "flags": [
+              "calibration gap 2.3pp > 2.0pp (46-55)"
+            ],
+            "table": [
+              {
+                "group": "21-25",
+                "n": 1164.0,
+                "default_rate": 0.2654639175257732,
+                "approval_rate": 0.8513745704467354,
+                "approval_good_payers": 0.9309941520467836,
+                "approval_defaulters": 0.6310679611650486,
+                "bad_rate_approved": 0.19677093844601412,
+                "mean_pd": 0.2642665178682579,
+                "auc": 0.7344934612691383,
+                "cal_gap_pp": -0.11973996575153079,
+                "approval_ci_lo": 0.8297840951422013,
+                "approval_ci_hi": 0.8706533614443768,
+                "dir_vs_best": 0.9347360652116349,
+                "small_group": false
+              },
+              {
+                "group": "26-35",
+                "n": 3903.0,
+                "default_rate": 0.20420189597745325,
+                "approval_rate": 0.9044324878298745,
+                "approval_good_payers": 0.9616870573084353,
+                "approval_defaulters": 0.6813048933500627,
+                "bad_rate_approved": 0.1538243626062323,
+                "mean_pd": 0.2096563380161163,
+                "auc": 0.737625440217299,
+                "cal_gap_pp": 0.5454442038663049,
+                "approval_ci_lo": 0.8948071812233035,
+                "approval_ci_hi": 0.9132624369562513,
+                "dir_vs_best": 0.992989095833651,
+                "small_group": false
+              },
+              {
+                "group": "36-45",
+                "n": 2579.0,
+                "default_rate": 0.21054672353625437,
+                "approval_rate": 0.9108181465684374,
+                "approval_good_payers": 0.9675834970530451,
+                "approval_defaulters": 0.6979742173112339,
+                "bad_rate_approved": 0.1613452532992763,
+                "mean_pd": 0.20525872464103526,
+                "auc": 0.7271271803666597,
+                "cal_gap_pp": -0.5287998895219109,
+                "approval_ci_lo": 0.899198534793417,
+                "approval_ci_hi": 0.9212156942479615,
+                "dir_vs_best": 1.0,
+                "small_group": false
+              },
+              {
+                "group": "46-55",
+                "n": 1110.0,
+                "default_rate": 0.2531531531531532,
+                "approval_rate": 0.8738738738738738,
+                "approval_good_payers": 0.9505428226779252,
+                "approval_defaulters": 0.6476868327402135,
+                "bad_rate_approved": 0.18762886597938144,
+                "mean_pd": 0.23041641706735655,
+                "auc": 0.7707996170835676,
+                "cal_gap_pp": -2.2736736085796627,
+                "approval_ci_lo": 0.85304464609473,
+                "approval_ci_hi": 0.8921241463080675,
+                "dir_vs_best": 0.9594383655686337,
+                "small_group": false
+              },
+              {
+                "group": "56+",
+                "n": 243.0,
+                "default_rate": 0.24691358024691357,
+                "approval_rate": 0.8683127572016461,
+                "approval_good_payers": 0.9344262295081968,
+                "approval_defaulters": 0.6666666666666666,
+                "bad_rate_approved": 0.1895734597156398,
+                "mean_pd": 0.23711408841881917,
+                "auc": 0.7103825136612022,
+                "cal_gap_pp": -0.9799491828094392,
+                "approval_ci_lo": 0.8200081643561761,
+                "approval_ci_hi": 0.9051532346948754,
+                "dir_vs_best": 0.9533327376854174,
+                "small_group": false
+              }
+            ]
+          },
+          "approve_80pct": {
+            "summary": {
+              "disparate_impact_ratio": 0.8924374650363622,
+              "disparate_impact_ratio_excl_small": 0.8924374650363622,
+              "statistical_parity_diff": 0.08967020169516138,
+              "equal_opportunity_diff": 0.061698204253265776,
+              "equalised_odds_diff": 0.10159309124068011,
+              "auc_range": 0.06041710342236539,
+              "max_abs_cal_gap_pp": 2.2736736085796627,
+              "max_abs_cal_gap_pp_excl_small": 2.2736736085796627,
+              "lowest_approval_group": "21-25",
+              "highest_approval_group": "36-45",
+              "worst_calibrated_group": "46-55",
+              "small_groups": []
+            },
+            "flags": [
+              "calibration gap 2.3pp > 2.0pp (46-55)"
+            ],
+            "table": [
+              {
+                "group": "21-25",
+                "n": 1164.0,
+                "default_rate": 0.2654639175257732,
+                "approval_rate": 0.7439862542955327,
+                "approval_good_payers": 0.8385964912280702,
+                "approval_defaulters": 0.48220064724919093,
+                "bad_rate_approved": 0.1720554272517321,
+                "mean_pd": 0.2642665178682579,
+                "auc": 0.7344934612691383,
+                "cal_gap_pp": -0.11973996575153079,
+                "approval_ci_lo": 0.7181398009941219,
+                "approval_ci_hi": 0.7682275282738199,
+                "dir_vs_best": 0.8924374650363622,
+                "small_group": false
+              },
+              {
+                "group": "26-35",
+                "n": 3903.0,
+                "default_rate": 0.20420189597745325,
+                "approval_rate": 0.8239815526518063,
+                "approval_good_payers": 0.8943979394719896,
+                "approval_defaulters": 0.5495608531994981,
+                "bad_rate_approved": 0.13619402985074627,
+                "mean_pd": 0.2096563380161163,
+                "auc": 0.737625440217299,
+                "cal_gap_pp": 0.5454442038663049,
+                "approval_ci_lo": 0.8117166246321272,
+                "approval_ci_hi": 0.8356093381097458,
+                "dir_vs_best": 0.9883946159483761,
+                "small_group": false
+              },
+              {
+                "group": "36-45",
+                "n": 2579.0,
+                "default_rate": 0.21054672353625437,
+                "approval_rate": 0.833656455990694,
+                "approval_good_payers": 0.900294695481336,
+                "approval_defaulters": 0.583793738489871,
+                "bad_rate_approved": 0.1474418604651163,
+                "mean_pd": 0.20525872464103526,
+                "auc": 0.7271271803666597,
+                "cal_gap_pp": -0.5287998895219109,
+                "approval_ci_lo": 0.8187899895373631,
+                "approval_ci_hi": 0.8475303918596222,
+                "dir_vs_best": 1.0,
+                "small_group": false
+              },
+              {
+                "group": "46-55",
+                "n": 1110.0,
+                "default_rate": 0.2531531531531532,
+                "approval_rate": 0.7918918918918919,
+                "approval_good_payers": 0.8926417370325693,
+                "approval_defaulters": 0.49466192170818507,
+                "bad_rate_approved": 0.15813424345847554,
+                "mean_pd": 0.23041641706735655,
+                "auc": 0.7707996170835676,
+                "cal_gap_pp": -2.2736736085796627,
+                "approval_ci_lo": 0.7670230674813836,
+                "approval_ci_hi": 0.8147472668282705,
+                "dir_vs_best": 0.949901948460088,
+                "small_group": false
+              },
+              {
+                "group": "56+",
+                "n": 243.0,
+                "default_rate": 0.24691358024691357,
+                "approval_rate": 0.8065843621399177,
+                "approval_good_payers": 0.8907103825136612,
+                "approval_defaulters": 0.55,
+                "bad_rate_approved": 0.1683673469387755,
+                "mean_pd": 0.23711408841881917,
+                "auc": 0.7103825136612022,
+                "cal_gap_pp": -0.9799491828094392,
+                "approval_ci_lo": 0.752308535091876,
+                "approval_ci_hi": 0.8513174339506192,
+                "dir_vs_best": 0.9675260790506268,
+                "small_group": false
+              }
+            ]
+          }
+        },
+        "edu_g": {
+          "pd_0.50": {
+            "summary": {
+              "disparate_impact_ratio": 0.8804921644427818,
+              "disparate_impact_ratio_excl_small": 0.9129551257615766,
+              "statistical_parity_diff": 0.11599289921730005,
+              "equal_opportunity_diff": 0.0493244129607765,
+              "equalised_odds_diff": 0.1821138211382114,
+              "auc_range": 0.13518965053860654,
+              "max_abs_cal_gap_pp": 8.458144698067054,
+              "max_abs_cal_gap_pp_excl_small": 0.7125452063410892,
+              "lowest_approval_group": "High school",
+              "highest_approval_group": "Other/unknown",
+              "worst_calibrated_group": "Other/unknown",
+              "small_groups": [
+                "Other/unknown"
+              ]
+            },
+            "flags": [],
+            "table": [
+              {
+                "group": "Graduate school",
+                "n": 3160.0,
+                "default_rate": 0.19240506329113924,
+                "approval_rate": 0.9360759493670886,
+                "approval_good_payers": 0.9749216300940439,
+                "approval_defaulters": 0.7730263157894737,
+                "bad_rate_approved": 0.15889114266396215,
+                "mean_pd": 0.18958576178912295,
+                "auc": 0.717112674785514,
+                "cal_gap_pp": -0.2819301502016286,
+                "approval_ci_lo": 0.9270061656620101,
+                "approval_ci_hi": 0.9440867487240958,
+                "dir_vs_best": 0.9644418872266973,
+                "small_group": false
+              },
+              {
+                "group": "University",
+                "n": 4245.0,
+                "default_rate": 0.23627797408716136,
+                "approval_rate": 0.8751472320376914,
+                "approval_good_payers": 0.9506477483035164,
+                "approval_defaulters": 0.6311066799601196,
+                "bad_rate_approved": 0.17039030955585463,
+                "mean_pd": 0.2330819638211487,
+                "auc": 0.7510626664116226,
+                "cal_gap_pp": -0.31960102660126555,
+                "approval_ci_lo": 0.8648628494637786,
+                "approval_ci_hi": 0.8847532341294532,
+                "dir_vs_best": 0.9016668451297427,
+                "small_group": false
+              },
+              {
+                "group": "High school",
+                "n": 1458.0,
+                "default_rate": 0.25308641975308643,
+                "approval_rate": 0.8545953360768176,
+                "approval_good_payers": 0.9348025711662076,
+                "approval_defaulters": 0.6178861788617886,
+                "bad_rate_approved": 0.18298555377207062,
+                "mean_pd": 0.24596096768967554,
+                "auc": 0.7428261426783229,
+                "cal_gap_pp": -0.7125452063410892,
+                "approval_ci_lo": 0.8355687631921986,
+                "approval_ci_hi": 0.8717582139577196,
+                "dir_vs_best": 0.8804921644427818,
+                "small_group": false
+              },
+              {
+                "group": "Other/unknown",
+                "n": 136.0,
+                "default_rate": 0.07352941176470588,
+                "approval_rate": 0.9705882352941176,
+                "approval_good_payers": 0.9841269841269841,
+                "approval_defaulters": 0.8,
+                "bad_rate_approved": 0.06060606060606061,
+                "mean_pd": 0.15811085874537642,
+                "auc": 0.615873015873016,
+                "cal_gap_pp": 8.458144698067054,
+                "approval_ci_lo": 0.9268170119919115,
+                "approval_ci_hi": 0.9885043230042556,
+                "dir_vs_best": 1.0,
+                "small_group": true
+              }
+            ]
+          },
+          "approve_80pct": {
+            "summary": {
+              "disparate_impact_ratio": 0.8440196468870305,
+              "disparate_impact_ratio_excl_small": 0.8983263935445522,
+              "statistical_parity_diff": 0.1422173807794722,
+              "equal_opportunity_diff": 0.05562114653023742,
+              "equalised_odds_diff": 0.31219512195121957,
+              "auc_range": 0.13518965053860654,
+              "max_abs_cal_gap_pp": 8.458144698067054,
+              "max_abs_cal_gap_pp_excl_small": 0.7125452063410892,
+              "lowest_approval_group": "High school",
+              "highest_approval_group": "Other/unknown",
+              "worst_calibrated_group": "Other/unknown",
+              "small_groups": [
+                "Other/unknown"
+              ]
+            },
+            "flags": [],
+            "table": [
+              {
+                "group": "Graduate school",
+                "n": 3160.0,
+                "default_rate": 0.19240506329113924,
+                "approval_rate": 0.8566455696202532,
+                "approval_good_payers": 0.9086990595611285,
+                "approval_defaulters": 0.6381578947368421,
+                "bad_rate_approved": 0.14333210195788695,
+                "mean_pd": 0.18958576178912295,
+                "auc": 0.717112674785514,
+                "cal_gap_pp": -0.2819301502016286,
+                "approval_ci_lo": 0.8439937453998574,
+                "approval_ci_hi": 0.8684313014166458,
+                "dir_vs_best": 0.9395467537770519,
+                "small_group": false
+              },
+              {
+                "group": "University",
+                "n": 4245.0,
+                "default_rate": 0.23627797408716136,
+                "approval_rate": 0.7901060070671378,
+                "approval_good_payers": 0.8803207896360271,
+                "approval_defaulters": 0.4985044865403789,
+                "bad_rate_approved": 0.1490757304710793,
+                "mean_pd": 0.2330819638211487,
+                "auc": 0.7510626664116226,
+                "cal_gap_pp": -0.31960102660126555,
+                "approval_ci_lo": 0.7775957655698897,
+                "approval_ci_hi": 0.8020916485243426,
+                "dir_vs_best": 0.8665678787187964,
+                "small_group": false
+              },
+              {
+                "group": "High school",
+                "n": 1458.0,
+                "default_rate": 0.25308641975308643,
+                "approval_rate": 0.7695473251028807,
+                "approval_good_payers": 0.8650137741046832,
+                "approval_defaulters": 0.4878048780487805,
+                "bad_rate_approved": 0.16042780748663102,
+                "mean_pd": 0.24596096768967554,
+                "auc": 0.7428261426783229,
+                "cal_gap_pp": -0.7125452063410892,
+                "approval_ci_lo": 0.7472392570347666,
+                "approval_ci_hi": 0.790438696582096,
+                "dir_vs_best": 0.8440196468870305,
+                "small_group": false
+              },
+              {
+                "group": "Other/unknown",
+                "n": 136.0,
+                "default_rate": 0.07352941176470588,
+                "approval_rate": 0.9117647058823529,
+                "approval_good_payers": 0.9206349206349206,
+                "approval_defaulters": 0.8,
+                "bad_rate_approved": 0.06451612903225806,
+                "mean_pd": 0.15811085874537642,
+                "auc": 0.615873015873016,
+                "cal_gap_pp": 8.458144698067054,
+                "approval_ci_lo": 0.8521002501471651,
+                "approval_ci_hi": 0.948805917974481,
+                "dir_vs_best": 1.0,
+                "small_group": true
+              }
+            ]
+          }
+        },
+        "mar_g": {
+          "pd_0.50": {
+            "summary": {
+              "disparate_impact_ratio": 0.9904243326675388,
+              "disparate_impact_ratio_excl_small": 0.9904243326675388,
+              "statistical_parity_diff": 0.008604596962163868,
+              "equal_opportunity_diff": 0.010249942673698609,
+              "equalised_odds_diff": 0.02393363600695031,
+              "auc_range": 0.014342536723832344,
+              "max_abs_cal_gap_pp": 1.7325336951749148,
+              "max_abs_cal_gap_pp_excl_small": 1.1920986127264306,
+              "lowest_approval_group": "Married",
+              "highest_approval_group": "Single",
+              "worst_calibrated_group": "Other",
+              "small_groups": [
+                "Other"
+              ]
+            },
+            "flags": [],
+            "table": [
+              {
+                "group": "Married",
+                "n": 4054.0,
+                "default_rate": 0.23162308830784412,
+                "approval_rate": 0.889985199802664,
+                "approval_good_payers": 0.9592295345104334,
+                "approval_defaulters": 0.6602768903088392,
+                "bad_rate_approved": 0.17184035476718404,
+                "mean_pd": 0.2197021021805798,
+                "auc": 0.7468183597522723,
+                "cal_gap_pp": -1.1920986127264306,
+                "approval_ci_lo": 0.8799811555131631,
+                "approval_ci_hi": 0.8992508381654465,
+                "dir_vs_best": 0.9904243326675388,
+                "small_group": false
+              },
+              {
+                "group": "Single",
+                "n": 4822.0,
+                "default_rate": 0.21277478224802987,
+                "approval_rate": 0.8985897967648279,
+                "approval_good_payers": 0.9565331928345627,
+                "approval_defaulters": 0.6842105263157895,
+                "bad_rate_approved": 0.16201246249711515,
+                "mean_pd": 0.217925087654539,
+                "auc": 0.7346370551129023,
+                "cal_gap_pp": 0.5150305406509126,
+                "approval_ci_lo": 0.8897495045530783,
+                "approval_ci_hi": 0.9067954960122118,
+                "dir_vs_best": 1.0,
+                "small_group": false
+              },
+              {
+                "group": "Other",
+                "n": 123.0,
+                "default_rate": 0.2032520325203252,
+                "approval_rate": 0.8943089430894309,
+                "approval_good_payers": 0.9489795918367347,
+                "approval_defaulters": 0.68,
+                "bad_rate_approved": 0.15454545454545454,
+                "mean_pd": 0.22057736947207435,
+                "auc": 0.7489795918367347,
+                "cal_gap_pp": 1.7325336951749148,
+                "approval_ci_lo": 0.827545863784844,
+                "approval_ci_hi": 0.9371874729122648,
+                "dir_vs_best": 0.9952360312894613,
+                "small_group": true
+              }
+            ]
+          },
+          "approve_80pct": {
+            "summary": {
+              "disparate_impact_ratio": 0.9898296228562898,
+              "disparate_impact_ratio_excl_small": 0.9971174656042936,
+              "statistical_parity_diff": 0.00827002255920517,
+              "equal_opportunity_diff": 0.011520025303309867,
+              "equalised_odds_diff": 0.07165692007797275,
+              "auc_range": 0.014342536723832344,
+              "max_abs_cal_gap_pp": 1.7325336951749148,
+              "max_abs_cal_gap_pp_excl_small": 1.1920986127264306,
+              "lowest_approval_group": "Other",
+              "highest_approval_group": "Single",
+              "worst_calibrated_group": "Other",
+              "small_groups": [
+                "Other"
+              ]
+            },
+            "flags": [],
+            "table": [
+              {
+                "group": "Married",
+                "n": 4054.0,
+                "default_rate": 0.23162308830784412,
+                "approval_rate": 0.810804144055254,
+                "approval_good_payers": 0.8953451043338684,
+                "approval_defaulters": 0.5303514376996805,
+                "bad_rate_approved": 0.15150593246121083,
+                "mean_pd": 0.2197021021805798,
+                "auc": 0.7468183597522723,
+                "cal_gap_pp": -1.1920986127264306,
+                "approval_ci_lo": 0.7984553323618566,
+                "approval_ci_hi": 0.8225644728469026,
+                "dir_vs_best": 0.9971174656042936,
+                "small_group": false
+              },
+              {
+                "group": "Single",
+                "n": 4822.0,
+                "default_rate": 0.21277478224802987,
+                "approval_rate": 0.813148071339693,
+                "approval_good_payers": 0.8838250790305585,
+                "approval_defaulters": 0.5516569200779727,
+                "bad_rate_approved": 0.14435093088497833,
+                "mean_pd": 0.217925087654539,
+                "auc": 0.7346370551129023,
+                "cal_gap_pp": 0.5150305406509126,
+                "approval_ci_lo": 0.8018982332761497,
+                "approval_ci_hi": 0.823899347813126,
+                "dir_vs_best": 1.0,
+                "small_group": false
+              },
+              {
+                "group": "Other",
+                "n": 123.0,
+                "default_rate": 0.2032520325203252,
+                "approval_rate": 0.8048780487804879,
+                "approval_good_payers": 0.8877551020408163,
+                "approval_defaulters": 0.48,
+                "bad_rate_approved": 0.12121212121212122,
+                "mean_pd": 0.22057736947207435,
+                "auc": 0.7489795918367347,
+                "cal_gap_pp": 1.7325336951749148,
+                "approval_ci_lo": 0.7260616310567942,
+                "approval_ci_hi": 0.8652270313378776,
+                "dir_vs_best": 0.9898296228562898,
+                "small_group": true
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "proxy_auc": {
+    "sex=female": 0.5876437537388866,
+    "age<=25": 0.7787131274986456,
+    "age>=56": 0.5191955381095527,
+    "marital=single": 0.5616784683400349
+  },
+  "headline": {
+    "sex_g": {
+      "summary": {
+        "disparate_impact_ratio": 0.9332749238339301,
+        "disparate_impact_ratio_excl_small": 0.9332749238339301,
+        "statistical_parity_diff": 0.05545660828846666,
+        "equal_opportunity_diff": 0.03956521485735598,
+        "equalised_odds_diff": 0.06366271398885115,
+        "auc_range": 0.03121177822368537,
+        "max_abs_cal_gap_pp": 0.746406107273137,
+        "max_abs_cal_gap_pp_excl_small": 0.746406107273137,
+        "lowest_approval_group": "Male",
+        "highest_approval_group": "Female",
+        "worst_calibrated_group": "Female",
+        "small_groups": []
+      },
+      "flags": []
+    },
+    "age_g": {
+      "summary": {
+        "disparate_impact_ratio": 0.9140082742165968,
+        "disparate_impact_ratio_excl_small": 0.9140082742165968,
+        "statistical_parity_diff": 0.07120811112783987,
+        "equal_opportunity_diff": 0.045629850543938755,
+        "equalised_odds_diff": 0.08127006523573727,
+        "auc_range": 0.0642579990127532,
+        "max_abs_cal_gap_pp": 1.5899410249300638,
+        "max_abs_cal_gap_pp_excl_small": 1.5899410249300638,
+        "lowest_approval_group": "21-25",
+        "highest_approval_group": "26-35",
+        "worst_calibrated_group": "21-25",
+        "small_groups": []
+      },
+      "flags": []
+    },
+    "edu_g": {
+      "summary": {
+        "disparate_impact_ratio": 0.7745567240766142,
+        "disparate_impact_ratio_excl_small": 0.9069063810329899,
+        "statistical_parity_diff": 0.22378560477689025,
+        "equal_opportunity_diff": 0.13406795224977042,
+        "equalised_odds_diff": 0.4176151761517615,
+        "auc_range": 0.16844559029744677,
+        "max_abs_cal_gap_pp": 1.4397593829417528,
+        "max_abs_cal_gap_pp_excl_small": 0.5612927484788532,
+        "lowest_approval_group": "High school",
+        "highest_approval_group": "Other/unknown",
+        "worst_calibrated_group": "Other/unknown",
+        "small_groups": [
+          "Other/unknown"
+        ]
+      },
+      "flags": []
+    },
+    "mar_g": {
+      "summary": {
+        "disparate_impact_ratio": 0.9513155957589332,
+        "disparate_impact_ratio_excl_small": 0.9513155957589332,
+        "statistical_parity_diff": 0.040294371075507596,
+        "equal_opportunity_diff": 0.021703677267783772,
+        "equalised_odds_diff": 0.08822612085769987,
+        "auc_range": 0.018128788016552266,
+        "max_abs_cal_gap_pp": 2.1251969441169,
+        "max_abs_cal_gap_pp_excl_small": 0.9604353628263479,
+        "lowest_approval_group": "Married",
+        "highest_approval_group": "Single",
+        "worst_calibrated_group": "Other",
+        "small_groups": [
+          "Other"
+        ]
+      },
+      "flags": []
+    }
+  },
+  "statistical_rag": "GREEN",
+  "legal_rag": "RED",
+  "direct_protected_inputs": [
+    "sex2",
+    "marriage2",
+    "marriage3"
+  ],
+  "recommendation": {
+    "variant": "B_no_sex_marriage",
+    "auc_change": 0.0015011568041377599,
+    "sex_dir_change": 0.02412068056167438,
+    "new_flags": {
+      "age_g": [
+        "calibration gap 2.3pp > 2.0pp (46-55)"
+      ]
+    }
+  },
+  "overall_rag": "RED"
+}

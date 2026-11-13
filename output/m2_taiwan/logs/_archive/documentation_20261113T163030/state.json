@@ -1,0 +1,37 @@
+{
+  "stages": {
+    "facts": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:22:31Z",
+      "n_variables": 11,
+      "disclosures": [
+        "D-01:sex",
+        "D-01:education",
+        "D-01:marriage",
+        "D-02",
+        "D-04",
+        "D-05"
+      ]
+    },
+    "verify": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:22:31Z",
+      "iterations": 1
+    },
+    "render": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:22:36Z",
+      "output": "output/m2_taiwan/reports/documentation"
+    }
+  },
+  "iterations": [
+    {
+      "iteration": 1,
+      "file": "output/m2_taiwan/logs/documentation/extract_1.json",
+      "violations": [],
+      "verdict": "PASS"
+    }
+  ],
+  "status": "AWAITING_HUMAN_APPROVAL",
+  "mlflow_run_id": "0628c24d85b544e9949346d4dedd38e3"
+}

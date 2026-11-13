@@ -1,0 +1,479 @@
+{
+  "purpose": "Estimates the expected number of motor third-party liability claims per policy for its exposure period (claim frequency), as the frequency component of a technical risk premium. The source calls it GLM1.",
+  "intended_use": "Not stated in the source beyond the case-study context: a benchmark claim-frequency GLM for French motor TPL policies. No pricing decision, tariff, owner or approval is named; governance fields must come from the model owner.",
+  "out_of_scope_use": "The evidence defines no permitted use. Based on what the code does it should not be used for claim severity or total cost, for portfolios outside the French motor TPL population it was fitted on, or as a final street price without the expense, severity and commercial loadings that the code does not contain.",
+  "methodology": "Poisson generalised linear model with a log link, fitted by R's glm on a random learning sample, with the logarithm of the (capped) policy exposure as an offset, so the coefficients act multiplicatively on the annualised claim frequency. Categorical inputs enter as treatment-coded dummies against an explicitly chosen reference level; bonus-malus, log density and the area code enter as linear terms on the log-frequency scale. Predictions are expected claim counts for the policy's own exposure.",
+  "target_definition": "ClaimNb: number of claims reported on the policy during its exposure period, capped at 4 before fitting. Modelled as a Poisson count with mean equal to exposure times annual frequency.",
+  "variables": [
+    {
+      "name": "VehPowerGLM",
+      "role": "input",
+      "kind": "categorical",
+      "description": "Vehicle power class, derived from VehPower.",
+      "levels": [
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ],
+      "level_meaning": {
+        "9": "power class 9 and above (merged)"
+      },
+      "transformation": "VehPower capped at 9 with pmin, then converted to a factor; first level (4) is the reference.",
+      "source_lines": [
+        20,
+        21
+      ]
+    },
+    {
+      "name": "VehAgeGLM",
+      "role": "input",
+      "kind": "categorical",
+      "description": "Vehicle age class, derived from VehAge (years).",
+      "levels": [
+        "2",
+        "1",
+        "3"
+      ],
+      "level_meaning": {
+        "1": "under 1 year",
+        "2": "1 to 10 years",
+        "3": "over 10 years"
+      },
+      "transformation": "VehAge mapped to three classes through a lookup table, converted to a factor and relevelled so class 2 is the reference.",
+      "source_lines": [
+        22,
+        23,
+        24,
+        25
+      ]
+    },
+    {
+      "name": "DrivAgeGLM",
+      "role": "input",
+      "kind": "categorical",
+      "description": "Driver age class, derived from DrivAge (protected characteristic: age).",
+      "levels": [
+        "5",
+        "1",
+        "2",
+        "3",
+        "4",
+        "6",
+        "7"
+      ],
+      "level_meaning": {
+        "1": "18-20",
+        "2": "21-25",
+        "3": "26-30",
+        "4": "31-40",
+        "5": "41-50",
+        "6": "51-70",
+        "7": "71 and over"
+      },
+      "transformation": "DrivAge mapped to seven classes through a lookup table, converted to a factor and relevelled so class 5 (41-50) is the reference.",
+      "source_lines": [
+        26,
+        27,
+        29,
+        30
+      ]
+    },
+    {
+      "name": "BonusMalusGLM",
+      "role": "input",
+      "kind": "numeric",
+      "description": "Bonus-malus level, derived from BonusMalus (below 100 means a no-claims bonus, above 100 a malus).",
+      "levels": [],
+      "level_meaning": {},
+      "transformation": "BonusMalus capped at 150 with pmin and stored as an integer; linear on the log-frequency scale.",
+      "source_lines": [
+        31,
+        32
+      ]
+    },
+    {
+      "name": "VehBrand",
+      "role": "input",
+      "kind": "categorical",
+      "description": "Vehicle brand code.",
+      "levels": [
+        "B1",
+        "B10",
+        "B11",
+        "B12",
+        "B13",
+        "B14",
+        "B2",
+        "B3",
+        "B4",
+        "B5",
+        "B6"
+      ],
+      "level_meaning": {},
+      "transformation": "Converted to a factor and relevelled so B1 is the reference.",
+      "source_lines": [
+        35,
+        36
+      ]
+    },
+    {
+      "name": "VehGas",
+      "role": "input",
+      "kind": "binary",
+      "description": "Fuel type of the vehicle.",
+      "levels": [
+        "Diesel",
+        "Regular"
+      ],
+      "level_meaning": {
+        "Diesel": "diesel",
+        "Regular": "regular petrol"
+      },
+      "transformation": "Converted to a factor; first level (Diesel) is the reference.",
+      "source_lines": [
+        38
+      ]
+    },
+    {
+      "name": "DensityGLM",
+      "role": "input",
+      "kind": "numeric",
+      "description": "Natural logarithm of the population density (inhabitants per square kilometre) where the driver lives, derived from Density.",
+      "levels": [],
+      "level_meaning": {},
+      "transformation": "log(Density); linear on the log-frequency scale.",
+      "source_lines": [
+        33,
+        34
+      ]
+    },
+    {
+      "name": "Region",
+      "role": "input",
+      "kind": "categorical",
+      "description": "Policy region code (French administrative region).",
+      "levels": [
+        "R24",
+        "R11",
+        "R21",
+        "R22",
+        "R23",
+        "R25",
+        "R26",
+        "R31",
+        "R41",
+        "R42",
+        "R43",
+        "R52",
+        "R53",
+        "R54",
+        "R72",
+        "R73",
+        "R74",
+        "R82",
+        "R83",
+        "R91",
+        "R93",
+        "R94"
+      ],
+      "level_meaning": {},
+      "transformation": "Converted to a factor and relevelled so R24 is the reference.",
+      "source_lines": [
+        35,
+        37
+      ]
+    },
+    {
+      "name": "AreaGLM",
+      "role": "input",
+      "kind": "ordinal_as_numeric",
+      "description": "Area density class A to F, derived from Area.",
+      "levels": [],
+      "level_meaning": {},
+      "transformation": "Area letters converted to their factor codes (A=1 ... F=6) and used as a single linear term.",
+      "source_lines": [
+        18,
+        19
+      ]
+    },
+    {
+      "name": "ClaimNb",
+      "role": "target",
+      "kind": "numeric",
+      "description": "Number of claims during the exposure period.",
+      "levels": [],
+      "level_meaning": {},
+      "transformation": "Capped at 4 with pmin.",
+      "source_lines": [
+        13,
+        14,
+        47
+      ]
+    }
+  ],
+  "preprocessing": [
+    {
+      "order": 1,
+      "description": "Read the OpenML export, treating both double and single quotes as string delimiters so category labels are read without quote characters.",
+      "columns": [
+        "all"
+      ],
+      "source_lines": [
+        11
+      ],
+      "author_rationale": "The OpenML export wraps strings in single quotes.",
+      "is_assumption": false
+    },
+    {
+      "order": 2,
+      "description": "Cap ClaimNb at 4 and Exposure at 1 year.",
+      "columns": [
+        "ClaimNb",
+        "Exposure"
+      ],
+      "source_lines": [
+        13,
+        14,
+        15
+      ],
+      "author_rationale": "Claim counts above 4 and exposures above one year are treated as data errors.",
+      "is_assumption": true
+    },
+    {
+      "order": 3,
+      "description": "Map Area letters to integer codes 1 to 6 (AreaGLM).",
+      "columns": [
+        "Area",
+        "AreaGLM"
+      ],
+      "source_lines": [
+        18,
+        19
+      ],
+      "author_rationale": "Area is ordinal, so it is used as a continuous variable.",
+      "is_assumption": true
+    },
+    {
+      "order": 4,
+      "description": "Cap VehPower at 9 and make it a factor (VehPowerGLM).",
+      "columns": [
+        "VehPower",
+        "VehPowerGLM"
+      ],
+      "source_lines": [
+        20,
+        21
+      ],
+      "author_rationale": "Levels above 9 are merged into 9.",
+      "is_assumption": false
+    },
+    {
+      "order": 5,
+      "description": "Band VehAge into three classes via a lookup table indexed by VehAge + 1, make it a factor and set class 2 as reference (VehAgeGLM).",
+      "columns": [
+        "VehAge",
+        "VehAgeGLM"
+      ],
+      "source_lines": [
+        22,
+        23,
+        24,
+        25
+      ],
+      "author_rationale": "Classes [0,1), [1,10], (10,inf).",
+      "is_assumption": false
+    },
+    {
+      "order": 6,
+      "description": "Band DrivAge into seven classes via a lookup table indexed by DrivAge - 17, make it a factor and set class 5 (41-50) as reference (DrivAgeGLM).",
+      "columns": [
+        "DrivAge",
+        "DrivAgeGLM"
+      ],
+      "source_lines": [
+        26,
+        27,
+        28,
+        29,
+        30
+      ],
+      "author_rationale": "Seven age classes from the case study.",
+      "is_assumption": false
+    },
+    {
+      "order": 7,
+      "description": "Cap BonusMalus at 150 (BonusMalusGLM).",
+      "columns": [
+        "BonusMalus",
+        "BonusMalusGLM"
+      ],
+      "source_lines": [
+        31,
+        32
+      ],
+      "author_rationale": "Capped at 150.",
+      "is_assumption": false
+    },
+    {
+      "order": 8,
+      "description": "Log-transform Density (DensityGLM).",
+      "columns": [
+        "Density",
+        "DensityGLM"
+      ],
+      "source_lines": [
+        33,
+        34
+      ],
+      "author_rationale": "Density is log-transformed.",
+      "is_assumption": false
+    },
+    {
+      "order": 9,
+      "description": "Make VehBrand and Region factors with references B1 and R24; make VehGas a factor.",
+      "columns": [
+        "VehBrand",
+        "Region",
+        "VehGas"
+      ],
+      "source_lines": [
+        35,
+        36,
+        37,
+        38
+      ],
+      "author_rationale": "References are described as the largest classes.",
+      "is_assumption": false
+    },
+    {
+      "order": 10,
+      "description": "Random 90% / 10% learning / test split with set.seed(100) and sample() without replacement; no stratification.",
+      "columns": [
+        "all"
+      ],
+      "source_lines": [
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "author_rationale": "Learning and test samples as in the case study.",
+      "is_assumption": false
+    }
+  ],
+  "variable_selection": "No selection procedure in the code: the nine features are fixed by the case study's GLM1 specification and all are kept. Raw columns IDpol, Area, VehPower, VehAge, DrivAge, BonusMalus and Density enter only through their engineered versions.",
+  "assumptions": [
+    "Claim counts follow a Poisson distribution with mean proportional to exposure (log-exposure offset with coefficient fixed at one).",
+    "Claim counts above 4 and exposures above one year are data errors and can be capped rather than investigated.",
+    "Effects are multiplicative and there are no interactions between rating factors.",
+    "Bonus-malus, log density and the area code act linearly on the log-frequency.",
+    "The banding of vehicle age and driver age captures their effect adequately; within a band the frequency is constant.",
+    "The random learning sample is representative of the policies to be priced; there is no out-of-time test."
+  ],
+  "limitations": [
+    {
+      "text": "Driver age (DrivAgeGLM, banded from DrivAge) is a direct rating factor. Age is a protected characteristic; UK insurers may use it only with relevant and reliable actuarial data (Equality Act 2010 Sch.3 para 20A), so the justification and the outcomes by age band must be evidenced.",
+      "severity": "High",
+      "disclosure_ids": [
+        "D-01:DrivAgeGLM"
+      ],
+      "source_lines": [
+        26,
+        29,
+        47
+      ]
+    },
+    {
+      "text": "The response and exposure are capped before fitting: ClaimNb at 4 and Exposure at 1 year; VehPower is capped at 9 and BonusMalus at 150. Capping the claim count understates frequency for the affected policies, and the caps are justified only as presumed data errors without investigation.",
+      "severity": "High",
+      "disclosure_ids": [
+        "D-06"
+      ],
+      "source_lines": [
+        14,
+        15,
+        21,
+        32
+      ]
+    },
+    {
+      "text": "Many terms are not statistically significant (several VehBrand and Region levels, the youngest and oldest driver-age classes, and AreaGLM), yet all are kept; there is no documented selection or level-grouping step, which adds variance to the tariff.",
+      "severity": "Medium",
+      "disclosure_ids": [
+        "D-05"
+      ],
+      "source_lines": [
+        47,
+        48
+      ]
+    },
+    {
+      "text": "AreaGLM uses the alphabetical factor codes of Area as a linear score, assuming equal spacing between areas A to F; Area is also strongly related to DensityGLM, so the two effects overlap.",
+      "severity": "Medium",
+      "disclosure_ids": [],
+      "source_lines": [
+        19,
+        34
+      ]
+    },
+    {
+      "text": "The banding tables are indexed by raw values (VehAge + 1, DrivAge - 17): a vehicle age above 110 or a driver age outside 18 to 100 gives an NA class silently rather than an error.",
+      "severity": "Medium",
+      "disclosure_ids": [],
+      "source_lines": [
+        23,
+        24,
+        27,
+        29
+      ]
+    },
+    {
+      "text": "The split relies on R's sample() algorithm: the same seed gives a different learning sample under R versions with a different default sampling method, so the case-study figures are not reproducible in current R.",
+      "severity": "Medium",
+      "disclosure_ids": [],
+      "source_lines": [
+        41,
+        42
+      ]
+    },
+    {
+      "text": "The model has no interactions (for example driver age by bonus-malus), so frequency differences driven by combinations of factors are averaged out.",
+      "severity": "Medium",
+      "disclosure_ids": [],
+      "source_lines": [
+        47
+      ]
+    },
+    {
+      "text": "Only a random test sample is available; stability over time cannot be assessed from this data.",
+      "severity": "Low",
+      "disclosure_ids": [],
+      "source_lines": [
+        42
+      ]
+    },
+    {
+      "text": "The script is reconstructed from a published case study rather than taken from a production code base.",
+      "severity": "Low",
+      "disclosure_ids": [],
+      "source_lines": [
+        6
+      ]
+    }
+  ],
+  "code_vs_docs_discrepancies": [
+    "The source comments state that VehBrand B1 and Region R24 are the largest classes; the code sets them as references without checking it.",
+    "The header says the script follows the published case study, but because sample() changed in later R versions the learning sample, and therefore the fitted coefficients and losses, differ from the published ones."
+  ],
+  "open_questions": [
+    "Which tariff or pricing decision consumes this frequency, and who owns it?",
+    "What is the actuarial justification and evidence for using driver age bands, and how are outcomes by age monitored?",
+    "Were the policies with more than 4 claims or exposure above one year investigated, and how many are there in production data?",
+    "Should non-significant VehBrand and Region levels be grouped or credibility-weighted?",
+    "Is a severity model combined with this frequency, and is there an out-of-time sample for validation?"
+  ]
+}

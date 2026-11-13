@@ -1,0 +1,163 @@
+{
+  "model_id": "M2",
+  "timestamp_utc": "2026-11-13T16:41:33+00:00",
+  "champion": {
+    "module": "output/m2_taiwan/model/m2_taiwan_pd.py",
+    "module_sha256": "9d9c4e58426ba49be28c637592d01d4fe421d17094e7866841be03086db63eea",
+    "manifest_module_sha256": "9d9c4e58426ba49be28c637592d01d4fe421d17094e7866841be03086db63eea",
+    "migration_status": "AWAITING_HUMAN_APPROVAL",
+    "migration_iterations": 1,
+    "human_review": null,
+    "migrated_by": "Claude Opus 5.5 (Claude Code, migration-agent)",
+    "reference_dir": "output/m2_taiwan/model/reference"
+  },
+  "discrimination": {
+    "train": {
+      "auc": 0.7674543033503967,
+      "gini": 0.5349086067007933,
+      "ks": 0.42222742205633634
+    },
+    "test": {
+      "auc": 0.7402449542619647,
+      "gini": 0.48048990852392937,
+      "ks": 0.3805857651791559
+    },
+    "test_auc_ci95": [
+      0.727391163075004,
+      0.7527443434148723
+    ],
+    "test_ks_ci95": [
+      0.3593570127120794,
+      0.40687403799467625
+    ],
+    "overfit_auc_gap": 0.027209349088431978,
+    "repeated_split_auc": {
+      "mean": 0.758991302101892,
+      "sd": 0.00537927542257681,
+      "p2_5": 0.747982542725039,
+      "p97_5": 0.768913416060184
+    },
+    "challenger_gbm_test": {
+      "auc": 0.773313241912229,
+      "gini": 0.5466264838244581,
+      "ks": 0.41354927010570036
+    },
+    "champion_vs_challenger_auc_gap": 0.03306828765026437,
+    "rag": "GREEN"
+  },
+  "calibration": {
+    "brier_test": 0.1408671632055303,
+    "brier_reference_base_rate": 0.1722346920027328,
+    "mean_pd_test": 0.21870680413744886,
+    "observed_rate_test": 0.22113568174241582,
+    "calibration_in_the_large_pp": -0.24288776049669614,
+    "calibration_intercept": -0.05909659663785958,
+    "calibration_slope": 0.936168374385763,
+    "hosmer_lemeshow_test": {
+      "hl_stat": 12.908413759783224,
+      "df": 8,
+      "p_value": 0.11503989619171184
+    },
+    "bands_flagged": 0,
+    "worst_band_gap_pp": 1.9013033647888227,
+    "rag": "GREEN"
+  },
+  "stability": {
+    "psi_train_vs_test": 0.001607266552113695,
+    "psi_train_vs_shifted_month": 0.08261356708563916,
+    "csi_train_vs_test": {
+      "limit_bal": 0.0011385385916014173,
+      "pay_0": 0.0002930362923435769,
+      "pay_2": 7.167193907558825e-05,
+      "pay_3": 1.5331843161753652e-05,
+      "pay_5": 0.0,
+      "pay_6": 0.00045615154039989575,
+      "pay_amt1": 0.0013450637601828414,
+      "pay_amt2": 0.0016910923217841028
+    },
+    "csi_train_vs_shifted_month": {
+      "limit_bal": 0.0011385385916014173,
+      "pay_0": 0.6175273241460307,
+      "pay_2": 0.0005943488804961653,
+      "pay_3": 0.007305284753905281,
+      "pay_5": 0.0,
+      "pay_6": 0.00045615154039989575,
+      "pay_amt1": 0.0071626107726573685,
+      "pay_amt2": 0.04553914772892037
+    },
+    "pseudo_oot": {
+      "note": "Clients re-scored as at Aug-2005; proxy outcome = Sep-2005 repayment delay (pay_0>=1).",
+      "proxy_event_rate": 0.2228025336148461,
+      "mean_pd": 0.21494477102722925,
+      "auc": 0.805819986778835,
+      "gini": 0.6116399735576701,
+      "ks": 0.5599394422151656
+    },
+    "max_csi": 0.6175273241460307,
+    "rag": "AMBER"
+  },
+  "data_quality": {
+    "pay_code_1_counts": {
+      "PAY_0": 3688,
+      "PAY_2": 28,
+      "PAY_3": 4,
+      "PAY_4": 2,
+      "PAY_5": 0,
+      "PAY_6": 0
+    },
+    "finding": "Repayment-status code 1 (one-month delay) appears in PAY_0 but almost never in PAY_2-PAY_6, so the months are coded inconsistently. pay_0 is not on the same scale as earlier months, and the shifted-month pay_0 CSI (above the PSI action threshold) is driven by this artefact, not by population drift.",
+    "education_undocumented_0_5_6": 345,
+    "marriage_undocumented_0": 54,
+    "pay_undocumented_minus2_0": {
+      "PAY_0": 17496,
+      "PAY_2": 19512,
+      "PAY_3": 19849,
+      "PAY_4": 20803,
+      "PAY_5": 21493,
+      "PAY_6": 21181
+    }
+  },
+  "specification": {
+    "pay0_linearity_LR_stat": 241.3265402311372,
+    "pay0_linearity_df": 2,
+    "pay0_linearity_p": 0.0,
+    "pay0_banded_test_auc": 0.7414424096513385,
+    "pay0_banded_auc_uplift": 0.0011974553893737694,
+    "dropped_vars_LR_stat": 32.161210383412254,
+    "dropped_vars_df": 12,
+    "dropped_vars_p": 0.0013066799328668166,
+    "vif": {
+      "limit_bal": 1.116983577213391,
+      "pay_0": 2.027100058830679,
+      "pay_2": 2.6723312076116055,
+      "pay_3": 2.1582245977846712,
+      "pay_5": 2.5355732621026448,
+      "pay_6": 2.2798534494136575,
+      "pay_amt1": 1.0950336978855728,
+      "pay_amt2": 1.0862537755233452
+    },
+    "max_vif": 2.6723312076116055,
+    "undocumented_codes": {
+      "education_0_5_6_rows": 345,
+      "education4_coef": -1.178826070383469,
+      "education4_se": 0.23100433702088607
+    }
+  },
+  "policy_cutoffs": {
+    "pd_0.50": {
+      "threshold": 0.5,
+      "approval_rate": 0.8956550727858651,
+      "defaulters_caught": 0.3221105527638191,
+      "good_customers_declined": 0.04251676416036525,
+      "bad_rate_in_approved": 0.1673697270471464
+    },
+    "approve_80pct": {
+      "threshold": 0.28772137273360776,
+      "approval_rate": 0.809089898877653,
+      "defaulters_caught": 0.46834170854271356,
+      "good_customers_declined": 0.11214153231559423,
+      "bad_rate_in_approved": 0.14530971020464223
+    }
+  },
+  "overall_rag": "AMBER"
+}

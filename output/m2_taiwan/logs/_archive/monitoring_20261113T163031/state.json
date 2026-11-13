@@ -1,0 +1,22 @@
+{
+  "stages": {
+    "monitor": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:23:15Z"
+    }
+  },
+  "started_utc": "2026-11-13T16:23:12Z",
+  "steps": [
+    {
+      "cmd": "python -m agent.validators.m2_taiwan.monitor",
+      "exit": 0,
+      "seconds": 3.0,
+      "tail": [
+        "2005-09 cohort     AMBER  max_group_cal_gap_pp = 1.5899 (AMBER; amber/red at 1.5/2.0)",
+        "2005-08 re-score   RED    max_csi = 0.6175 (RED; amber/red at 0.1/0.25), driven by pay_0",
+        "RE-VALIDATION REQUIRED"
+      ]
+    }
+  ],
+  "status": "DONE"
+}

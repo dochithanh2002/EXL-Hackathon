@@ -1,0 +1,22 @@
+{
+  "model_id": "M1",
+  "status": "AWAITING_HUMAN_APPROVAL",
+  "packaged_utc": "2026-11-13T16:49:30Z",
+  "migrated_by": "Claude Opus 5.5 (Claude Code, migration-agent)",
+  "input_hashes": {
+    "model_yaml": "38152693ac960ee3e097f3dcb189a6dbfd4a9b02a171f65900dc10167f2654cf",
+    "legacy_script": "e7f35adf9c79f8c50857c5cb42883d178411f4619895ccf851fcc15927d7ef2b",
+    "data": "5008e249ac75b345a180fa8cba7db50a01f2617415be5de2d110f0ad096bcdaf",
+    "thresholds": "6a7b68939687cbcc8718c0f900e265c967b486aefbb64e02dcc92d04ad51fb69",
+    "rulebook": "37fce5672c63ed3d027d0b3661cf9e7a653f2f4f677344409c75159b6a44ce91"
+  },
+  "files": {
+    "m1_fremtpl2_freq.py": "fda45c0fbca2682bc540a35908b7eb3f4a71c6bad60f745cca35c3c36db00a74",
+    "reference/coefficients.csv": "bc3d767a50ca1e25078805734043a6211bcc8418d58c61e0be45e8d702aa7890",
+    "reference/meta.json": "1f18cccb95bbe319229ce3fbdde13ca26a38b24f06a2c0095b9b78779650a3fc",
+    "reference/predictions.csv": "1fc1c58cf093f0a24ad542591106ed99e0cc6be3794e7e209ca7e70e6b16882e",
+    "reference/split.csv": "3dd539b06ddd62285e4e7ebdc06fa99e4a9dbf6aed31814eb1847f99b55b3b5d",
+    "requirements.txt": "0b9884fba4f5400a9c5c29fb25b50c4dc3c378aec18317f2248da15d0d53838b",
+    "tests/test_parity.py": "f0185c828e04a395a50e90b09c7977101708aa3b581f76da73794250c8abadda"
+  }
+}

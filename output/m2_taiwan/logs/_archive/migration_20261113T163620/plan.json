@@ -1,0 +1,19 @@
+{
+  "steps": [
+    {"order": 1, "r_construct": "read.csv(path) with check.names=TRUE", "python_approach": "pd.read_csv(csv_path) keeping the default RangeIndex (raw 0-based row position); rename columns with an explicit make.names helper (re.sub('[^A-Za-z0-9.]', '.', name)) so 'default payment next month' -> 'default.payment.next.month'. Never sort/reset_index.", "rule_ids": ["R-IO-01", "R-IO-03"]},
+    {"order": 2, "r_construct": "colnames(raw.credit) <- tolower(colnames(raw.credit))", "python_approach": "df.columns = [c.lower() for c in df.columns], applied after make.names.", "rule_ids": ["R-IO-02"]},
+    {"order": 3, "r_construct": "raw.credit$id <- NULL", "python_approach": "df = df.drop(columns=['id']).", "rule_ids": ["R-IDX-01"]},
+    {"order": 4, "r_construct": "raw.credit$education[raw.credit$education %in% c(0,4,5,6)] <- 4", "python_approach": "df.loc[df['education'].isin([0,4,5,6]), 'education'] = 4 on the numeric column, before the marriage recode (R order).", "rule_ids": ["R-REC-01", "R-REC-02", "R-IDX-02"]},
+    {"order": 5, "r_construct": "raw.credit$marriage[raw.credit$marriage == 0] <- 3", "python_approach": "df.loc[df['marriage'] == 0, 'marriage'] = 3.", "rule_ids": ["R-REC-02", "R-IDX-02"]},
+    {"order": 6, "r_construct": "for (i in seq(6, 11, 1)) raw.credit[which(raw.credit[[i]] %in% c(-2,-1,0)),][[i]] <- 0", "python_approach": "Positions 6..11 resolved (after id removal) to names ['pay_0','pay_2','pay_3','pay_4','pay_5','pay_6']; loop over these names: cast to float (R numeric) and df.loc[df[col].isin([-2,-1,0]), col] = 0.0. No iloc.", "rule_ids": ["R-IDX-01", "R-IDX-02", "R-REC-01", "R-REC-02"]},
+    {"order": 7, "r_construct": "as.factor(sex/education/marriage)", "python_approach": "Keep the codes; the design function builds treatment dummies explicitly from the captured xlevels (sex [1,2], education [1,2,3,4], marriage [1,2,3]): column '<var><level>' = (str(code) == level) for every non-reference level. No get_dummies.", "rule_ids": ["R-FAC-01", "R-FAC-02"]},
+    {"order": 8, "r_construct": "as.factor(default.payment.next.month)", "python_approach": "TARGET = 'default.payment.next.month' kept numeric 0/1 (R levels '0','1'); y = (value != first level '0') as float.", "rule_ids": ["R-FAC-01", "R-FAC-03"]},
+    {"order": 9, "r_construct": "library(caret); createDataPartition(..., p=0.7)", "python_approach": "caret removed. No split code: fit() receives the train rows chosen by the harness from the R capture.", "rule_ids": ["R-RNG-01", "R-PKG-01"]},
+    {"order": 10, "r_construct": "glm(default.payment.next.month ~ limit_bal+sex+education+marriage+pay_0+pay_2+pay_3+pay_5+pay_6+pay_amt1+pay_amt2, family=binomial)", "python_approach": "Explicit design matrix with '(Intercept)' first, then terms in R order. numpy IRLS mirroring glm.fit: mustart=(y+0.5)/2, eta=logit(mustart), deviance-based stop |dev-devold|/(|dev|+0.1) < 1e-8, maxit=25; weighted least squares via QR; SEs from the QR (R matrix) of the last iteration's weighted design, dispersion 1. coefficients() returns term/estimate/std_error with R names.", "rule_ids": ["R-EST-01", "R-EST-02", "R-FAC-04", "GOV-01"]},
+    {"order": 11, "r_construct": "predict(glm.final, type='response', test.batch)", "python_approach": "Build X_new with the same design function and captured levels; return 1/(1+exp(-X_new @ beta)); NaN where any input is missing (none in this data).", "rule_ids": ["R-PRED-01", "R-FAC-02"]},
+    {"order": 12, "r_construct": "sex, education, marriage used as model inputs", "python_approach": "Migrated faithfully without removal or change; recorded as protected attributes for validation.", "rule_ids": ["GOV-01"]}
+  ],
+  "packages": ["numpy", "pandas"],
+  "unmapped": [],
+  "escalations": []
+}

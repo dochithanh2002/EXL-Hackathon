@@ -1,0 +1,33 @@
+{
+  "stages": {},
+  "started_utc": "2026-11-13T16:34:26Z",
+  "steps": [
+    {
+      "cmd": "Rscript agent/validators/m2_taiwan/seed_sensitivity.R input/m2_taiwan/data/taiwan_default.csv output/m2_taiwan/reports/validation",
+      "exit": 0,
+      "seconds": 10.5,
+      "tail": [
+        "n_seeds                mean                  sd                p2_5 ",
+        "       2.000000e+02        7.589913e-01        5.379275e-03        7.479825e-01 ",
+        "             median               p97_5   reported_notebook reported_percentile ",
+        "       7.591947e-01        7.689134e-01        7.542000e-01        1.850000e-01"
+      ]
+    },
+    {
+      "cmd": "python -m agent.validators.m2_taiwan.parity",
+      "exit": 1,
+      "seconds": 1.2,
+      "tail": [
+        "  File \"<frozen runpy>\", line 198, in _run_module_as_main",
+        "  File \"<frozen runpy>\", line 88, in _run_code",
+        "  File \"/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/agent/validators/m2_taiwan/parity.py\", line 175, in <module>",
+        "    res = main()",
+        "  File \"/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/agent/validators/m2_taiwan/parity.py\", line 85, in main",
+        "    check(\"residual deviance abs diff\", abs(meta[\"deviance\"] - res.deviance), TOL[\"deviance_abs\"]),",
+        "                                                               ^^^^^^^^^^^^",
+        "AttributeError: 'dict' object has no attribute 'deviance'"
+      ]
+    }
+  ],
+  "status": "FAILED at parity"
+}

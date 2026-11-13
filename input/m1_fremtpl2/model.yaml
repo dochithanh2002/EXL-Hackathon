@@ -1,0 +1,47 @@
+# Model request: M1. One file per legacy model. Everything here is owned by humans (model owner / MRM).
+# Thresholds, parity tolerances and agent limits are NOT set here: they live in agent/config/thresholds.yaml.
+model_id: M1
+model_name: French Motor TPL Claim Frequency (Poisson GLM1)
+model_type: poisson_frequency        # selects the threshold set in agent/config/thresholds.yaml
+
+legacy:
+  language: R
+  script: model.R                    # paths in this file are relative to this folder
+  model_object: d.glm1
+  train_object: learn
+  test_object: test
+  seed: 100                          # the legacy script also sets set.seed(100) itself
+
+data:
+  path: data/freMTPL2freq.csv
+  id_column: IDpol
+  protected_attributes: [DrivAge]    # age: permitted in UK insurance pricing only with actuarial justification
+
+target_python:
+  module_name: m1_fremtpl2_freq
+  allowed_packages: [numpy, pandas, statsmodels, scipy]
+
+supporting_docs: []
+
+governance:
+  owner: Motor Pricing (simulated)
+  developer: Reconstructed from a published actuarial case study (Noll, Salzmann & Wuthrich 2018)
+  domain: Insurance pricing (motor third-party liability)
+  business_use: Technical claim-frequency model feeding the motor TPL risk premium (simulated insurer)
+  materiality_tier: Tier 1 (high) - drives retail pricing
+  regulatory_framework: [PRA SS1/23, FCA Consumer Duty, FCA GIPP (PS21/5), UK Equality Act 2010 Sch.3 para 20A]
+  last_independent_validation: none on record
+  data_source:
+    dataset: "freMTPL2freq (OpenML 41214; R package CASdatasets)"
+    source_url: https://www.openml.org/d/41214
+    licence: CC0
+    population: 678,013 French motor TPL policies
+    observation_window: one accounting year (exposure in years, capped at 1)
+
+validation:
+  suite: m1_fremtpl2
+  steps: [parity, validate, report]
+  monitoring_steps: [monitor]
+
+tracking:
+  experiment: m1-fremtpl2-frequency

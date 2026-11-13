@@ -1,0 +1,721 @@
+
+
+Defaul Credit Card of Taiwan Clients in 2005
+
+Code 
+
+Show All Code
+Hide All Code
+
+Defaul Credit Card of Taiwan Clients in 2005
+
+Default of Credit Card Clients Dataset
+
+Overview
+
+Dataset Information
+
+This dataset contains information on default payments, demographic factors, credit data, history of payment, and bill statements of credit card clients in Taiwan from April 2005 to September 2005.
+
+I have put the column names to lower cases. Let’s quickly look at the dataset.
+
+There’re quite lots of features in dataset (25 columns)
+id column is the client identifier, this is not important and will be removed.
+There’re few variables which I will convert to factor (such as sex, education, marriage). pay_0 and other pay_x features can considered to be factor variable, but let’s keep them as numeric for now.
+
+dim(raw.credit)
+
+## [1] 30000    25
+
+summary(raw.credit)
+
+##        id          limit_bal            sex          education    
+##  Min.   :    1   Min.   :  10000   Min.   :1.000   Min.   :0.000  
+##  1st Qu.: 7501   1st Qu.:  50000   1st Qu.:1.000   1st Qu.:1.000  
+##  Median :15000   Median : 140000   Median :2.000   Median :2.000  
+##  Mean   :15000   Mean   : 167484   Mean   :1.604   Mean   :1.853  
+##  3rd Qu.:22500   3rd Qu.: 240000   3rd Qu.:2.000   3rd Qu.:2.000  
+##  Max.   :30000   Max.   :1000000   Max.   :2.000   Max.   :6.000  
+##     marriage          age            pay_0             pay_2        
+##  Min.   :0.000   Min.   :21.00   Min.   :-2.0000   Min.   :-2.0000  
+##  1st Qu.:1.000   1st Qu.:28.00   1st Qu.:-1.0000   1st Qu.:-1.0000  
+##  Median :2.000   Median :34.00   Median : 0.0000   Median : 0.0000  
+##  Mean   :1.552   Mean   :35.49   Mean   :-0.0167   Mean   :-0.1338  
+##  3rd Qu.:2.000   3rd Qu.:41.00   3rd Qu.: 0.0000   3rd Qu.: 0.0000  
+##  Max.   :3.000   Max.   :79.00   Max.   : 8.0000   Max.   : 8.0000  
+##      pay_3             pay_4             pay_5             pay_6        
+##  Min.   :-2.0000   Min.   :-2.0000   Min.   :-2.0000   Min.   :-2.0000  
+##  1st Qu.:-1.0000   1st Qu.:-1.0000   1st Qu.:-1.0000   1st Qu.:-1.0000  
+##  Median : 0.0000   Median : 0.0000   Median : 0.0000   Median : 0.0000  
+##  Mean   :-0.1662   Mean   :-0.2207   Mean   :-0.2662   Mean   :-0.2911  
+##  3rd Qu.: 0.0000   3rd Qu.: 0.0000   3rd Qu.: 0.0000   3rd Qu.: 0.0000  
+##  Max.   : 8.0000   Max.   : 8.0000   Max.   : 8.0000   Max.   : 8.0000  
+##    bill_amt1         bill_amt2        bill_amt3         bill_amt4      
+##  Min.   :-165580   Min.   :-69777   Min.   :-157264   Min.   :-170000  
+##  1st Qu.:   3559   1st Qu.:  2985   1st Qu.:   2666   1st Qu.:   2327  
+##  Median :  22382   Median : 21200   Median :  20088   Median :  19052  
+##  Mean   :  51223   Mean   : 49179   Mean   :  47013   Mean   :  43263  
+##  3rd Qu.:  67091   3rd Qu.: 64006   3rd Qu.:  60165   3rd Qu.:  54506  
+##  Max.   : 964511   Max.   :983931   Max.   :1664089   Max.   : 891586  
+##    bill_amt5        bill_amt6          pay_amt1         pay_amt2      
+##  Min.   :-81334   Min.   :-339603   Min.   :     0   Min.   :      0  
+##  1st Qu.:  1763   1st Qu.:   1256   1st Qu.:  1000   1st Qu.:    833  
+##  Median : 18104   Median :  17071   Median :  2100   Median :   2009  
+##  Mean   : 40311   Mean   :  38872   Mean   :  5664   Mean   :   5921  
+##  3rd Qu.: 50190   3rd Qu.:  49198   3rd Qu.:  5006   3rd Qu.:   5000  
+##  Max.   :927171   Max.   : 961664   Max.   :873552   Max.   :1684259  
+##     pay_amt3         pay_amt4         pay_amt5           pay_amt6       
+##  Min.   :     0   Min.   :     0   Min.   :     0.0   Min.   :     0.0  
+##  1st Qu.:   390   1st Qu.:   296   1st Qu.:   252.5   1st Qu.:   117.8  
+##  Median :  1800   Median :  1500   Median :  1500.0   Median :  1500.0  
+##  Mean   :  5226   Mean   :  4826   Mean   :  4799.4   Mean   :  5215.5  
+##  3rd Qu.:  4505   3rd Qu.:  4013   3rd Qu.:  4031.5   3rd Qu.:  4000.0  
+##  Max.   :896040   Max.   :621000   Max.   :426529.0   Max.   :528666.0  
+##  default.payment.next.month
+##  Min.   :0.0000            
+##  1st Qu.:0.0000            
+##  Median :0.0000            
+##  Mean   :0.2212            
+##  3rd Qu.:0.0000            
+##  Max.   :1.0000
+
+head(raw.credit,1)
+
+##   id limit_bal sex education marriage age pay_0 pay_2 pay_3 pay_4 pay_5
+## 1  1     20000   2         2        1  24     2     2    -1    -1    -2
+##   pay_6 bill_amt1 bill_amt2 bill_amt3 bill_amt4 bill_amt5 bill_amt6
+## 1    -2      3913      3102       689         0         0         0
+##   pay_amt1 pay_amt2 pay_amt3 pay_amt4 pay_amt5 pay_amt6
+## 1        0      689        0        0        0        0
+##   default.payment.next.month
+## 1                          1
+
+Is there any missing data points in the dataset?
+
+There are no missing data.
+
+missmap(raw.credit, main = "Deafult credit card missing data heatmap", 
+        col=c("red", "black"), legend=F)
+
+[IMG]
+
+colSums(sapply(raw.credit, is.na))
+
+##                         id                  limit_bal 
+##                          0                          0 
+##                        sex                  education 
+##                          0                          0 
+##                   marriage                        age 
+##                          0                          0 
+##                      pay_0                      pay_2 
+##                          0                          0 
+##                      pay_3                      pay_4 
+##                          0                          0 
+##                      pay_5                      pay_6 
+##                          0                          0 
+##                  bill_amt1                  bill_amt2 
+##                          0                          0 
+##                  bill_amt3                  bill_amt4 
+##                          0                          0 
+##                  bill_amt5                  bill_amt6 
+##                          0                          0 
+##                   pay_amt1                   pay_amt2 
+##                          0                          0 
+##                   pay_amt3                   pay_amt4 
+##                          0                          0 
+##                   pay_amt5                   pay_amt6 
+##                          0                          0 
+## default.payment.next.month 
+##                          0
+
+Note that we have removed id from datasets as there’s no meaning in this context. We will proceed to next section before assigning any factor class to the variables.
+
+Basic Visual & Data Cleansing
+
+This section will try to make more senses on each data point by visualization. I will also fix the data points if they are not making any senses from the given definition.
+
+Look at Demographical variable data
+
+There are more female than male in the dataset.
+There are clients who finished university-level education.
+There are more single client than married, but the number is quite closed (53.2%:45.5%)
+
+Recap from data definition:
+
+EDUCATION: (1=graduate school, 2=university, 3=high school, 4=others, 5=unknown, 6=unknown)
+MARRIAGE: Marital status (1=married, 2=single, 3=others)
+
+# Plot Demographical data
+lets.plot(raw.credit, fun=barPlot, ii=2:4, ncol=2)
+
+[IMG]
+
+Let’s fix the datapoint of education and marriage.
+
+For education, we will merge 0, 4, 5, 6 to 4 (others)
+For marriage, we will merge 0 to 3 (others)
+
+[IMG]
+
+Age data - the data looks ok,
+
+lets.plot(raw.credit, fun=plotDen, ii=5, ncol=1)
+
+[IMG]
+
+Quick look on the limit balance
+
+lets.plot(raw.credit, fun=plotDen, ii=1, ncol=1)
+
+[IMG]
+
+What about repayment status
+
+Based on the data definition, we have the following:
+
+-1 = pay duly
+1 = payment delay for one month
+2 = payment delay for two months
+
+. ..
+
+8 = payment delay for eight months
+
+and so on …
+
+However, from the plot, we can see that there are a lot of -2 and 0 data points spreading out across repayment status.
+
+With this, I assume that -2, -1 and 0 have the same meaning. We will merge them to 0.
+
+lets.plot(raw.credit, fun=barPlot, ii=6:11, ncol=2)
+
+[IMG]
+
+for (i in seq(6, 11, 1)) {
+  raw.credit[which(raw.credit[[i]] %in% c(-2, -1, 0)),][[i]] <- 0
+}
+
+Let’s quickly look at the bill statement and previous payment in each month.
+
+lets.plot(raw.credit, fun=plotDen, ii=12:17, ncol=2)
+
+[IMG]
+
+lets.plot(raw.credit, fun=plotDen, ii=18:23, ncol=2)
+
+[IMG]
+
+Lastly, let’s look at the number of default payment next month.
+
+The default payment is around 22% of the total observations in the dataset.
+
+lets.plot(raw.credit, fun=barPlot, ii=24, ncol=1)
+
+[IMG]
+
+prop.table(table(raw.credit$default.payment.next.month))
+
+## 
+##      0      1 
+## 0.7788 0.2212
+
+Let’s move to the next section.
+
+Correlation
+
+Let’s explore the correlation between each data points.
+
+I will use the mosaicplot to visualize the demographical data against the default payment.
+
+mosaicplot(raw.credit$sex ~ raw.credit$default.payment.next.month, shade=F, color=T,
+           main="Gender affecting the default payment next month?",
+           ylab="Default payment next month (1-Y, 0-N)",
+           xlab="Gender (1-male, 2-female)"
+          )
+
+[IMG]
+
+mosaicplot(raw.credit$education ~ raw.credit$default.payment.next.month, shade=F, color=T,
+           main="Education affecting the default payment next month?",
+           ylab="Default payment next month (1-Y, 0-N)",
+           xlab="Education  (1=graduate school, 2=university, 3=high school, 4=others)"
+          )
+
+[IMG]
+
+mosaicplot(raw.credit$marriage ~ raw.credit$default.payment.next.month, shade=F, color=T,
+           main="Marital status affecting the default payment next month?",
+           ylab="Default payment next month (1-Y, 0-N)",
+           xlab="Marriage (1=married, 2=single, 3=others)"
+          )
+
+[IMG]
+
+mosaicplot(paste0(raw.credit$sex, '-', raw.credit$marriage) ~ raw.credit$default.payment.next.month,
+           shade =F, color = T, main= "Gender with marital status against default credit?",
+           xlab="Gender - marital status", ylab="Default payment next month (1-Y, 0-N)")
+
+[IMG]
+
+Let’s combine everything
+
+It looks like the married women are more likely to default payment.
+
+ggplot(raw.credit, aes(education, fill=default.payment.next.month)) +
+  stat_count() +
+  facet_wrap(~paste0(raw.credit$sex, '-', raw.credit$marriage)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)
+          , legend.position = "bottom"
+          , legend.title = element_blank()
+        )  
+
+[IMG]
+
+Look at the repayment status of each month
+
+From pay_0 to pay_6, the definition is the same except it is reflected the repayment status of each month (-1=pay duly, 1=payment delay for one month, 2=payment delay for two months, … 8=payment delay for eight months, 9=payment delay for nine months and above).
+
+repay.bar.plot <- function(df, i, target) {
+  d <- data.frame(x=df[[i]]) 
+  p <- ggplot(d, aes(factor(x), fill=df[[target]])) + 
+    stat_count() + 
+    xlab(colnames(df)[i]) + 
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 0, hjust = 1)
+          , legend.position = "right"
+          , legend.title = element_blank()
+    )  
+  return(p)
+}
+
+repayment.plot <- function(df, fun, ii, target, ncol) {
+  pp <- list()
+  for (i in ii) {
+    p <- fun(df=df, i=i, target=target)
+    pp <- c(pp, list(p))
+  }
+  do.call("grid.arrange", c(pp, ncol=ncol))
+}
+
+repayment.plot(raw.credit, fun=repay.bar.plot, ii=6:11, target=24, ncol=2)
+
+[IMG]
+
+Let’s plot some corrplot to see if the data has any correlation.
+
+The figure and color are related to correlation coefficients with the number is the p-values. Any sig.level less than or equal to 0.01, it will be crossed out.
+
+credit.corr <- rcorr(as.matrix(tmp), type=c("pearson"))
+colnames(credit.corr$r) <- c(1:length(colnames(credit.corr$r)))
+colnames(credit.corr$P) <- c(1:length(colnames(credit.corr$P)))
+
+corrplot(credit.corr$r, order="FPC", type="upper", method="square",
+         tl.col="black", tl.srt = 45, p.mat = credit.corr$P, addCoef.col = "black",
+         number.cex = 0.5, sig.level = 0.01)
+
+[IMG]
+
+Not much correlation to our binary ‘default.payment.next.month’ output. Let’s dive to the modeling part.
+
+Model Building
+
+This section is to start building the model. Several model will be attempted to build and predict the default payment output.
+
+Separate the dataset onto training (70%) and testing (30%).
+
+intraining <- createDataPartition(y=raw.credit$default.payment.next.month, p=0.7, list=F)
+train.batch <- raw.credit[intraining,]
+test.batch <- raw.credit[-intraining,]
+
+## --- Distribution of training dataset --
+
+## 
+##     0     1 
+## 16355  4646
+
+## 
+##    0    1 
+## 0.78 0.22
+
+## 
+## --- Distribution of training dataset --
+
+## 
+##    0    1 
+## 7009 1990
+
+## 
+##    0    1 
+## 0.78 0.22
+
+Traditional Score using Logistic Regression
+
+glm.m <- glm(default.payment.next.month ~ ., data=train.batch, family=binomial)
+summary(glm.m)
+
+## 
+## Call:
+## glm(formula = default.payment.next.month ~ ., family = binomial, 
+##     data = train.batch)
+## 
+## Deviance Residuals: 
+##     Min       1Q   Median       3Q      Max  
+## -3.9556  -0.6088  -0.5292  -0.3294   3.5591  
+## 
+## Coefficients:
+##                  Estimate    Std. Error z value Pr(>|z|)    
+## (Intercept) -1.3504568659  0.1081854533 -12.483  < 2e-16 ***
+## limit_bal   -0.0000014978  0.0000001871  -8.005 1.19e-15 ***
+## sex2        -0.1663682052  0.0378739559  -4.393 1.12e-05 ***
+## education2  -0.0371670066  0.0435496824  -0.853  0.39342    
+## education3  -0.0868961122  0.0586885822  -1.481  0.13871    
+## education4  -1.2255061510  0.2363484631  -5.185 2.16e-07 ***
+## marriage2   -0.2160475453  0.0429457452  -5.031 4.89e-07 ***
+## marriage3    0.0235916669  0.1545739024   0.153  0.87869    
+## age          0.0028222897  0.0023154743   1.219  0.22289    
+## pay_0        0.8595509213  0.0299673218  28.683  < 2e-16 ***
+## pay_2        0.0728778483  0.0316959208   2.299  0.02149 *  
+## pay_3        0.1447184961  0.0340214057   4.254 2.10e-05 ***
+## pay_4        0.0187459685  0.0381015810   0.492  0.62272    
+## pay_5        0.1090286908  0.0407891476   2.673  0.00752 ** 
+## pay_6        0.1475796670  0.0352592438   4.186 2.84e-05 ***
+## bill_amt1   -0.0000023052  0.0000012492  -1.845  0.06497 .  
+## bill_amt2    0.0000016222  0.0000016789   0.966  0.33392    
+## bill_amt3    0.0000027890  0.0000014992   1.860  0.06283 .  
+## bill_amt4   -0.0000001357  0.0000014924  -0.091  0.92758    
+## bill_amt5   -0.0000004365  0.0000018001  -0.242  0.80843    
+## bill_amt6   -0.0000004912  0.0000015043  -0.326  0.74405    
+## pay_amt1    -0.0000118611  0.0000026623  -4.455 8.38e-06 ***
+## pay_amt2    -0.0000111283  0.0000025839  -4.307 1.66e-05 ***
+## pay_amt3    -0.0000006537  0.0000018498  -0.353  0.72380    
+## pay_amt4    -0.0000020366  0.0000020381  -0.999  0.31768    
+## pay_amt5    -0.0000021646  0.0000021608  -1.002  0.31647    
+## pay_amt6    -0.0000028094  0.0000015887  -1.768  0.07700 .  
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## (Dispersion parameter for binomial family taken to be 1)
+## 
+##     Null deviance: 22196  on 21000  degrees of freedom
+## Residual deviance: 18679  on 20974  degrees of freedom
+## AIC: 18733
+## 
+## Number of Fisher Scoring iterations: 6
+
+glm.final <- glm(default.payment.next.month ~ limit_bal+sex+education+marriage+
+                   pay_0+pay_2+pay_3+pay_5+pay_6+pay_amt1+pay_amt2, data=train.batch,
+                 family=binomial)
+summary(glm.final)
+
+## 
+## Call:
+## glm(formula = default.payment.next.month ~ limit_bal + sex + 
+##     education + marriage + pay_0 + pay_2 + pay_3 + pay_5 + pay_6 + 
+##     pay_amt1 + pay_amt2, family = binomial, data = train.batch)
+## 
+## Deviance Residuals: 
+##     Min       1Q   Median       3Q      Max  
+## -3.9593  -0.6059  -0.5281  -0.3475   3.3100  
+## 
+## Coefficients:
+##                  Estimate    Std. Error z value       Pr(>|z|)    
+## (Intercept) -1.2464715831  0.0601064514 -20.738        < 2e-16 ***
+## limit_bal   -0.0000015140  0.0000001738  -8.712        < 2e-16 ***
+## sex2        -0.1739113382  0.0375086368  -4.637 0.000003542420 ***
+## education2  -0.0277543002  0.0432921129  -0.641       0.521462    
+## education3  -0.0658065656  0.0574427500  -1.146       0.251960    
+## education4  -1.2000012011  0.2357514468  -5.090 0.000000357853 ***
+## marriage2   -0.2404882395  0.0384488193  -6.255 0.000000000398 ***
+## marriage3    0.0283120743  0.1543996255   0.183       0.854509    
+## pay_0        0.8688694354  0.0298363252  29.121        < 2e-16 ***
+## pay_2        0.0754848440  0.0314949315   2.397       0.016542 *  
+## pay_3        0.1581567233  0.0303531854   5.211 0.000000188284 ***
+## pay_5        0.1203090249  0.0359752028   3.344       0.000825 ***
+## pay_6        0.1481768121  0.0350330573   4.230 0.000023407770 ***
+## pay_amt1    -0.0000097448  0.0000023035  -4.230 0.000023324033 ***
+## pay_amt2    -0.0000094181  0.0000022051  -4.271 0.000019462892 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## (Dispersion parameter for binomial family taken to be 1)
+## 
+##     Null deviance: 22196  on 21000  degrees of freedom
+## Residual deviance: 18708  on 20986  degrees of freedom
+## AIC: 18738
+## 
+## Number of Fisher Scoring iterations: 5
+
+test.x <- select(test.batch, - default.payment.next.month)
+test.batch$glm_scor1 <- predict(glm.final, type="response", test.x)
+pred <- prediction(test.batch$glm_scor1, test.batch$default.payment.next.month)
+glm.perf <- performance(pred, "tpr", "fpr")
+
+ggplot(test.batch, aes(default.payment.next.month, glm_scor1)) +
+  geom_boxplot() + theme_bw() +
+  ggtitle("GLM Score distribution") +
+  xlab("Default Payment") +
+  ylab("Default Score")
+
+[IMG]
+
+# ROC
+plot(glm.perf, lty=1, col="blue", main="Logistic Regression Performance")
+abline(a=0, b= 1)
+
+[IMG]
+
+auc.perf <- performance(pred, measure = "auc")
+acc.perf <- performance(pred, measure = "acc")
+# AUC
+cat(paste0("AUC:: ", auc.perf@y.values), "\n")
+
+## AUC:: 0.754195252191898
+
+# Get accuracy and cutoff
+ind <- which.max( slot(acc.perf, "y.values")[[1]] )
+acc <- slot(acc.perf, "y.values")[[1]][ind]
+cutoff <- slot(acc.perf, "x.values")[[1]][ind]
+
+print(c(accuracy= acc, cutoff = cutoff))
+
+##  accuracy    cutoff 
+## 0.8199800 0.4538829
+
+# Draw Accuracy with cutoff
+plot(acc.perf)
+abline(v=cutoff)
+
+[IMG]
+
+glm.scor <- select(test.batch,
+                   glm_scor1, 
+                   default.payment.next.month)
+
+glm.scor <- mutate(glm.scor,
+                   predict_class = ifelse(glm_scor1 >= cutoff, 1, 0))
+
+confusionMatrix(glm.scor$predict_class, glm.scor$default.payment.next.month, positive = '1')
+
+## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    0    1
+##          0 6659 1270
+##          1  350  720
+##                                           
+##                Accuracy : 0.82            
+##                  95% CI : (0.8119, 0.8279)
+##     No Information Rate : 0.7789          
+##     P-Value [Acc > NIR] : < 2.2e-16       
+##                                           
+##                   Kappa : 0.3737          
+##  Mcnemar's Test P-Value : < 2.2e-16       
+##                                           
+##             Sensitivity : 0.36181         
+##             Specificity : 0.95006         
+##          Pos Pred Value : 0.67290         
+##          Neg Pred Value : 0.83983         
+##              Prevalence : 0.22114         
+##          Detection Rate : 0.08001         
+##    Detection Prevalence : 0.11890         
+##       Balanced Accuracy : 0.65594         
+##                                           
+##        'Positive' Class : 1               
+## 
+
+Eventually, we can see which top X variables are influenced the predicted score. In this example, I will select only top 2 variables.
+
+glm.terms <-predict(glm.final,type='terms',test.x)
+
+get.top.var <- function(x,top=2){ 
+  res=names(x)[order(x, decreasing = TRUE)][1:top]
+  paste(res,collapse=";",sep="")
+}
+
+top.var <- apply(glm.terms, 1, get.top.var, top=2)
+test.batch %>% select(default.payment.next.month, glm_scor1) %>%
+  cbind(top.var) %>% head(5)
+
+##    default.payment.next.month  glm_scor1            top.var
+## 2                           1 0.19272500        pay_6;pay_2
+## 5                           0 0.15253181 limit_bal;marriage
+## 7                           0 0.04083023      sex;education
+## 9                           0 0.19556046     pay_3;marriage
+## 10                          0 0.17036448      limit_bal;sex
+
+Decision Tree (rpart library)
+
+rpart.model <- rpart(default.payment.next.month ~.,data=train.batch)
+
+plot(rpart.model);text(rpart.model)
+
+[IMG]
+
+plotcp(rpart.model)
+
+[IMG]
+
+printcp(rpart.model)
+
+## 
+## Classification tree:
+## rpart(formula = default.payment.next.month ~ ., data = train.batch)
+## 
+## Variables actually used in tree construction:
+## [1] pay_0
+## 
+## Root node error: 4646/21001 = 0.22123
+## 
+## n= 21001 
+## 
+##        CP nsplit rel error  xerror     xstd
+## 1 0.18252      0   1.00000 1.00000 0.012947
+## 2 0.01000      1   0.81748 0.81748 0.012006
+
+rpart.pred <- predict(rpart.model, test.x, type="class")
+confusionMatrix(rpart.pred, test.batch$default.payment.next.month, positive = '1')
+
+## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    0    1
+##          0 6744 1349
+##          1  265  641
+##                                           
+##                Accuracy : 0.8206          
+##                  95% CI : (0.8126, 0.8285)
+##     No Information Rate : 0.7789          
+##     P-Value [Acc > NIR] : < 2.2e-16       
+##                                           
+##                   Kappa : 0.3532          
+##  Mcnemar's Test P-Value : < 2.2e-16       
+##                                           
+##             Sensitivity : 0.32211         
+##             Specificity : 0.96219         
+##          Pos Pred Value : 0.70751         
+##          Neg Pred Value : 0.83331         
+##              Prevalence : 0.22114         
+##          Detection Rate : 0.07123         
+##    Detection Prevalence : 0.10068         
+##       Balanced Accuracy : 0.64215         
+##                                           
+##        'Positive' Class : 1               
+## 
+
+test.batch$rpart_scor1 <- predict(rpart.model,type='prob',test.x)
+pred2 <- prediction(test.batch$rpart_scor1[, 2], test.batch$default.payment.next.month)
+rpart.perf1 <- performance(pred2,"tpr","fpr")
+
+plot(rpart.perf1, col='red', main='Rpart Tree performance')
+abline(a=0, b= 1)
+
+[IMG]
+
+Random Forest
+
+rand.model <- randomForest(default.payment.next.month~.,data=train.batch, importance=T,
+                            ntree=500, keep.forest=T)
+
+varImpPlot(rand.model)
+
+[IMG]
+
+rand.pred <- predict(rand.model, test.x, type="class")
+confusionMatrix(rand.pred, test.batch$default.payment.next.month, positive='1')
+
+## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    0    1
+##          0 6639 1267
+##          1  370  723
+##                                        
+##                Accuracy : 0.8181       
+##                  95% CI : (0.81, 0.826)
+##     No Information Rate : 0.7789       
+##     P-Value [Acc > NIR] : < 2.2e-16    
+##                                        
+##                   Kappa : 0.3703       
+##  Mcnemar's Test P-Value : < 2.2e-16    
+##                                        
+##             Sensitivity : 0.36332      
+##             Specificity : 0.94721      
+##          Pos Pred Value : 0.66148      
+##          Neg Pred Value : 0.83974      
+##              Prevalence : 0.22114      
+##          Detection Rate : 0.08034      
+##    Detection Prevalence : 0.12146      
+##       Balanced Accuracy : 0.65526      
+##                                        
+##        'Positive' Class : 1            
+## 
+
+rand.prob <- predict(rand.model, test.x, type='prob')[,2]
+pred4 <- prediction(rand.prob,test.batch$default.payment.next.month)
+
+rf.perf1 <- performance(pred4,"tpr","fpr")
+
+plot(glm.perf,col='red',lty=1, main='ROC Logistic VS. Rpart tree VS. Random Forest'); 
+plot(rpart.perf1, col='blue',lty=2,add=T); 
+plot(rf.perf1, col='green', lty=3, add=T);
+legend(0.6,0.6,c('logistic regression','rpart tree', 'randomForest'),
+       col=c('red','blue','green'),lwd=3)
+
+[IMG]
+
+Final print the AUC of all 3 predictions…
+
+#simple model
+glm.auc <- performance(pred,"auc")
+cat("\n=== Logistic Regression ===\n")
+
+## 
+## === Logistic Regression ===
+
+cat(paste0(glm.auc@y.name,":: ", round(glm.auc@y.values[[1]], 2)))
+
+## Area under the ROC curve:: 0.75
+
+cat(paste0("\nKS :: ", 
+           round(max(attr(glm.perf,'y.values')[[1]]-attr(glm.perf,'x.values')[[1]]),2)))
+
+## 
+## KS :: 0.4
+
+# rpart
+rpart.auc <- performance(pred2,"auc")
+cat("\n\n=== Rpart tree ===\n")
+
+## 
+## 
+## === Rpart tree ===
+
+cat(paste0(rpart.auc@y.name,":: ", round(rpart.auc@y.values[[1]],2)))
+
+## Area under the ROC curve:: 0.64
+
+cat(paste0("\nKS :: ", 
+           round(max(attr(rpart.perf1,'y.values')[[1]]-attr(rpart.perf1,'x.values')[[1]]),2)))
+
+## 
+## KS :: 0.28
+
+# RF
+rf.auc <- performance(pred4,"auc")
+cat("\n\n=== Random Forest ===\n")
+
+## 
+## 
+## === Random Forest ===
+
+cat(paste0(rf.auc@y.name,":: ", round(rf.auc@y.values[[1]], 2)))
+
+## Area under the ROC curve:: 0.77
+
+cat(paste0("\nKS :: ", 
+           round(max(attr(rf.perf1,'y.values')[[1]]-attr(rf.perf1,'x.values')[[1]]),2)))
+
+## 
+## KS :: 0.41
+

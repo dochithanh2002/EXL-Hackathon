@@ -1,0 +1,178 @@
+{
+  "model_id": "M1",
+  "timestamp_utc": "2026-11-13T16:50:05+00:00",
+  "champion": {
+    "module": "output/m1_fremtpl2/model/m1_fremtpl2_freq.py",
+    "module_sha256": "fda45c0fbca2682bc540a35908b7eb3f4a71c6bad60f745cca35c3c36db00a74",
+    "manifest_module_sha256": "fda45c0fbca2682bc540a35908b7eb3f4a71c6bad60f745cca35c3c36db00a74",
+    "migration_status": "AWAITING_HUMAN_APPROVAL",
+    "migration_iterations": 1,
+    "human_review": null,
+    "migrated_by": "Claude Opus 5.5 (Claude Code, migration-agent)",
+    "reference_dir": "output/m1_fremtpl2/model/reference"
+  },
+  "reference": {
+    "version": "R version 4.6.1 (2026-06-24)",
+    "seed": 100,
+    "script": "model.R"
+  },
+  "rebuild": {
+    "iterations": 6,
+    "converged": true
+  },
+  "metrics": {
+    "test_loss_r": 30.910946729292426,
+    "test_loss_py": 30.910946729292437,
+    "deviance_r": 191651.269966774,
+    "deviance_py": 191651.26996678728
+  },
+  "tolerances": {
+    "coef_abs": 1e-08,
+    "coef_rel": 1e-06,
+    "se_rel": 1e-06,
+    "pred_abs": 1e-10,
+    "deviance_abs": 1e-06,
+    "statsmodels_coef_rel": 0.0001,
+    "statsmodels_pred_abs": 1e-06
+  },
+  "checks": [
+    {
+      "check": "artefact: module SHA-256 differs from agent manifest",
+      "value": 0.0,
+      "tolerance": 0,
+      "pass": true
+    },
+    {
+      "check": "term names/order differ from R model.matrix",
+      "value": 0.0,
+      "tolerance": 0,
+      "pass": true
+    },
+    {
+      "check": "split: rows with different learn/test membership",
+      "value": 0.0,
+      "tolerance": 0,
+      "pass": true
+    },
+    {
+      "check": "response: rows with different ClaimNb",
+      "value": 0.0,
+      "tolerance": 0,
+      "pass": true
+    },
+    {
+      "check": "coef max abs diff",
+      "value": 7.283063041541027e-14,
+      "tolerance": 1e-08,
+      "pass": true
+    },
+    {
+      "check": "coef max rel diff",
+      "value": 9.869676926672826e-13,
+      "tolerance": 1e-06,
+      "pass": true
+    },
+    {
+      "check": "std error max rel diff",
+      "value": 7.241881947656443e-14,
+      "tolerance": 1e-06,
+      "pass": true
+    },
+    {
+      "check": "expected claims max abs diff (all 678,013 rows)",
+      "value": 6.195044477408373e-14,
+      "tolerance": 1e-10,
+      "pass": true
+    },
+    {
+      "check": "residual deviance abs diff",
+      "value": 1.3271346688270569e-08,
+      "tolerance": 1e-06,
+      "pass": true
+    },
+    {
+      "check": "AIC-equivalent: deviance + 2k abs diff",
+      "value": 1.3271346688270569e-08,
+      "tolerance": 1e-06,
+      "pass": true
+    },
+    {
+      "check": "test Poisson loss abs diff",
+      "value": 1.0658141036401503e-14,
+      "tolerance": 1e-10,
+      "pass": true
+    }
+  ],
+  "independent_crosscheck_statsmodels": [
+    {
+      "check": "statsmodels coef max rel diff vs R",
+      "value": 7.009440993080553e-08,
+      "tolerance": 0.0001,
+      "pass": true
+    },
+    {
+      "check": "statsmodels expected claims max abs diff vs R",
+      "value": 7.079178909741302e-09,
+      "tolerance": 1e-06,
+      "pass": true
+    }
+  ],
+  "agent_reported_checks": [
+    {
+      "check": "G-05 coefficient names: missing + extra",
+      "value": 0.0,
+      "tolerance": 0.0,
+      "pass": true
+    },
+    {
+      "check": "coefficient max rel diff",
+      "value": 9.869676926672826e-13,
+      "tolerance": 1e-06,
+      "pass": true
+    },
+    {
+      "check": "std error max rel diff",
+      "value": 7.241881947656443e-14,
+      "tolerance": 1e-06,
+      "pass": true
+    },
+    {
+      "check": "rows: identical set",
+      "value": 0.0,
+      "tolerance": 0.0,
+      "pass": true
+    },
+    {
+      "check": "response values: rows differing",
+      "value": 0.0,
+      "tolerance": 0.0,
+      "pass": true
+    },
+    {
+      "check": "split membership: rows differing",
+      "value": 0.0,
+      "tolerance": 0.0,
+      "pass": true
+    },
+    {
+      "check": "prediction NA pattern: rows differing",
+      "value": 0.0,
+      "tolerance": 0.0,
+      "pass": true
+    },
+    {
+      "check": "prediction max abs diff (rows predicted by both)",
+      "value": 6.195044477408373e-14,
+      "tolerance": 1e-08,
+      "pass": true
+    },
+    {
+      "check": "poisson deviance abs diff",
+      "value": 0.0,
+      "tolerance": 1e-06,
+      "pass": true
+    }
+  ],
+  "migration_iterations": 1,
+  "parity_pass": true
+}

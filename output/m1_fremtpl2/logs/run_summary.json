@@ -1,0 +1,114 @@
+{
+  "model_id": "M1",
+  "model": "m1_fremtpl2",
+  "generated_utc": "2026-11-13T16:52:45Z",
+  "documentation": {
+    "status": "AWAITING_HUMAN_APPROVAL",
+    "done": [
+      "facts",
+      "verify",
+      "render"
+    ],
+    "iterations": [
+      "PASS"
+    ]
+  },
+  "migration": {
+    "status": "AWAITING_HUMAN_APPROVAL",
+    "done": [
+      "analyse",
+      "plan",
+      "test_and_repair",
+      "package"
+    ],
+    "iterations": [
+      "PASS"
+    ]
+  },
+  "stale_results_for_older_module": [],
+  "parity_recheck": {
+    "pass": true,
+    "checks_passed": 11,
+    "checks": 11,
+    "report": "output/m1_fremtpl2/reports/parity/parity_report_M1.md"
+  },
+  "validation": {
+    "overall_rag": "AMBER",
+    "date_utc": "2026-11-13T16:50:16+00:00",
+    "areas": {
+      "predictive_power": "GREEN",
+      "calibration": "AMBER",
+      "stability": "AMBER",
+      "specification": "AMBER"
+    },
+    "headline": {
+      "name": "test Poisson deviance loss x100",
+      "value": 30.910946729292437
+    },
+    "report": "output/m1_fremtpl2/reports/validation_report_M1.html"
+  },
+  "fairness": {
+    "overall_rag": "AMBER",
+    "statistical_rag": "AMBER",
+    "legal_rag": "AMBER",
+    "recommended_variant": "keep driver age with documented actuarial justification; monitor A/E by age band"
+  },
+  "monitoring": {
+    "revalidation_required": true,
+    "batches": {
+      "test cohort": "GREEN",
+      "young-driver growth": "RED"
+    },
+    "report": "output/m1_fremtpl2/reports/monitoring/MONITORING_REPORT.md"
+  },
+  "awaiting_human": [
+    "model card",
+    "migrated module"
+  ],
+  "validation_steps": [
+    {
+      "cmd": "python -m agent.validators.m1_fremtpl2.parity",
+      "exit": 0,
+      "seconds": 17.7,
+      "tail": [
+        "PASS  std error max rel diff                                  7.242e-14  (tol 1e-06)",
+        "PASS  expected claims max abs diff (all 678,013 rows)         6.195e-14  (tol 1e-10)",
+        "PASS  residual deviance abs diff                              1.327e-08  (tol 1e-06)",
+        "PASS  AIC-equivalent: deviance + 2k abs diff                  1.327e-08  (tol 1e-06)",
+        "PASS  test Poisson loss abs diff                              1.066e-14  (tol 1e-10)",
+        "PASS  statsmodels coef max rel diff vs R                      7.009e-08  (tol 1e-04)",
+        "PASS  statsmodels expected claims max abs diff vs R           7.079e-09  (tol 1e-06)",
+        "PARITY: PASS"
+      ]
+    },
+    {
+      "cmd": "python -m agent.validators.m1_fremtpl2.validate",
+      "exit": 0,
+      "seconds": 87.8,
+      "tail": [
+        "{'predictive_power': 'GREEN', 'calibration': 'AMBER', 'stability': 'AMBER', 'specification': 'AMBER'} fairness: AMBER overall: AMBER",
+        "test loss x100 30.9109  null 32.3984  GBM 29.8078  Gini 0.265  A/E 0.9685"
+      ]
+    },
+    {
+      "cmd": "python -m agent.validators.m1_fremtpl2.report",
+      "exit": 0,
+      "seconds": 0.9,
+      "tail": [
+        "wrote /Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/output/m1_fremtpl2/reports/validation_report_M1.md and .html"
+      ]
+    }
+  ],
+  "monitoring_steps": [
+    {
+      "cmd": "python -m agent.validators.m1_fremtpl2.monitor",
+      "exit": 0,
+      "seconds": 9.6,
+      "tail": [
+        "test cohort            GREEN  ",
+        "young-driver growth    RED    max_csi = 0.1004 (AMBER; amber/red at 0.1/0.25), driven by DrivAgeGLM; max_age_band_ae_dev = 0.2631 (RED; amber/red at 0.1/0.2)",
+        "RE-VALIDATION REQUIRED"
+      ]
+    }
+  ]
+}

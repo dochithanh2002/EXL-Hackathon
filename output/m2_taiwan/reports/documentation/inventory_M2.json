@@ -1,0 +1,690 @@
+{
+  "model_id": "M2",
+  "model_name": "Taiwan Card-Default Logistic PD (Traditional Score)",
+  "record_version": 1,
+  "status": "DRAFT - AWAITING HUMAN APPROVAL",
+  "governance (human-owned, from model.yaml)": {
+    "owner": "Retail Credit Risk Modelling (simulated)",
+    "developer": "Third party (public Kaggle notebook author)",
+    "domain": "Credit risk",
+    "business_use": "Account management - credit-limit reviews and collections prioritisation (simulated bank)",
+    "materiality_tier": "Tier 2 (medium)",
+    "regulatory_framework": [
+      "PRA SS1/23",
+      "UK Equality Act 2010",
+      "FCA Consumer Duty",
+      "UK GDPR Art. 22"
+    ],
+    "last_independent_validation": "none on record",
+    "data_source": {
+      "dataset": "UCI #350 Default of Credit Card Clients (Yeh & Lien, 2009)",
+      "source_url": "https://archive.ics.uci.edu/dataset/350",
+      "licence": "CC BY 4.0",
+      "population": "30,000 credit-card clients, Taiwan bank",
+      "observation_window": "Apr-Sep 2005 (6 monthly snapshots)"
+    }
+  },
+  "source": {
+    "language": "R",
+    "script": "input/m2_taiwan/model.R",
+    "sha256": "b78cf83bbf12f74f7a0d1bd4ad19d4344ca0a6046f58df9f60dbcfbbe5d36354",
+    "supporting_docs": [
+      "input/m2_taiwan/docs/netzone_results.txt"
+    ],
+    "r_version": "R version 4.6.1 (2026-06-24)"
+  },
+  "purpose": "Estimate, for an individual credit-card client, the probability of default on the payment due next month (the 'Traditional Score'), using a logistic regression on account limit, demographic attributes, recent repayment status and recent payment amounts. The legacy script fits the model on a training partition and scores the held-out test partition with predicted probabilities (lines 37-42).",
+  "intended_use": "Per the governance record in model.yaml: account management - credit-limit reviews and collections prioritisation for existing credit-card clients (simulated bank). The model output is a probability score per client (line 42, type=\"response\"); the legacy source contains no decision cut-off, so any decision rule built on the score sits outside this model.",
+  "out_of_scope_use": "Not established by the evidence and to be confirmed by the owner. On the evidence available the model should not be used for: origination / application scoring of new applicants (all inputs describe an existing account's limit and repayment history); populations other than the Taiwan credit-card clients of the April-September 2005 development data; regulatory capital PD estimation (no long-run calibration, no default definition aligned to regulatory standards); or fully automated adverse decisions on individuals, given that sex, marital status and education are direct inputs.",
+  "methodology": {
+    "summary": "Binary logistic regression (generalised linear model, binomial family, logit link) fitted by maximum likelihood with R glm() on a training partition (lines 38-40). The data are read from CSV, column names are lower-cased, the client id is dropped, education and marriage codes are merged into an 'others' category, the six repayment-status columns have their non-delinquent codes merged into a single code, and sex, education, marriage and the target are converted to factors (lines 10-30). Factors enter the model with treatment (dummy) coding against the first level; repayment status, limit and payment amounts enter as linear numeric terms with no transformation. The data are split into training (70%) and testing (30%) with caret::createDataPartition stratified on the target, with no random seed set (lines 32-35). The final model uses a hand-picked subset of eleven inputs (lines 38-39); predicted default probabilities are produced for the test partition (line 42).",
+    "class": [
+      "glm",
+      "lm"
+    ],
+    "family": "binomial",
+    "link": "logit",
+    "formula": "default.payment.next.month ~ limit_bal + sex + education + marriage + pay_0 + pay_2 + pay_3 + pay_5 + pay_6 + pay_amt1 + pay_amt2",
+    "variable_selection": "The legacy source contains only the final formula (lines 38-39); it records no selection procedure. The supporting notebook shows that a full model on all remaining columns (glm.m, formula '~ .') was fitted and summarised first, and the final eleven-input model was then specified by hand. The criteria are not stated. Excluded from the final model: age, pay_4, all six bill_amt columns and pay_amt3 to pay_amt6. Protected attributes sex and marriage and the sensitive attribute education were retained; age was dropped. No check of multicollinearity among the correlated repayment-status columns, no out-of-time test, and no fairness review is recorded as part of the selection."
+  },
+  "target": {
+    "name": "default.payment.next.month",
+    "definition": "default.payment.next.month: binary indicator of default payment in the month following the observation window (1 = default / Yes, 0 = no default / No, per the notebook's plot labels 'Default payment next month (1-Y, 0-N)'). Read from the CSV column 'default payment next month', which read.csv renames to default.payment.next.month; converted to a factor at line 30 so the model estimates the probability of level '1'. The underlying definition of 'default' (days past due, amount threshold) is not stated in the source or supporting document."
+  },
+  "inputs": [
+    {
+      "name": "limit_bal",
+      "kind": "numeric",
+      "description": "Credit limit / limit balance of the card account (notebook: 'Quick look on the limit balance'). Currency and whether it includes supplementary cards are not stated in the evidence.",
+      "levels": [],
+      "level_meaning": {},
+      "transformation": "none (entered as a raw linear term; no scaling, log transform or capping)",
+      "source_lines": [
+        11,
+        38
+      ],
+      "r_class": "integer",
+      "protected": false
+    },
+    {
+      "name": "sex",
+      "kind": "binary",
+      "description": "Client gender (protected attribute). Notebook coding: 1 = male, 2 = female.",
+      "levels": [
+        "1",
+        "2"
+      ],
+      "level_meaning": {
+        "1": "male",
+        "2": "female"
+      },
+      "transformation": "Converted to a factor (line 27); treatment-coded with level 1 (male) as the reference.",
+      "source_lines": [
+        27,
+        38
+      ],
+      "r_class": "factor",
+      "protected": true
+    },
+    {
+      "name": "education",
+      "kind": "categorical",
+      "description": "Client education level (sensitive attribute). Data definition quoted in the notebook: 1 = graduate school, 2 = university, 3 = high school, 4 = others, 5 = unknown, 6 = unknown; code 0 is present in the data but undefined.",
+      "levels": [
+        "1",
+        "2",
+        "3",
+        "4"
+      ],
+      "level_meaning": {
+        "1": "graduate school",
+        "2": "university",
+        "3": "high school",
+        "4": "others (after merge: original codes 0, 4, 5 and 6)"
+      },
+      "transformation": "Codes 0, 4, 5 and 6 merged into 4 'others' (line 17); then converted to a factor (line 28), treatment-coded with level 1 (graduate school) as the reference.",
+      "source_lines": [
+        16,
+        17,
+        28,
+        38
+      ],
+      "r_class": "factor",
+      "protected": true
+    },
+    {
+      "name": "marriage",
+      "kind": "categorical",
+      "description": "Client marital status (protected attribute). Data definition quoted in the notebook: 1 = married, 2 = single, 3 = others; code 0 is present in the data but undefined.",
+      "levels": [
+        "1",
+        "2",
+        "3"
+      ],
+      "level_meaning": {
+        "1": "married",
+        "2": "single",
+        "3": "others (after merge: original codes 0 and 3)"
+      },
+      "transformation": "Code 0 merged into 3 'others' (line 19); then converted to a factor (line 29), treatment-coded with level 1 (married) as the reference.",
+      "source_lines": [
+        18,
+        19,
+        29,
+        38
+      ],
+      "r_class": "factor",
+      "protected": true
+    },
+    {
+      "name": "pay_0",
+      "kind": "ordinal_as_numeric",
+      "description": "Repayment status in the most recent month of the observation window (September 2005 per the dataset's monthly ordering). Data definition: -1 = pay duly, 1 = payment delay for one month, 2 = two months ... 9 = payment delay for nine months and above; codes -2 and 0 occur in the data but are not defined.",
+      "levels": [],
+      "level_meaning": {},
+      "transformation": "Codes -2, -1 and 0 merged to 0 (lines 22-24); kept numeric, so the model treats months of delay as a linear effect.",
+      "source_lines": [
+        21,
+        22,
+        23,
+        24,
+        39
+      ],
+      "r_class": "numeric",
+      "protected": false
+    },
+    {
+      "name": "pay_2",
+      "kind": "ordinal_as_numeric",
+      "description": "Repayment status one month before pay_0 (same coding as pay_0: -1 = pay duly, 1..9 = months of payment delay).",
+      "levels": [],
+      "level_meaning": {},
+      "transformation": "Codes -2, -1 and 0 merged to 0 (lines 22-24); kept numeric (linear in months of delay).",
+      "source_lines": [
+        21,
+        22,
+        23,
+        24,
+        39
+      ],
+      "r_class": "numeric",
+      "protected": false
+    },
+    {
+      "name": "pay_3",
+      "kind": "ordinal_as_numeric",
+      "description": "Repayment status two months before pay_0 (same coding as pay_0).",
+      "levels": [],
+      "level_meaning": {},
+      "transformation": "Codes -2, -1 and 0 merged to 0 (lines 22-24); kept numeric (linear in months of delay).",
+      "source_lines": [
+        21,
+        22,
+        23,
+        24,
+        39
+      ],
+      "r_class": "numeric",
+      "protected": false
+    },
+    {
+      "name": "pay_5",
+      "kind": "ordinal_as_numeric",
+      "description": "Repayment status four months before pay_0 (same coding as pay_0). The data profile shows no records with code 1 (one-month delay) in this column.",
+      "levels": [],
+      "level_meaning": {},
+      "transformation": "Codes -2, -1 and 0 merged to 0 (lines 22-24); kept numeric (linear in months of delay).",
+      "source_lines": [
+        21,
+        22,
+        23,
+        24,
+        39
+      ],
+      "r_class": "numeric",
+      "protected": false
+    },
+    {
+      "name": "pay_6",
+      "kind": "ordinal_as_numeric",
+      "description": "Repayment status five months before pay_0, the oldest month of the observation window (same coding as pay_0). The data profile shows no records with code 1 (one-month delay) in this column.",
+      "levels": [],
+      "level_meaning": {},
+      "transformation": "Codes -2, -1 and 0 merged to 0 (lines 22-24); kept numeric (linear in months of delay).",
+      "source_lines": [
+        21,
+        22,
+        23,
+        24,
+        39
+      ],
+      "r_class": "numeric",
+      "protected": false
+    },
+    {
+      "name": "pay_amt1",
+      "kind": "numeric",
+      "description": "Amount of previous payment in the most recent month of the observation window (notebook: 'previous payment in each month').",
+      "levels": [],
+      "level_meaning": {},
+      "transformation": "none (raw linear term; no scaling, log transform or capping)",
+      "source_lines": [
+        39
+      ],
+      "r_class": "integer",
+      "protected": false
+    },
+    {
+      "name": "pay_amt2",
+      "kind": "numeric",
+      "description": "Amount of previous payment one month before pay_amt1.",
+      "levels": [],
+      "level_meaning": {},
+      "transformation": "none (raw linear term; no scaling, log transform or capping)",
+      "source_lines": [
+        39
+      ],
+      "r_class": "integer",
+      "protected": false
+    }
+  ],
+  "preprocessing": [
+    {
+      "order": 1,
+      "description": "Read the CSV and convert all column names to lower case. read.csv also turns the target header 'default payment next month' into default.payment.next.month.",
+      "columns": [
+        "all"
+      ],
+      "source_lines": [
+        10,
+        11
+      ],
+      "author_rationale": "Notebook: 'I have put the column names to lower cases.'",
+      "is_assumption": false
+    },
+    {
+      "order": 2,
+      "description": "Drop the client identifier column id.",
+      "columns": [
+        "id"
+      ],
+      "source_lines": [
+        13,
+        14
+      ],
+      "author_rationale": "id column is the client identifier, not important, so it is removed.",
+      "is_assumption": false
+    },
+    {
+      "order": 3,
+      "description": "Recode education codes 0, 4, 5 and 6 to 4 ('others'). This line is marked [reconstructed]: it was described in the notebook but its code was not printed.",
+      "columns": [
+        "education"
+      ],
+      "source_lines": [
+        16,
+        17
+      ],
+      "author_rationale": "Notebook: 'Let's fix the datapoint of education and marriage' - the codes are not making sense against the data definition (0 is undefined; 5 and 6 are 'unknown').",
+      "is_assumption": true
+    },
+    {
+      "order": 4,
+      "description": "Recode marriage code 0 to 3 ('others'). Marked [reconstructed] in the source.",
+      "columns": [
+        "marriage"
+      ],
+      "source_lines": [
+        18,
+        19
+      ],
+      "author_rationale": "Code 0 is not in the data definition (1 = married, 2 = single, 3 = others).",
+      "is_assumption": true
+    },
+    {
+      "order": 5,
+      "description": "For the six repayment-status columns, selected by position 6 to 11 (pay_0, pay_2, pay_3, pay_4, pay_5, pay_6 after id is dropped), recode -2, -1 and 0 to 0. This removes the distinction between 'pay duly' (-1) and the undefined codes -2 and 0.",
+      "columns": [
+        "pay_0",
+        "pay_2",
+        "pay_3",
+        "pay_4",
+        "pay_5",
+        "pay_6"
+      ],
+      "source_lines": [
+        21,
+        22,
+        23,
+        24
+      ],
+      "author_rationale": "Author: 'Assume -2, -1 and 0 have the same meaning. Merge them to 0.' Based on the observation that many -2 and 0 values appear although the definition only defines -1 as pay duly.",
+      "is_assumption": true
+    },
+    {
+      "order": 6,
+      "description": "Convert sex, education, marriage and the target to factors (R default level ordering, treatment contrasts). Repayment-status and amount columns remain numeric. Marked [reconstructed] in the source.",
+      "columns": [
+        "sex",
+        "education",
+        "marriage",
+        "default.payment.next.month"
+      ],
+      "source_lines": [
+        26,
+        27,
+        28,
+        29,
+        30
+      ],
+      "author_rationale": "Notebook: 'There're few variables which I will convert to factor (such as sex, education, marriage). pay_0 and other pay_x features can considered to be factor variable, but let's keep them as numeric for now.'",
+      "is_assumption": false
+    },
+    {
+      "order": 7,
+      "description": "Split the data into training (70%) and testing (30%) partitions with caret::createDataPartition, stratified on the target. No random seed is set, so the partition differs on every run.",
+      "columns": [
+        "default.payment.next.month"
+      ],
+      "source_lines": [
+        32,
+        33,
+        34,
+        35
+      ],
+      "author_rationale": "Notebook: 'Separate the dataset onto training (70%) and testing (30%).'",
+      "is_assumption": false
+    }
+  ],
+  "data": {
+    "path": "input/m2_taiwan/data/taiwan_default.csv",
+    "sha256": "4edce6da569b2c30788a85fd98a9bafb1a983e8ca1a7aac875dd7ff853cbd0bb",
+    "n_rows": 30000,
+    "n_columns": 25,
+    "n_train": 21001,
+    "n_test": 8999,
+    "seed_used_by_harness": 2026,
+    "missing_values": 0
+  },
+  "protected_attributes_used_as_inputs": [
+    "sex",
+    "education",
+    "marriage"
+  ],
+  "coefficients": [
+    {
+      "term": "(Intercept)",
+      "estimate": -1.2259151019037402,
+      "std_error": 0.06038071432040655,
+      "z": -20.303090410598607,
+      "p_value": 1.2074703022080452e-91
+    },
+    {
+      "term": "limit_bal",
+      "estimate": -1.6420032280410302e-06,
+      "std_error": 1.7600084253174862e-07,
+      "z": -9.32951913423273,
+      "p_value": 1.0635231210448148e-20
+    },
+    {
+      "term": "sex2",
+      "estimate": -0.16743048738529084,
+      "std_error": 0.03766119095678833,
+      "z": -4.445703471709036,
+      "p_value": 8.760471840755316e-06
+    },
+    {
+      "term": "education2",
+      "estimate": -0.029816857166514717,
+      "std_error": 0.043498399286648205,
+      "z": -0.6854702162722336,
+      "p_value": 0.49304724877780387
+    },
+    {
+      "term": "education3",
+      "estimate": -0.0696433499214047,
+      "std_error": 0.057380663015432494,
+      "z": -1.213707654487613,
+      "p_value": 0.2248593803499861
+    },
+    {
+      "term": "education4",
+      "estimate": -1.178826070383468,
+      "std_error": 0.23100433702088682,
+      "z": -5.103047352210022,
+      "p_value": 3.34227330307799e-07
+    },
+    {
+      "term": "marriage2",
+      "estimate": -0.24816954036474548,
+      "std_error": 0.03855050400558605,
+      "z": -6.437517401297404,
+      "p_value": 1.2144340437799271e-10
+    },
+    {
+      "term": "marriage3",
+      "estimate": -0.10681455478314725,
+      "std_error": 0.16488640353881634,
+      "z": -0.6478069294415882,
+      "p_value": 0.5171098329816421
+    },
+    {
+      "term": "pay_0",
+      "estimate": 0.9091779694301938,
+      "std_error": 0.029967150973095696,
+      "z": 30.33915270245235,
+      "p_value": 3.4930719384695665e-202
+    },
+    {
+      "term": "pay_2",
+      "estimate": 0.04046063753608107,
+      "std_error": 0.031481120560416666,
+      "z": 1.285234985788751,
+      "p_value": 0.19871018138769475
+    },
+    {
+      "term": "pay_3",
+      "estimate": 0.14751341256345674,
+      "std_error": 0.030460097190428553,
+      "z": 4.842841164991743,
+      "p_value": 1.2799560411063095e-06
+    },
+    {
+      "term": "pay_5",
+      "estimate": 0.10049976929870297,
+      "std_error": 0.03594800272094606,
+      "z": 2.795698277839066,
+      "p_value": 0.0051787723745786605
+    },
+    {
+      "term": "pay_6",
+      "estimate": 0.19058774863891045,
+      "std_error": 0.03413785682289212,
+      "z": 5.582885581472894,
+      "p_value": 2.3656038460363776e-08
+    },
+    {
+      "term": "pay_amt1",
+      "estimate": -6.972138937965761e-06,
+      "std_error": 2.1380427081762117e-06,
+      "z": -3.2609914251493692,
+      "p_value": 0.0011102339768411591
+    },
+    {
+      "term": "pay_amt2",
+      "estimate": -1.3988870215992397e-05,
+      "std_error": 2.616040739389133e-06,
+      "z": -5.3473441775447705,
+      "p_value": 8.92541940256738e-08
+    }
+  ],
+  "performance_reproduced": {
+    "test": {
+      "n": 8999,
+      "event_rate": 0.2211,
+      "auc": 0.7402,
+      "gini": 0.4805,
+      "ks": 0.3806,
+      "brier": 0.1409,
+      "mean_predicted": 0.2187
+    },
+    "train": {
+      "n": 21001,
+      "event_rate": 0.2212,
+      "auc": 0.7675,
+      "gini": 0.5349,
+      "ks": 0.4222,
+      "brier": 0.1374,
+      "mean_predicted": 0.2212
+    }
+  },
+  "assumptions": [
+    "Repayment-status codes -2, -1 and 0 have the same meaning (no delinquency) and can be merged to 0 (author's stated assumption, line 21).",
+    "Undefined or unknown education codes (0, 5, 6) belong with 'others' (4), and the undefined marriage code 0 belongs with 'others' (3) (lines 16-19).",
+    "The log-odds of default is linear in months of payment delay for each repayment-status column, since these are kept numeric rather than treated as categories (lines 22-24, 38-39; the notebook notes they could be treated as factors).",
+    "The log-odds of default is linear in the raw credit limit and the raw payment amounts, with no transformation or capping of extreme values (lines 38-39).",
+    "Observations are independent and the April-September 2005 Taiwan client population is representative of the population on which the score is used.",
+    "Columns 6 to 11 of the data frame, after lower-casing and dropping id, are exactly the repayment-status columns; the code selects them by position, not by name (line 22)."
+  ],
+  "limitations": [
+    {
+      "text": "Sex (gender) is a direct model input (line 27, 38). Using a protected characteristic to set credit limits or prioritise collections risks direct discrimination under the Equality Act 2010 and poor outcomes under the FCA Consumer Duty. The notebook itself notes that married women appear more likely to default, which the model will encode. A fairness assessment and a legal review of using gender as an input are required before use.",
+      "severity": "High",
+      "disclosure_ids": [
+        "D-01:sex"
+      ],
+      "source_lines": [
+        27,
+        38
+      ]
+    },
+    {
+      "text": "Education is a direct model input (lines 28, 38). Education is a sensitive attribute and a potential proxy for protected characteristics such as age, race or disability, and its use in credit decisions needs a fairness and Consumer Duty justification. The education terms are also weak: education levels 2 and 3 are not statistically significant in the final model (see D-05).",
+      "severity": "High",
+      "disclosure_ids": [
+        "D-01:education"
+      ],
+      "source_lines": [
+        28,
+        38
+      ]
+    },
+    {
+      "text": "Marital status (marriage) is a direct model input (lines 29, 38). Marriage and civil partnership is a protected characteristic under the Equality Act 2010; using it to drive credit-limit or collections decisions risks direct discrimination and must be reviewed for fairness before use.",
+      "severity": "High",
+      "disclosure_ids": [
+        "D-01:marriage"
+      ],
+      "source_lines": [
+        29,
+        38
+      ]
+    },
+    {
+      "text": "The train/test split uses createDataPartition with no random seed (line 33). Each run gives a different partition and therefore different coefficients and test results: the legacy model is not reproducible. The factory harness fixes a seed for capture, but that seed does not come from the original author, so the captured model is one of many possible fits.",
+      "severity": "High",
+      "disclosure_ids": [
+        "D-02"
+      ],
+      "source_lines": [
+        32,
+        33,
+        34,
+        35
+      ]
+    },
+    {
+      "text": "Category codes are merged / recoded before fitting: education codes 0, 4, 5, 6 are merged to 4 (line 17), marriage code 0 is merged to 3 (line 19), and repayment-status codes -2, -1 and 0 are merged to 0 (line 23). These merges rest on the author's assumptions, not on a confirmed data dictionary, and they change what the model learns: the 'others' groups mix known and unknown values, and the merge removes the difference between paying duly (-1) and the undefined codes -2 and 0. The education and marriage merges are also marked [reconstructed], so the exact code the original author ran is not confirmed.",
+      "severity": "Medium",
+      "disclosure_ids": [
+        "D-04"
+      ],
+      "source_lines": [
+        16,
+        17,
+        18,
+        19,
+        21,
+        22,
+        23,
+        24
+      ]
+    },
+    {
+      "text": "Several terms in the final model are not statistically significant: education2, education3, marriage3 and pay_2. The hand-picked formula keeps inputs that add little evidence and widen the model's uncertainty; for pay_2 this may also reflect collinearity with the other repayment-status columns. No documented variable-selection procedure supports retaining them.",
+      "severity": "Medium",
+      "disclosure_ids": [
+        "D-05"
+      ],
+      "source_lines": [
+        38,
+        39
+      ]
+    },
+    {
+      "text": "The repayment-status recode loop selects columns by position (seq(6, 11, 1)), not by name (lines 22-24). If the input file's column order changes, or id is not present, the recode silently hits the wrong columns (for example age or bill amounts). Any re-implementation must select pay_0 to pay_6 by name.",
+      "severity": "Medium",
+      "disclosure_ids": [],
+      "source_lines": [
+        22,
+        23,
+        24
+      ]
+    },
+    {
+      "text": "Repayment status is treated as a linear numeric term (months of delay), although the notebook author notes it could be categorical. The model forces each extra month of delay to add the same amount to the log-odds. The data profile also shows that pay_5 and pay_6 never take code 1 (one-month delay), so the slope for those columns is estimated without that value.",
+      "severity": "Medium",
+      "disclosure_ids": [],
+      "source_lines": [
+        22,
+        23,
+        24,
+        38,
+        39
+      ]
+    },
+    {
+      "text": "Credit limit and payment amounts enter untransformed, with no capping or log transform. Extreme limits or one-off large payments can dominate the linear score; no outlier treatment is applied.",
+      "severity": "Low",
+      "disclosure_ids": [],
+      "source_lines": [
+        38,
+        39
+      ]
+    },
+    {
+      "text": "The development data are a single public dataset of Taiwan credit-card clients covering April-September 2005. There is no out-of-time validation, and the population, economic conditions and product terms differ from a current UK portfolio. The score's calibration and ranking power for the intended business use are unproven.",
+      "severity": "High",
+      "disclosure_ids": [],
+      "source_lines": [
+        10
+      ]
+    },
+    {
+      "text": "Key preprocessing lines (education and marriage merges, factor conversions, lines 16-19 and 26-30) are marked [reconstructed]: the notebook described them but did not print the code. The legacy script is therefore a reconstruction, and its equivalence to the original author's model cannot be confirmed.",
+      "severity": "Medium",
+      "disclosure_ids": [],
+      "source_lines": [
+        5,
+        16,
+        18,
+        26
+      ]
+    },
+    {
+      "text": "The legacy source produces only a probability score; it has no cut-off, calibration step or decision rule. The supporting notebook picks a cut-off by maximising accuracy on the test set, which is not part of the legacy source and would bias any test-set performance figure if adopted.",
+      "severity": "Low",
+      "disclosure_ids": [],
+      "source_lines": [
+        42
+      ]
+    }
+  ],
+  "code_vs_docs_discrepancies": [
+    "The notebook fits a full model glm.m on all remaining columns before the final model; the legacy source contains only glm.final (lines 37-40), so the selection step is not reproduced in code.",
+    "The notebook scores the test set using test.x (the test partition with the target column removed); the legacy source scores test.batch directly, including the target column (line 42). The predictions are the same, because glm prediction ignores the response column.",
+    "The notebook continues with an accuracy-maximising cut-off, a confusion matrix, top-variable explanations and alternative rpart and randomForest models; none of these is in the legacy source, which stops at the predicted probability (line 42).",
+    "The education and marriage merges and the factor conversions (lines 16-19, 26-30) are marked [reconstructed]: the notebook describes them in prose but does not print the code, so the code is an interpretation of the documented intent.",
+    "The data definition quoted in the notebook defines repayment status -1 as 'pay duly' and 1 to 9 as months of delay; it does not define -2 or 0. The code nevertheless merges -2, -1 and 0 into 0 (line 23), based on the author's assumption that they mean the same thing.",
+    "The notebook's education data definition lists 5 and 6 as 'unknown' and 4 as 'others'; the code puts unknown values into 'others' (line 17), mixing a category with missing information."
+  ],
+  "open_questions": [
+    "What is the exact definition of 'default payment next month' (days past due, minimum amount, observation month)?",
+    "What do repayment-status codes -2 and 0 mean in the source system, and is merging them with -1 ('pay duly') justified?",
+    "What do education codes 0, 5 and 6 and marriage code 0 mean, and should 'unknown' be kept separate from 'others'?",
+    "Can the original author's code for the [reconstructed] lines (education and marriage merges, factor conversions) be obtained to confirm the reconstruction?",
+    "What criteria were used to select the final eleven inputs from the full model, and why were pay_4, age and the bill amounts excluded while the non-significant education, marriage and pay_2 terms were kept?",
+    "Has the use of sex, marital status and education as direct inputs been reviewed by Legal / Compliance under the Equality Act 2010 and Consumer Duty, and is there a plan to remove or justify them?",
+    "What currency and units are limit_bal and the payment amounts in, and will production data use the same units?",
+    "How will the score be turned into decisions (cut-offs, segments) for credit-limit reviews and collections prioritisation, and who owns that decision rule?",
+    "Is a Taiwan 2005 development sample acceptable for the intended (simulated UK bank) population, and what out-of-time or out-of-population validation is planned?"
+  ],
+  "provenance": {
+    "generated_utc": "2026-11-13T16:33:09Z",
+    "documented_by": "Claude Opus 5.5 (Claude Code documentation agent)",
+    "verification": [
+      {
+        "iteration": 1,
+        "file": "output/m2_taiwan/logs/documentation/extract_1.json",
+        "violations": [],
+        "verdict": "PASS"
+      }
+    ],
+    "input_hashes": {
+      "model_yaml": "2830020bd83c8fc8d7dec466eb8caed26502df0f3f7cbcffc26e8a52da07d256",
+      "legacy_script": "b78cf83bbf12f74f7a0d1bd4ad19d4344ca0a6046f58df9f60dbcfbbe5d36354",
+      "data": "4edce6da569b2c30788a85fd98a9bafb1a983e8ca1a7aac875dd7ff853cbd0bb",
+      "thresholds": "dc565ba6ca6bab5f799180acb77828b79580c52c63414d47d9034248d5981a28",
+      "rulebook": "fcb8a5df9e7f5785a6b36bfd695e8e6b78133a59211588b976ecf7cbd5bd6ed1",
+      "doc:docs/netzone_results.txt": "57f0ed3c16e4e43096c46e3e33fe8f5b3f913449b1170b7d888c86434d94d3cd"
+    },
+    "required_disclosures": [
+      "D-01:sex",
+      "D-01:education",
+      "D-01:marriage",
+      "D-02",
+      "D-04",
+      "D-05"
+    ]
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "exl-hackathon",
+  "owner": {"name": "EXL Hackathon team"},
+  "plugins": [
+    {"name": "mrf", "source": "./agent", "description": "Agentic Model Risk Factory (document, migrate, validate, monitor)"}
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "r_version": "R version 4.6.1 (2026-06-24)",
+  "seed": 100,
+  "runtime_s": 7.70706415176392,
+  "packages": ["compiler", "jsonlite"],
+  "class": ["glm", "lm"],
+  "formula": "ClaimNb ~ VehPowerGLM + VehAgeGLM + DrivAgeGLM + BonusMalusGLM +      VehBrand + VehGas + DensityGLM + Region + AreaGLM",
+  "family": "poisson",
+  "link": "log",
+  "terms": ["(Intercept)", "VehPowerGLM5", "VehPowerGLM6", "VehPowerGLM7", "VehPowerGLM8", "VehPowerGLM9", "VehAgeGLM1", "VehAgeGLM3", "DrivAgeGLM1", "DrivAgeGLM2", "DrivAgeGLM3", "DrivAgeGLM4", "DrivAgeGLM6", "DrivAgeGLM7", "BonusMalusGLM", "VehBrandB10", "VehBrandB11", "VehBrandB12", "VehBrandB13", "VehBrandB14", "VehBrandB2", "VehBrandB3", "VehBrandB4", "VehBrandB5", "VehBrandB6", "VehGasRegular", "DensityGLM", "RegionR11", "RegionR21", "RegionR22", "RegionR23", "RegionR25", "RegionR26", "RegionR31", "RegionR41", "RegionR42", "RegionR43", "RegionR52", "RegionR53", "RegionR54", "RegionR72", "RegionR73", "RegionR74", "RegionR82", "RegionR83", "RegionR91", "RegionR93", "RegionR94", "AreaGLM"],
+  "response": "ClaimNb",
+  "response_levels": {},
+  "xlevels": {
+    "VehPowerGLM": ["4", "5", "6", "7", "8", "9"],
+    "VehAgeGLM": ["2", "1", "3"],
+    "DrivAgeGLM": ["5", "1", "2", "3", "4", "6", "7"],
+    "VehBrand": ["B1", "B10", "B11", "B12", "B13", "B14", "B2", "B3", "B4", "B5", "B6"],
+    "VehGas": ["Diesel", "Regular"],
+    "Region": ["R24", "R11", "R21", "R22", "R23", "R25", "R26", "R31", "R41", "R42", "R43", "R52", "R53", "R54", "R72", "R73", "R74", "R82", "R83", "R91", "R93", "R94"]
+  },
+  "contrasts": {
+    "VehPowerGLM": "contr.treatment",
+    "VehAgeGLM": "contr.treatment",
+    "DrivAgeGLM": "contr.treatment",
+    "VehBrand": "contr.treatment",
+    "VehGas": "contr.treatment",
+    "Region": "contr.treatment"
+  },
+  "n_train": 610212,
+  "n_test": 67801,
+  "converged": true,
+  "iterations": 6,
+  "null_deviance": 201966.364055248,
+  "deviance": 191651.269966774,
+  "aic": 254279.763151247,
+  "control": {
+    "epsilon": 1e-08,
+    "maxit": 25
+  },
+  "column_classes_after_preprocessing": {
+    "IDpol": "numeric",
+    "ClaimNb": "numeric",
+    "Exposure": "numeric",
+    "Area": "character",
+    "VehPower": "integer",
+    "VehAge": "integer",
+    "DrivAge": "integer",
+    "BonusMalus": "integer",
+    "VehBrand": "factor",
+    "VehGas": "factor",
+    "Density": "integer",
+    "Region": "factor",
+    "AreaGLM": "integer",
+    "VehPowerGLM": "factor",
+    "VehAgeGLM": "factor",
+    "DrivAgeGLM": "factor",
+    "BonusMalusGLM": "integer",
+    "DensityGLM": "numeric",
+    "fitGLM1": "numeric"
+  }
+}

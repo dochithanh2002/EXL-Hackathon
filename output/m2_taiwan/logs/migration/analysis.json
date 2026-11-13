@@ -1,0 +1,34 @@
+{
+  "summary": "Legacy R script fits an unpenalised binomial/logit glm (glm.final) predicting default.payment.next.month on the UCI Taiwan credit-card data. Preprocessing: read.csv (make.names renames 'default payment next month'), lowercase column names, drop id, recode education {0,4,5,6}->4 and marriage 0->3, recode repayment-status columns pay_0..pay_6 (positions 6..11 after id removal) values {-2,-1,0}->0, convert sex/education/marriage/response to factors. caret::createDataPartition makes a stratified 70/30 split (replaced by the harness split). 15 coefficients; R converged in 6 IRLS iterations.",
+  "preprocessing": [
+    {"order": 1, "r_code": "raw.credit <- read.csv(\"data/taiwan_default.csv\")", "description": "Read CSV with check.names=TRUE: make.names turns 'default payment next month' into 'default.payment.next.month'; other names unchanged ('_' is valid in R names). Rows keep raw file order (row names 1..30000).", "columns": ["default.payment.next.month"], "rule_ids": ["R-IO-01", "R-IO-03"]},
+    {"order": 2, "r_code": "colnames(raw.credit) <- tolower(colnames(raw.credit))", "description": "Lower-case every column name (ID->id, LIMIT_BAL->limit_bal, PAY_0->pay_0, ...).", "columns": ["id", "limit_bal", "sex", "education", "marriage", "age", "pay_0", "pay_2", "pay_3", "pay_4", "pay_5", "pay_6", "bill_amt1", "bill_amt2", "bill_amt3", "bill_amt4", "bill_amt5", "bill_amt6", "pay_amt1", "pay_amt2", "pay_amt3", "pay_amt4", "pay_amt5", "pay_amt6", "default.payment.next.month"], "rule_ids": ["R-IO-02"]},
+    {"order": 3, "r_code": "raw.credit$id <- NULL", "description": "Drop the id column. Column positions shift: after this, column 1 = limit_bal, 2 = sex, 3 = education, 4 = marriage, 5 = age, 6 = pay_0, 7 = pay_2, 8 = pay_3, 9 = pay_4, 10 = pay_5, 11 = pay_6.", "columns": ["id"], "rule_ids": ["R-IDX-01"]},
+    {"order": 4, "r_code": "raw.credit$education[raw.credit$education %in% c(0, 4, 5, 6)] <- 4", "description": "Recode education codes 0, 4, 5, 6 to 4 ('others').", "columns": ["education"], "rule_ids": ["R-REC-01", "R-REC-02", "R-IDX-02"]},
+    {"order": 5, "r_code": "raw.credit$marriage[raw.credit$marriage == 0] <- 3", "description": "Recode marriage code 0 to 3 ('others').", "columns": ["marriage"], "rule_ids": ["R-REC-02", "R-IDX-02"]},
+    {"order": 6, "r_code": "for (i in seq(6, 11, 1)) { raw.credit[which(raw.credit[[i]] %in% c(-2, -1, 0)),][[i]] <- 0 }", "description": "Positional loop over columns 6..11 (1-based, after id removal) = pay_0, pay_2, pay_3, pay_4, pay_5, pay_6: values -2, -1, 0 set to 0. Assigning the double 0 makes these columns numeric (meta.json confirms). pay_4 is recoded but not used in the model.", "columns": ["pay_0", "pay_2", "pay_3", "pay_4", "pay_5", "pay_6"], "rule_ids": ["R-IDX-01", "R-IDX-02", "R-REC-01", "R-REC-02"]},
+    {"order": 7, "r_code": "raw.credit$sex <- as.factor(raw.credit$sex); raw.credit$education <- as.factor(raw.credit$education); raw.credit$marriage <- as.factor(raw.credit$marriage)", "description": "Convert sex (levels 1,2), education (levels 1,2,3,4 after recode) and marriage (levels 1,2,3 after recode) to factors; reference level is the first (numerically sorted) level.", "columns": ["sex", "education", "marriage"], "rule_ids": ["R-FAC-01", "R-FAC-02"]},
+    {"order": 8, "r_code": "raw.credit$default.payment.next.month <- as.factor(raw.credit$default.payment.next.month)", "description": "Response converted to factor with levels '0','1'; glm models P(level '1') = P(default).", "columns": ["default.payment.next.month"], "rule_ids": ["R-FAC-01", "R-FAC-03"]},
+    {"order": 9, "r_code": "intraining <- createDataPartition(y=raw.credit$default.payment.next.month, p=0.7, list=F); train.batch <- raw.credit[intraining,]; test.batch <- raw.credit[-intraining,]", "description": "Random stratified 70/30 split by caret. Not re-implemented: the harness supplies the R train/test membership (split.csv).", "columns": ["default.payment.next.month"], "rule_ids": ["R-RNG-01", "R-PKG-01"]}
+  ],
+  "model": {
+    "r_function": "glm",
+    "family": "binomial",
+    "link": "logit",
+    "response": "default.payment.next.month",
+    "formula": "default.payment.next.month ~ limit_bal + sex + education + marriage + pay_0 + pay_2 + pay_3 + pay_5 + pay_6 + pay_amt1 + pay_amt2",
+    "terms": ["(Intercept)", "limit_bal", "sex2", "education2", "education3", "education4", "marriage2", "marriage3", "pay_0", "pay_2", "pay_3", "pay_5", "pay_6", "pay_amt1", "pay_amt2"],
+    "factor_levels": {"sex": ["1", "2"], "education": ["1", "2", "3", "4"], "marriage": ["1", "2", "3"]}
+  },
+  "randomness": "caret::createDataPartition(y=default.payment.next.month, p=0.7, list=FALSE) stratified random split; the original notebook set no seed (harness used seed 2026). Python never re-splits: train/test membership comes from output/m2_taiwan/model/reference/split.csv (R-RNG-01).",
+  "protected_attributes_used": ["sex", "education", "marriage"],
+  "risks": [
+    "GOV-01: protected attributes sex, education and marriage are direct model inputs (age is not used). Migrated faithfully; fairness must be assessed in validation (UK Equality Act 2010, FCA Consumer Duty).",
+    "Reproducibility: the original notebook used createDataPartition with no set.seed, so the legacy split (and coefficients) cannot be reproduced exactly; the parity reference relies on the harness seed 2026.",
+    "Several recode lines (education, marriage, factor conversion) are marked [reconstructed] in the source, i.e. not printed in the published notebook; the migration reproduces the script as given, but the script itself may differ from the original model.",
+    "Recoding pay_* values -2,-1,0 to 0 and then treating pay_* as linear numeric terms imposes a linear effect of months-delayed; pay_4 is recoded but excluded from the formula (and pay_amt3..6, bill_amt*, age are excluded) without documented rationale.",
+    "Education code 0 and codes 5, 6 (undocumented / 'unknown') are merged into 4 ('others'), mixing missing-information codes with a real category.",
+    "Positional column access (seq(6, 11)) is fragile: any change in the input column order would silently recode different columns."
+  ],
+  "escalations": []
+}

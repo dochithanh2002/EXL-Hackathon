@@ -1,0 +1,72 @@
+{
+  "stages": {
+    "intake": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:10:04Z",
+      "hashes": {
+        "legacy_script": "46122fc07ba8e00cd6a9601c5ef24389bbdc9897581564f290e483f925ec356e",
+        "data": "4edce6da569b2c30788a85fd98a9bafb1a983e8ca1a7aac875dd7ff853cbd0bb",
+        "agent_code": "439f61c1794f638b4de479e3d1134485131aebfa9f63fae55eaa3fab896a6c65",
+        "inventory_yaml": "eb9d441cf833504e445007abf8acc85673e6bb32388b781d216abbf151552df2",
+        "doc:ref_code/taiwan_default/netzone_results.txt": "57f0ed3c16e4e43096c46e3e33fe8f5b3f913449b1170b7d888c86434d94d3cd"
+      }
+    },
+    "capture": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:10:06Z",
+      "reused": false,
+      "reference_dir": "runs/M2/doc/reference"
+    },
+    "facts": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:10:06Z",
+      "n_variables": 11,
+      "disclosures": [
+        "D-01:sex",
+        "D-01:education",
+        "D-01:marriage",
+        "D-02",
+        "D-04",
+        "D-05"
+      ]
+    },
+    "extract_and_verify": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:10:06Z",
+      "iterations": 1
+    },
+    "render": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:10:06Z",
+      "output": "runs/M2/doc/output"
+    }
+  },
+  "status": "APPROVED",
+  "input_hashes": {
+    "legacy_script": "46122fc07ba8e00cd6a9601c5ef24389bbdc9897581564f290e483f925ec356e",
+    "data": "4edce6da569b2c30788a85fd98a9bafb1a983e8ca1a7aac875dd7ff853cbd0bb",
+    "agent_code": "439f61c1794f638b4de479e3d1134485131aebfa9f63fae55eaa3fab896a6c65",
+    "inventory_yaml": "eb9d441cf833504e445007abf8acc85673e6bb32388b781d216abbf151552df2",
+    "doc:ref_code/taiwan_default/netzone_results.txt": "57f0ed3c16e4e43096c46e3e33fe8f5b3f913449b1170b7d888c86434d94d3cd"
+  },
+  "reference_dir": "runs/M2/doc/reference",
+  "iterations": [
+    {
+      "iteration": 1,
+      "step": "doc_extract",
+      "violations": [],
+      "verdict": "PASS"
+    }
+  ],
+  "mlflow_run_id": "d16b5973461d4a5bb5e01dbb28e70d13",
+  "human_review": {
+    "reviewer": "Thanh",
+    "decision": "approve",
+    "comment": "Approved by user instruction in Claude Code session; reviewed via factory reports",
+    "ts_utc": "2026-11-13T15:55:31Z",
+    "artefact_sha256": {
+      "MODEL_CARD_M2.md": "7b8c57a580d83128c79c04266b913a960cbeb59a6288b04bd5aabe856d8937e7",
+      "inventory_M2.json": "51eeaa29ecf9640de3b44878f8a186b4dbc9139c7aaada7572f19955d9bd7834"
+    }
+  }
+}

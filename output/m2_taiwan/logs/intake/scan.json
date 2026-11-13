@@ -1,0 +1,332 @@
+{
+  "triggered_rules": {
+    "R-PKG-01": {
+      "severity": "MUST",
+      "why": "pattern /\\blibrary\\(\\s*(\\w+)/ matched 1x: ['caret']"
+    },
+    "R-IO-01": {
+      "severity": "MUST",
+      "why": "pattern /\\bread\\.csv\\(/ matched 1x"
+    },
+    "R-IO-02": {
+      "severity": "MUST",
+      "why": "pattern /tolower\\(\\s*colnames/ matched 1x"
+    },
+    "R-IDX-01": {
+      "severity": "MUST",
+      "why": "pattern /\\[\\[\\s*\\w+\\s*\\]\\]|\\[\\s*,\\s*\\d+\\s*\\]|seq\\(\\s*\\d+/ matched 3x"
+    },
+    "R-IDX-02": {
+      "severity": "MUST",
+      "why": "pattern /which\\(.*\\)\\s*,\\s*\\]/ matched 1x"
+    },
+    "R-REC-01": {
+      "severity": "MUST",
+      "why": "pattern /%in%/ matched 2x"
+    },
+    "R-FAC-01": {
+      "severity": "MUST",
+      "why": "pattern /\\b(as\\.)?factor\\(/ matched 4x"
+    },
+    "R-RNG-01": {
+      "severity": "MUST",
+      "why": "pattern /set\\.seed|sample\\(|createDataPartition/ matched 1x"
+    },
+    "R-EST-01": {
+      "severity": "MUST",
+      "why": "pattern /\\bglm\\([^)]*binomial/ matched 1x"
+    },
+    "R-EST-02": {
+      "severity": "MUST",
+      "why": "pattern /\\bglm\\(/ matched 1x"
+    },
+    "R-PRED-01": {
+      "severity": "MUST",
+      "why": "pattern /\\bpredict\\(/ matched 1x"
+    },
+    "R-FAC-02": {
+      "severity": "MUST",
+      "why": "factors in formula: ['sex', 'education', 'marriage']"
+    },
+    "R-FAC-03": {
+      "severity": "MUST",
+      "why": "factor response 'default.payment.next.month'"
+    },
+    "R-IO-03": {
+      "severity": "MUST",
+      "why": "always applies"
+    },
+    "R-FAC-04": {
+      "severity": "MUST",
+      "why": "always applies"
+    },
+    "R-REC-02": {
+      "severity": "MUST",
+      "why": "always applies"
+    },
+    "GOV-01": {
+      "severity": "MUST",
+      "why": "always applies"
+    }
+  },
+  "data_profile": {
+    "n_rows": 30000,
+    "columns": [
+      {
+        "name": "ID",
+        "dtype": "int64",
+        "n_unique": 30000,
+        "n_missing": 0
+      },
+      {
+        "name": "LIMIT_BAL",
+        "dtype": "int64",
+        "n_unique": 81,
+        "n_missing": 0
+      },
+      {
+        "name": "SEX",
+        "dtype": "int64",
+        "n_unique": 2,
+        "n_missing": 0,
+        "levels": [
+          1,
+          2
+        ]
+      },
+      {
+        "name": "EDUCATION",
+        "dtype": "int64",
+        "n_unique": 7,
+        "n_missing": 0,
+        "levels": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      {
+        "name": "MARRIAGE",
+        "dtype": "int64",
+        "n_unique": 4,
+        "n_missing": 0,
+        "levels": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      {
+        "name": "AGE",
+        "dtype": "int64",
+        "n_unique": 56,
+        "n_missing": 0
+      },
+      {
+        "name": "PAY_0",
+        "dtype": "int64",
+        "n_unique": 11,
+        "n_missing": 0,
+        "levels": [
+          -2,
+          -1,
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ]
+      },
+      {
+        "name": "PAY_2",
+        "dtype": "int64",
+        "n_unique": 11,
+        "n_missing": 0,
+        "levels": [
+          -2,
+          -1,
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ]
+      },
+      {
+        "name": "PAY_3",
+        "dtype": "int64",
+        "n_unique": 11,
+        "n_missing": 0,
+        "levels": [
+          -2,
+          -1,
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ]
+      },
+      {
+        "name": "PAY_4",
+        "dtype": "int64",
+        "n_unique": 11,
+        "n_missing": 0,
+        "levels": [
+          -2,
+          -1,
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ]
+      },
+      {
+        "name": "PAY_5",
+        "dtype": "int64",
+        "n_unique": 10,
+        "n_missing": 0,
+        "levels": [
+          -2,
+          -1,
+          0,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ]
+      },
+      {
+        "name": "PAY_6",
+        "dtype": "int64",
+        "n_unique": 10,
+        "n_missing": 0,
+        "levels": [
+          -2,
+          -1,
+          0,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ]
+      },
+      {
+        "name": "BILL_AMT1",
+        "dtype": "int64",
+        "n_unique": 22723,
+        "n_missing": 0
+      },
+      {
+        "name": "BILL_AMT2",
+        "dtype": "int64",
+        "n_unique": 22346,
+        "n_missing": 0
+      },
+      {
+        "name": "BILL_AMT3",
+        "dtype": "int64",
+        "n_unique": 22026,
+        "n_missing": 0
+      },
+      {
+        "name": "BILL_AMT4",
+        "dtype": "int64",
+        "n_unique": 21548,
+        "n_missing": 0
+      },
+      {
+        "name": "BILL_AMT5",
+        "dtype": "int64",
+        "n_unique": 21010,
+        "n_missing": 0
+      },
+      {
+        "name": "BILL_AMT6",
+        "dtype": "int64",
+        "n_unique": 20604,
+        "n_missing": 0
+      },
+      {
+        "name": "PAY_AMT1",
+        "dtype": "int64",
+        "n_unique": 7943,
+        "n_missing": 0
+      },
+      {
+        "name": "PAY_AMT2",
+        "dtype": "int64",
+        "n_unique": 7899,
+        "n_missing": 0
+      },
+      {
+        "name": "PAY_AMT3",
+        "dtype": "int64",
+        "n_unique": 7518,
+        "n_missing": 0
+      },
+      {
+        "name": "PAY_AMT4",
+        "dtype": "int64",
+        "n_unique": 6937,
+        "n_missing": 0
+      },
+      {
+        "name": "PAY_AMT5",
+        "dtype": "int64",
+        "n_unique": 6897,
+        "n_missing": 0
+      },
+      {
+        "name": "PAY_AMT6",
+        "dtype": "int64",
+        "n_unique": 6939,
+        "n_missing": 0
+      },
+      {
+        "name": "default payment next month",
+        "dtype": "int64",
+        "n_unique": 2,
+        "n_missing": 0,
+        "levels": [
+          0,
+          1
+        ]
+      }
+    ]
+  },
+  "protected_attributes": [
+    "SEX",
+    "MARRIAGE",
+    "AGE",
+    "EDUCATION"
+  ]
+}

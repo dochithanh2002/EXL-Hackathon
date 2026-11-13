@@ -1,0 +1,113 @@
+{
+  "model_id": "M1",
+  "timestamp_utc": "2026-11-13T16:50:16+00:00",
+  "champion": {
+    "module": "output/m1_fremtpl2/model/m1_fremtpl2_freq.py",
+    "module_sha256": "fda45c0fbca2682bc540a35908b7eb3f4a71c6bad60f745cca35c3c36db00a74",
+    "manifest_module_sha256": "fda45c0fbca2682bc540a35908b7eb3f4a71c6bad60f745cca35c3c36db00a74",
+    "migration_status": "AWAITING_HUMAN_APPROVAL",
+    "migration_iterations": 1,
+    "human_review": null,
+    "migrated_by": "Claude Opus 5.5 (Claude Code, migration-agent)",
+    "reference_dir": "output/m1_fremtpl2/model/reference"
+  },
+  "predictive_power": {
+    "loss_learn_x100": 31.407325645314625,
+    "loss_test_x100": 30.910946729292437,
+    "loss_test_null_x100": 32.398368289316856,
+    "deviance_explained_test": 0.0459103849533955,
+    "gini_test": 0.264866012857216,
+    "gini_learn": 0.28550123020909746,
+    "repeated_split_loss_x100": {
+      "n": 10,
+      "mean": 31.37067305880509,
+      "sd": 0.31279260471786485,
+      "min": 30.962971562189033,
+      "max": 31.931894966282297
+    },
+    "published_case_study_glm1": {
+      "loss_learn_x100": 31.267,
+      "loss_test_x100": 32.171,
+      "note": "different split (R sample() changed in 3.6)"
+    },
+    "rag": "GREEN"
+  },
+  "calibration": {
+    "ae_test": 0.9684770177718515,
+    "ae_learn": 0.9999999992859001,
+    "calibration_slope": 0.9642516937895421,
+    "calibration_slope_se": 0.02719274137917344,
+    "exposure_elasticity": 0.44789867497455693,
+    "exposure_elasticity_se": 0.0065122245927754265,
+    "exposure_note": "1.0 means claims are proportional to exposure, as the log-exposure offset assumes",
+    "deciles_flagged": 3,
+    "worst_decile_ae": 0.8614122124261732,
+    "rag": "AMBER"
+  },
+  "stability": {
+    "psi_freq_learn_vs_test": 6.89434010235165e-05,
+    "csi_learn_vs_test": {
+      "BonusMalusGLM": 0.00014863319926382187,
+      "DensityGLM": 0.0001911220932423222,
+      "AreaGLM": 9.746593952389335e-05,
+      "VehPowerGLM": 4.6198863354886145e-05,
+      "VehAgeGLM": 3.9198394997812704e-05,
+      "DrivAgeGLM": 0.00014036968503179303,
+      "VehBrand": 7.384447702766001e-05,
+      "VehGas": 2.5975754080734073e-07,
+      "Region": 0.00039532068670152453
+    },
+    "max_csi": 0.00039532068670152453,
+    "coef_split_sd_over_model_se": {
+      "median": 0.3121315214870271,
+      "max": 0.5334974909764769,
+      "max_term": "RegionR73"
+    },
+    "note": "No time dimension in freMTPL2: only learn/test and repeated random splits; out-of-time stability is untested.",
+    "rag": "AMBER"
+  },
+  "specification": {
+    "lr_drop_tests": {
+      "AreaGLM": {
+        "LR": 0.9401324815407861,
+        "df": 1,
+        "p": 0.33224377312496733
+      },
+      "VehBrand": {
+        "LR": 68.81723150718608,
+        "df": 10,
+        "p": 7.497325154381473e-11
+      },
+      "Region": {
+        "LR": 188.20740223422763,
+        "df": 21,
+        "p": 7.4450019606598e-29
+      },
+      "DrivAgeGLM": {
+        "LR": 648.3506987064611,
+        "df": 6,
+        "p": 8.622713361017033e-137
+      }
+    },
+    "challenger_gbm_loss_test_x100": 29.80778548721449,
+    "challenger_gbm_gini_test": 0.322350456595372,
+    "champion_minus_challenger_loss": 1.1031612420779489,
+    "n_nonsignificant_terms": 20,
+    "rag": "AMBER"
+  },
+  "fairness": {
+    "statistical_rag": "AMBER",
+    "legal_rag": "AMBER",
+    "overall_rag": "AMBER",
+    "worst_band": {
+      "band": "51-70",
+      "ae": 0.9300292144118947
+    },
+    "proxy_auc_young_driver": 0.9369029963108466
+  },
+  "overall_rag": "AMBER",
+  "headline_metric": {
+    "name": "test Poisson deviance loss x100",
+    "value": 30.910946729292437
+  }
+}

@@ -1,0 +1,417 @@
+{
+  "stages": {
+    "intake": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:25:51Z",
+      "hashes": {
+        "config": "64c556ff01100f9fbe728381872d2c36e11e485b27b3b0d2065c145aca5e97af",
+        "rulebook": "d9899ccf18ad7937838bdbbe50ffe5f9b82158d73680906f9093725b599283e5",
+        "legacy_script": "0473ee55ce04a4439564fc92fa7ccb05dec1659d018b0affdc1747e1fed72c08",
+        "tolerances": "ad54fd05de5d854c3c8e74075ce9d3043d504a47c69be5dfc781fd67b20e117c",
+        "data": "5008e249ac75b345a180fa8cba7db50a01f2617415be5de2d110f0ad096bcdaf"
+      }
+    },
+    "capture": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:26:00Z",
+      "reference_dir": "runs/M1/reference",
+      "r_stdout": "captured 678013 predictions to /Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/runs/M1/reference"
+    },
+    "scan": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:26:00Z",
+      "n_triggered": 11
+    },
+    "analyse": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:26:58Z",
+      "escalations": []
+    },
+    "plan": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:27:18Z",
+      "coverage": {
+        "passed": true,
+        "violations": [],
+        "checks": [
+          "G-13 plan coverage"
+        ]
+      },
+      "disallowed_packages": [],
+      "escalations": []
+    },
+    "test_and_repair": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:28:31Z",
+      "iterations": 2,
+      "final": "runs/M1/candidates/candidate_2.py"
+    },
+    "package": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:28:31Z",
+      "output": "runs/M1/output"
+    }
+  },
+  "status": "APPROVED",
+  "input_hashes": {
+    "config": "64c556ff01100f9fbe728381872d2c36e11e485b27b3b0d2065c145aca5e97af",
+    "rulebook": "d9899ccf18ad7937838bdbbe50ffe5f9b82158d73680906f9093725b599283e5",
+    "legacy_script": "0473ee55ce04a4439564fc92fa7ccb05dec1659d018b0affdc1747e1fed72c08",
+    "tolerances": "ad54fd05de5d854c3c8e74075ce9d3043d504a47c69be5dfc781fd67b20e117c",
+    "data": "5008e249ac75b345a180fa8cba7db50a01f2617415be5de2d110f0ad096bcdaf"
+  },
+  "scan": {
+    "triggered_rules": {
+      "R-IO-01": "pattern /\\bread\\.csv\\(/ matched 1x",
+      "R-FAC-01": "pattern /\\b(as\\.)?factor\\(/ matched 7x",
+      "R-RNG-01": "pattern /set\\.seed|sample\\(|createDataPartition/ matched 2x",
+      "R-EST-02": "pattern /\\bglm\\(/ matched 1x",
+      "R-EST-03": "pattern /poisson|Gamma|offset\\s*=/ matched 2x",
+      "R-PRED-01": "pattern /\\bpredict\\(/ matched 1x",
+      "R-FAC-02": "factors in formula: ['VehPowerGLM', 'VehAgeGLM', 'DrivAgeGLM', 'VehBrand', 'VehGas', 'Region']",
+      "R-IO-03": "always applies",
+      "R-FAC-04": "always applies",
+      "R-REC-02": "always applies",
+      "GOV-01": "always applies"
+    },
+    "data_profile": {
+      "n_rows": 678013,
+      "columns": [
+        {
+          "name": "IDpol",
+          "dtype": "float64",
+          "n_unique": 678013
+        },
+        {
+          "name": "ClaimNb",
+          "dtype": "int64",
+          "n_unique": 11,
+          "levels": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            8,
+            9,
+            11,
+            16
+          ]
+        },
+        {
+          "name": "Exposure",
+          "dtype": "float64",
+          "n_unique": 181
+        },
+        {
+          "name": "Area",
+          "dtype": "str",
+          "n_unique": 6,
+          "levels": [
+            "'A'",
+            "'B'",
+            "'C'",
+            "'D'",
+            "'E'",
+            "'F'"
+          ]
+        },
+        {
+          "name": "VehPower",
+          "dtype": "int64",
+          "n_unique": 12,
+          "levels": [
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ]
+        },
+        {
+          "name": "VehAge",
+          "dtype": "int64",
+          "n_unique": 78
+        },
+        {
+          "name": "DrivAge",
+          "dtype": "int64",
+          "n_unique": 83
+        },
+        {
+          "name": "BonusMalus",
+          "dtype": "int64",
+          "n_unique": 115
+        },
+        {
+          "name": "VehBrand",
+          "dtype": "str",
+          "n_unique": 11,
+          "levels": [
+            "'B1'",
+            "'B10'",
+            "'B11'",
+            "'B12'",
+            "'B13'",
+            "'B14'",
+            "'B2'",
+            "'B3'",
+            "'B4'",
+            "'B5'",
+            "'B6'"
+          ]
+        },
+        {
+          "name": "VehGas",
+          "dtype": "str",
+          "n_unique": 2,
+          "levels": [
+            "'Diesel'",
+            "'Regular'"
+          ]
+        },
+        {
+          "name": "Density",
+          "dtype": "int64",
+          "n_unique": 1607
+        },
+        {
+          "name": "Region",
+          "dtype": "str",
+          "n_unique": 22
+        }
+      ]
+    },
+    "protected_attributes": [
+      "DrivAge"
+    ]
+  },
+  "iterations": [
+    {
+      "iteration": 1,
+      "file": "runs/M1/candidates/candidate_1.py",
+      "sha256": "2cf9f5495bacf1d0e7b6b81e7c226709d59cb8ee91cf2200bc6f1cc0d768d1c7",
+      "rule_ids_applied": [
+        "R-IO-01",
+        "R-IO-03",
+        "R-REC-02",
+        "R-IDX-01",
+        "R-FAC-01",
+        "R-FAC-02",
+        "R-FAC-04",
+        "R-RNG-01",
+        "R-EST-02",
+        "R-EST-03",
+        "R-PRED-01",
+        "GOV-01"
+      ],
+      "change_summary": "",
+      "notes": [
+        "Offset log(capped Exposure) applied in fit and predict.",
+        "glm.fit's first eta = log(y + 0.1) excludes the offset; reproduced.",
+        "Driver age banding kept (GOV-01)."
+      ],
+      "static_guardrails": {
+        "passed": true,
+        "violations": [],
+        "checks": [
+          "G-04 syntax",
+          "G-01 imports",
+          "G-02 forbidden APIs",
+          "G-03 interface contract"
+        ]
+      },
+      "run": {
+        "ok": false,
+        "error_type": "ValueError",
+        "error": "VehBrand: levels [\"'B1'\", \"'B10'\", \"'B11'\", \"'B12'\", \"'B13'\", \"'B14'\", \"'B2'\", \"'B3'\", \"'B4'\", \"'B5'\", \"'B6'\"] not seen by the R model"
+      },
+      "failure": {
+        "stage": "runtime",
+        "ok": false,
+        "error_type": "ValueError",
+        "error": "VehBrand: levels [\"'B1'\", \"'B10'\", \"'B11'\", \"'B12'\", \"'B13'\", \"'B14'\", \"'B2'\", \"'B3'\", \"'B4'\", \"'B5'\", \"'B6'\"] not seen by the R model",
+        "traceback": "Traceback (most recent call last):\n  File \"/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/r2py_agent/candidate_runner.py\", line 49, in main\n    res = mod.fit(train)\n  File \"/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/runs/M1/candidates/candidate_1.py\", line 114, in fit\n    Xdf = design_matrix(train)\n  File \"/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/runs/M1/candidates/candidate_1.py\", line 87, in design_matrix\n    raise ValueError(f\"{v}: levels {sorted(unknown)} not seen by the R model\")\nValueError: VehBrand: levels [\"'B1'\", \"'B10'\", \"'B11'\", \"'B12'\", \"'B13'\", \"'B14'\", \"'B2'\", \"'B3'\", \"'B4'\", \"'B5'\", \"'B6'\"] not seen by the R model\n"
+      },
+      "verdict": "FAIL"
+    },
+    {
+      "iteration": 2,
+      "file": "runs/M1/candidates/candidate_2.py",
+      "sha256": "161c792478439e62a1d97bfda2e1952f18172f1d2cc5aff4500a2004d2bed076",
+      "rule_ids_applied": [
+        "R-IO-01",
+        "R-IO-03",
+        "R-REC-02",
+        "R-IDX-01",
+        "R-FAC-01",
+        "R-FAC-02",
+        "R-FAC-04",
+        "R-RNG-01",
+        "R-EST-02",
+        "R-EST-03",
+        "R-PRED-01",
+        "GOV-01"
+      ],
+      "change_summary": "Select text columns with pd.api.types.is_string_dtype (or object) before stripping the surrounding single quotes. No other change.",
+      "notes": [
+        "Root cause: pandas >= 3 infers text columns as the 'str' dtype, so `df.dtypes == object` selected no columns and the single quotes R strips via quote=\"\\\"'\" were kept ('B12' vs B12)."
+      ],
+      "static_guardrails": {
+        "passed": true,
+        "violations": [],
+        "checks": [
+          "G-04 syntax",
+          "G-01 imports",
+          "G-02 forbidden APIs",
+          "G-03 interface contract"
+        ]
+      },
+      "run": {
+        "ok": true,
+        "n_rows": 678013,
+        "n_train": 610212,
+        "n_test": 67801
+      },
+      "parity": {
+        "pass": true,
+        "checks": [
+          {
+            "check": "G-05 coefficient names: missing + extra",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "coefficient max rel diff",
+            "value": 9.347115039863506e-13,
+            "tolerance": 1e-06,
+            "pass": true
+          },
+          {
+            "check": "std error max rel diff",
+            "value": 7.161416592682483e-14,
+            "tolerance": 1e-06,
+            "pass": true
+          },
+          {
+            "check": "rows: identical set",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "response values: rows differing",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "split membership: rows differing",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "prediction NA pattern: rows differing",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "prediction max abs diff (rows predicted by both)",
+            "value": 6.261657858885883e-14,
+            "tolerance": 1e-08,
+            "pass": true
+          },
+          {
+            "check": "poisson deviance abs diff",
+            "value": 2.9103830456733704e-11,
+            "tolerance": 1e-06,
+            "pass": true
+          }
+        ],
+        "evidence": {
+          "worst_terms": [
+            {
+              "term": "AreaGLM",
+              "estimate_r": 0.016465472622546194,
+              "estimate_py": 0.016465472622561584,
+              "rel_diff": 9.347115039863506e-13
+            },
+            {
+              "term": "DrivAgeGLM1",
+              "estimate_r": 0.07228555418879344,
+              "estimate_py": 0.07228555418874313,
+              "rel_diff": 6.959479161207923e-13
+            },
+            {
+              "term": "DrivAgeGLM7",
+              "estimate_r": 0.004932238227834739,
+              "estimate_py": 0.0049322382278325656,
+              "rel_diff": 4.4069414634766275e-13
+            },
+            {
+              "term": "RegionR82",
+              "estimate_r": 0.009217266706149746,
+              "estimate_py": 0.009217266706153235,
+              "rel_diff": 3.784775922629881e-13
+            },
+            {
+              "term": "RegionR94",
+              "estimate_r": 0.016919015044792388,
+              "estimate_py": 0.016919015044798157,
+              "rel_diff": 3.410180950737289e-13
+            },
+            {
+              "term": "VehBrandB2",
+              "estimate_r": 0.0031070095066958116,
+              "estimate_py": 0.0031070095066948527,
+              "rel_diff": 3.086145695015593e-13
+            },
+            {
+              "term": "DensityGLM",
+              "estimate_r": 0.032427495227908366,
+              "estimate_py": 0.03242749522789914,
+              "rel_diff": 2.8459579832900597e-13
+            },
+            {
+              "term": "VehBrandB6",
+              "estimate_r": -0.005439053501400614,
+              "estimate_py": -0.005439053501401948,
+              "rel_diff": 2.452636938913443e-13
+            }
+          ],
+          "deviance_family": "poisson",
+          "deviance_rows": 678013,
+          "deviance_r": 212609.20095871482,
+          "deviance_py": 212609.20095871485
+        }
+      },
+      "verdict": "PASS"
+    }
+  ],
+  "mlflow_run_id": "67d842e68dd040fcbbd30715aa905569",
+  "human_review": {
+    "reviewer": "Thanh",
+    "decision": "approve",
+    "comment": "Approved by user instruction in Claude Code session; reviewed via factory reports",
+    "ts_utc": "2026-11-13T15:55:26Z",
+    "artefact_sha256": {
+      "HUMAN_REVIEW.md": "f001708fae5c492ffcc0b0d47aaaabcd34dcf795dab6e9402d41f5887963199c",
+      "MIGRATION_REPORT.md": "8e020846e912192d11b6133988d621712107264be91a3dbb2b37f73ed45f446f",
+      "m1_fremtpl2_freq.py": "161c792478439e62a1d97bfda2e1952f18172f1d2cc5aff4500a2004d2bed076",
+      "manifest.json": "5799191a936d907e78775b8acf2a0f4477704dfd7f3e57dc60722567eb1b394f",
+      "requirements.txt": "0b9884fba4f5400a9c5c29fb25b50c4dc3c378aec18317f2248da15d0d53838b"
+    }
+  }
+}

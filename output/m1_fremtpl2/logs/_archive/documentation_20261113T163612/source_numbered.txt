@@ -1,0 +1,52 @@
+   1 | # ---------------------------------------------------------------------------
+   2 | # LEGACY MODEL (as received) - French motor TPL claim frequency, Poisson GLM "GLM1"
+   3 | # Source: reconstructed from Noll, Salzmann & Wuthrich (2018), "Case Study: French
+   4 | #         Motor Third-Party Liability Claims", SSRN 3164764, Listing 2 / Section 3.
+   5 | #         The original Kaggle notebook could not be retrieved; every line below follows
+   6 | #         the published feature engineering and model of that case study. [reconstructed]
+   7 | # Data:   freMTPL2freq (OpenML 41214, CC0), as exported by OpenML (strings in single quotes).
+   8 | # This file is the INPUT to the R->Python migration agent. Do not edit.
+   9 | # ---------------------------------------------------------------------------
+  10 | 
+  11 | dat <- read.csv("data/freMTPL2freq.csv", quote = "\"'", stringsAsFactors = FALSE)
+  12 | 
+  13 | # claim counts above 4 and exposures above one year are treated as data errors (case study, Sec. 2)
+  14 | dat$ClaimNb <- pmin(dat$ClaimNb, 4)
+  15 | dat$Exposure <- pmin(dat$Exposure, 1)
+  16 | 
+  17 | # --- feature pre-processing for GLM1 (case study, Sec. 3.1) ---
+  18 | # Area: ordinal A..F mapped to 1..6, used as a continuous variable
+  19 | dat$AreaGLM <- as.integer(factor(dat$Area))
+  20 | # VehPower: categorical, levels above 9 merged into 9
+  21 | dat$VehPowerGLM <- as.factor(pmin(dat$VehPower, 9))
+  22 | # VehAge: three classes [0,1), [1,10], (10,inf); class 2 is the reference
+  23 | VehAgeGLM <- cbind(c(0:110), c(1, rep(2, 10), rep(3, 100)))
+  24 | dat$VehAgeGLM <- as.factor(VehAgeGLM[dat$VehAge + 1, 2])
+  25 | dat[, "VehAgeGLM"] <- relevel(dat[, "VehAgeGLM"], ref = "2")
+  26 | # DrivAge: seven age classes 18-20, 21-25, 26-30, 31-40, 41-50, 51-70, 71+; class 5 (41-50) is the reference
+  27 | DrivAgeGLM <- cbind(c(18:100), c(rep(1, 21 - 18), rep(2, 26 - 21), rep(3, 31 - 26), rep(4, 41 - 31),
+  28 |                                  rep(5, 51 - 41), rep(6, 71 - 51), rep(7, 101 - 71)))
+  29 | dat$DrivAgeGLM <- as.factor(DrivAgeGLM[dat$DrivAge - 17, 2])
+  30 | dat[, "DrivAgeGLM"] <- relevel(dat[, "DrivAgeGLM"], ref = "5")
+  31 | # BonusMalus: capped at 150, continuous
+  32 | dat$BonusMalusGLM <- as.integer(pmin(dat$BonusMalus, 150))
+  33 | # Density: log-transformed, continuous
+  34 | dat$DensityGLM <- as.numeric(log(dat$Density))
+  35 | # VehBrand and Region: categorical with references B1 and R24 (largest classes)
+  36 | dat$VehBrand <- relevel(as.factor(dat$VehBrand), ref = "B1")
+  37 | dat$Region <- relevel(as.factor(dat$Region), ref = "R24")
+  38 | dat$VehGas <- as.factor(dat$VehGas)
+  39 | 
+  40 | # --- learning / test split: 90% / 10% (case study, Sec. 2) ---
+  41 | set.seed(100)
+  42 | ll <- sample(c(1:nrow(dat)), round(0.9 * nrow(dat)), replace = FALSE)
+  43 | learn <- dat[ll, ]
+  44 | test <- dat[-ll, ]
+  45 | 
+  46 | # --- GLM1: Poisson frequency model with log-exposure offset ---
+  47 | d.glm1 <- glm(ClaimNb ~ VehPowerGLM + VehAgeGLM + DrivAgeGLM + BonusMalusGLM + VehBrand + VehGas +
+  48 |                 DensityGLM + Region + AreaGLM,
+  49 |               data = learn, offset = log(Exposure), family = poisson())
+  50 | 
+  51 | learn$fitGLM1 <- fitted(d.glm1)
+  52 | test$fitGLM1 <- predict(d.glm1, newdata = test, type = "response")

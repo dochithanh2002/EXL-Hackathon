@@ -1,0 +1,42 @@
+# Model request template. Copy to input/<name>/model.yaml (the /mrf:new-model skill does this for you).
+# Paths are relative to input/<name>/. Thresholds are NOT set here: see agent/config/thresholds.yaml.
+model_id: M3
+model_name: "<human-readable name>"
+model_type: binary_pd                # binary_pd | poisson_frequency (selects the threshold set)
+
+legacy:
+  language: R
+  script: model.R
+  model_object: "<fitted glm/lm object name>"
+  train_object: "<training data frame>"
+  test_object: "<test data frame>"
+  seed: 2026                         # set by the capture harness before the script runs
+
+data:
+  path: data/<file>.csv
+  id_column: null                    # optional raw id column
+  protected_attributes: []           # column names, e.g. [SEX, AGE]
+
+target_python:
+  module_name: "<snake_case_module_name>"
+  allowed_packages: [numpy, pandas, statsmodels, scipy]
+
+supporting_docs: []                  # e.g. [docs/notebook_output.txt]
+
+governance:                          # human-owned; the agents copy these and never infer them
+  owner: NOT PROVIDED
+  developer: NOT PROVIDED
+  domain: NOT PROVIDED
+  business_use: NOT PROVIDED
+  materiality_tier: NOT PROVIDED
+  regulatory_framework: [PRA SS1/23]
+  last_independent_validation: none on record
+  data_source: {dataset: NOT PROVIDED, source_url: NOT PROVIDED, licence: NOT PROVIDED}
+
+validation:
+  suite: "<folder in agent/validators/>"
+  steps: [parity, validate, report]
+  monitoring_steps: [monitor]
+
+tracking:
+  experiment: "<mlflow-experiment-name>"

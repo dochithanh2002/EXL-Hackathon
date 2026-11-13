@@ -1,0 +1,142 @@
+{
+  "model_id": "M1",
+  "timestamp_utc": "2026-11-13T16:52:27+00:00",
+  "champion": {
+    "module": "output/m1_fremtpl2/model/m1_fremtpl2_freq.py",
+    "module_sha256": "fda45c0fbca2682bc540a35908b7eb3f4a71c6bad60f745cca35c3c36db00a74",
+    "manifest_module_sha256": "fda45c0fbca2682bc540a35908b7eb3f4a71c6bad60f745cca35c3c36db00a74",
+    "migration_status": "AWAITING_HUMAN_APPROVAL",
+    "migration_iterations": 1,
+    "human_review": null,
+    "migrated_by": "Claude Opus 5.5 (Claude Code, migration-agent)",
+    "reference_dir": "output/m1_fremtpl2/model/reference"
+  },
+  "baseline": {
+    "validated_loss_x100": 30.910946729292437
+  },
+  "thresholds": {
+    "freq_psi": [
+      0.1,
+      0.25
+    ],
+    "max_csi": [
+      0.1,
+      0.25
+    ],
+    "ae_dev": [
+      0.05,
+      0.1
+    ],
+    "loss_increase_rel": [
+      0.02,
+      0.05
+    ],
+    "max_age_band_ae_dev": [
+      0.1,
+      0.2
+    ]
+  },
+  "batches": [
+    {
+      "batch": "test cohort",
+      "note": "Simulated batch: held-out policies with observed claims.",
+      "has_outcome": true,
+      "metrics": {
+        "policies": 67801,
+        "exposure": 36006.92299348754,
+        "mean_pred_freq": 0.11378423904483659,
+        "freq_psi": 6.89434010235165e-05,
+        "csi": {
+          "BonusMalusGLM": 0.00014863319926382187,
+          "DensityGLM": 0.0001911220932423222,
+          "AreaGLM": 9.746593952389335e-05,
+          "VehPowerGLM": 4.6198863354886145e-05,
+          "VehAgeGLM": 3.9198394997812704e-05,
+          "DrivAgeGLM": 0.00014036968503179303,
+          "VehBrand": 7.384447702766001e-05,
+          "VehGas": 2.5975754080734073e-07,
+          "Region": 0.00039532068670152453
+        },
+        "max_csi": 0.00039532068670152453,
+        "max_csi_variable": "Region",
+        "young_driver_share": 0.05603162195247858,
+        "ae": 0.9684770177718515,
+        "ae_dev": 0.03152298222814853,
+        "loss_x100": 30.910946729292437,
+        "loss_increase_rel": 0.0,
+        "age_band_ae": {
+          "21-25": 0.9449702699305125,
+          "26-30": 1.0297516524788877,
+          "31-40": 1.0203026825757484,
+          "41-50": 0.9802166824996048,
+          "51-70": 0.9300292144118947,
+          "71+": 0.9332734131977239
+        },
+        "max_age_band_ae_dev": 0.06997078558810532
+      },
+      "ratings": {
+        "freq_psi": "GREEN",
+        "max_csi": "GREEN",
+        "ae_dev": "GREEN",
+        "loss_increase_rel": "GREEN",
+        "max_age_band_ae_dev": "GREEN"
+      },
+      "overall": "GREEN",
+      "breaches": [],
+      "revalidation_trigger": false
+    },
+    {
+      "batch": "young-driver growth",
+      "note": "Simulated scenario: test policies with drivers aged 18-25 tripled (portfolio-mix shift); observed claims of those policies reused.",
+      "has_outcome": true,
+      "metrics": {
+        "policies": 75399,
+        "exposure": 39181.39220824912,
+        "mean_pred_freq": 0.12174107349683731,
+        "freq_psi": 0.014729171830695914,
+        "csi": {
+          "BonusMalusGLM": 0.029197025687891974,
+          "DensityGLM": 0.0002084283961936819,
+          "AreaGLM": 0.0001388619528781016,
+          "VehPowerGLM": 0.0011319129352352457,
+          "VehAgeGLM": 8.878589856192257e-05,
+          "DrivAgeGLM": 0.10043181274712196,
+          "VehBrand": 0.0009412402120194904,
+          "VehGas": 0.00015325550608426627,
+          "Region": 0.0009642788408269142
+        },
+        "max_csi": 0.10043181274712196,
+        "max_csi_variable": "DrivAgeGLM",
+        "young_driver_share": 0.15115585087335376,
+        "ae": 0.9596833109997074,
+        "ae_dev": 0.040316689000292616,
+        "loss_x100": 31.496025855870396,
+        "loss_increase_rel": 0.018927894111490096,
+        "age_band_ae": {
+          "18-20": 0.7368857996718409,
+          "21-25": 0.9449702699305125,
+          "26-30": 1.0297516524788877,
+          "31-40": 1.0203026825757484,
+          "41-50": 0.9802166824996048,
+          "51-70": 0.9300292144118947,
+          "71+": 0.9332734131977239
+        },
+        "max_age_band_ae_dev": 0.26311420032815913
+      },
+      "ratings": {
+        "freq_psi": "GREEN",
+        "max_csi": "AMBER",
+        "ae_dev": "GREEN",
+        "loss_increase_rel": "GREEN",
+        "max_age_band_ae_dev": "RED"
+      },
+      "overall": "RED",
+      "breaches": [
+        "max_csi = 0.1004 (AMBER; amber/red at 0.1/0.25), driven by DrivAgeGLM",
+        "max_age_band_ae_dev = 0.2631 (RED; amber/red at 0.1/0.2)"
+      ],
+      "revalidation_trigger": true
+    }
+  ],
+  "revalidation_required": true
+}

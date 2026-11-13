@@ -1,0 +1,489 @@
+{
+  "stages": {
+    "intake": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:10:07Z",
+      "hashes": {
+        "config": "a5b40fd27ee261ac79716f174c10f25be517bdead262a0640b2c056af9a12bab",
+        "rulebook": "81e9997c317928abbc5fe768cf04222070c8fc7537b9d5c6033ff1ee550ee506",
+        "legacy_script": "46122fc07ba8e00cd6a9601c5ef24389bbdc9897581564f290e483f925ec356e",
+        "tolerances": "ad54fd05de5d854c3c8e74075ce9d3043d504a47c69be5dfc781fd67b20e117c",
+        "data": "4edce6da569b2c30788a85fd98a9bafb1a983e8ca1a7aac875dd7ff853cbd0bb"
+      }
+    },
+    "capture": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:10:09Z",
+      "reference_dir": "runs/M2/reference",
+      "r_stdout": "captured 30000 predictions to /Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/runs/M2/reference"
+    },
+    "scan": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:10:09Z",
+      "n_triggered": 17
+    },
+    "analyse": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:10:09Z",
+      "escalations": []
+    },
+    "plan": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:10:09Z",
+      "coverage": {
+        "passed": true,
+        "violations": [],
+        "checks": [
+          "G-13 plan coverage"
+        ]
+      },
+      "disallowed_packages": [],
+      "escalations": []
+    },
+    "test_and_repair": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:10:09Z",
+      "iterations": 1,
+      "final": "runs/M2/candidates/candidate_1.py"
+    },
+    "package": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:10:09Z",
+      "output": "runs/M2/output"
+    }
+  },
+  "status": "APPROVED",
+  "input_hashes": {
+    "config": "a5b40fd27ee261ac79716f174c10f25be517bdead262a0640b2c056af9a12bab",
+    "rulebook": "81e9997c317928abbc5fe768cf04222070c8fc7537b9d5c6033ff1ee550ee506",
+    "legacy_script": "46122fc07ba8e00cd6a9601c5ef24389bbdc9897581564f290e483f925ec356e",
+    "tolerances": "ad54fd05de5d854c3c8e74075ce9d3043d504a47c69be5dfc781fd67b20e117c",
+    "data": "4edce6da569b2c30788a85fd98a9bafb1a983e8ca1a7aac875dd7ff853cbd0bb"
+  },
+  "scan": {
+    "triggered_rules": {
+      "R-PKG-01": "pattern /\\blibrary\\(\\s*(\\w+)/ matched 1x: ['caret']",
+      "R-IO-01": "pattern /\\bread\\.csv\\(/ matched 1x",
+      "R-IO-02": "pattern /tolower\\(\\s*colnames/ matched 1x",
+      "R-IDX-01": "pattern /\\[\\[\\s*\\w+\\s*\\]\\]|\\[\\s*,\\s*\\d+\\s*\\]|seq\\(\\s*\\d+/ matched 3x",
+      "R-IDX-02": "pattern /which\\(.*\\)\\s*,\\s*\\]/ matched 1x",
+      "R-REC-01": "pattern /%in%/ matched 2x",
+      "R-FAC-01": "pattern /\\b(as\\.)?factor\\(/ matched 4x",
+      "R-RNG-01": "pattern /set\\.seed|sample\\(|createDataPartition/ matched 1x",
+      "R-EST-01": "pattern /\\bglm\\([^)]*binomial/ matched 1x",
+      "R-EST-02": "pattern /\\bglm\\(/ matched 1x",
+      "R-PRED-01": "pattern /\\bpredict\\(/ matched 1x",
+      "R-FAC-02": "factors in formula: ['sex', 'education', 'marriage']",
+      "R-FAC-03": "factor response 'default.payment.next.month'",
+      "R-IO-03": "always applies",
+      "R-FAC-04": "always applies",
+      "R-REC-02": "always applies",
+      "GOV-01": "always applies"
+    },
+    "data_profile": {
+      "n_rows": 30000,
+      "columns": [
+        {
+          "name": "ID",
+          "dtype": "int64",
+          "n_unique": 30000
+        },
+        {
+          "name": "LIMIT_BAL",
+          "dtype": "int64",
+          "n_unique": 81
+        },
+        {
+          "name": "SEX",
+          "dtype": "int64",
+          "n_unique": 2,
+          "levels": [
+            1,
+            2
+          ]
+        },
+        {
+          "name": "EDUCATION",
+          "dtype": "int64",
+          "n_unique": 7,
+          "levels": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        {
+          "name": "MARRIAGE",
+          "dtype": "int64",
+          "n_unique": 4,
+          "levels": [
+            0,
+            1,
+            2,
+            3
+          ]
+        },
+        {
+          "name": "AGE",
+          "dtype": "int64",
+          "n_unique": 56
+        },
+        {
+          "name": "PAY_0",
+          "dtype": "int64",
+          "n_unique": 11,
+          "levels": [
+            -2,
+            -1,
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        {
+          "name": "PAY_2",
+          "dtype": "int64",
+          "n_unique": 11,
+          "levels": [
+            -2,
+            -1,
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        {
+          "name": "PAY_3",
+          "dtype": "int64",
+          "n_unique": 11,
+          "levels": [
+            -2,
+            -1,
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        {
+          "name": "PAY_4",
+          "dtype": "int64",
+          "n_unique": 11,
+          "levels": [
+            -2,
+            -1,
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        {
+          "name": "PAY_5",
+          "dtype": "int64",
+          "n_unique": 10,
+          "levels": [
+            -2,
+            -1,
+            0,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        {
+          "name": "PAY_6",
+          "dtype": "int64",
+          "n_unique": 10,
+          "levels": [
+            -2,
+            -1,
+            0,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        {
+          "name": "BILL_AMT1",
+          "dtype": "int64",
+          "n_unique": 22723
+        },
+        {
+          "name": "BILL_AMT2",
+          "dtype": "int64",
+          "n_unique": 22346
+        },
+        {
+          "name": "BILL_AMT3",
+          "dtype": "int64",
+          "n_unique": 22026
+        },
+        {
+          "name": "BILL_AMT4",
+          "dtype": "int64",
+          "n_unique": 21548
+        },
+        {
+          "name": "BILL_AMT5",
+          "dtype": "int64",
+          "n_unique": 21010
+        },
+        {
+          "name": "BILL_AMT6",
+          "dtype": "int64",
+          "n_unique": 20604
+        },
+        {
+          "name": "PAY_AMT1",
+          "dtype": "int64",
+          "n_unique": 7943
+        },
+        {
+          "name": "PAY_AMT2",
+          "dtype": "int64",
+          "n_unique": 7899
+        },
+        {
+          "name": "PAY_AMT3",
+          "dtype": "int64",
+          "n_unique": 7518
+        },
+        {
+          "name": "PAY_AMT4",
+          "dtype": "int64",
+          "n_unique": 6937
+        },
+        {
+          "name": "PAY_AMT5",
+          "dtype": "int64",
+          "n_unique": 6897
+        },
+        {
+          "name": "PAY_AMT6",
+          "dtype": "int64",
+          "n_unique": 6939
+        },
+        {
+          "name": "default payment next month",
+          "dtype": "int64",
+          "n_unique": 2,
+          "levels": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    "protected_attributes": [
+      "SEX",
+      "MARRIAGE",
+      "AGE",
+      "EDUCATION"
+    ]
+  },
+  "iterations": [
+    {
+      "iteration": 1,
+      "file": "runs/M2/candidates/candidate_1.py",
+      "sha256": "ed70c5e3cb53ffecc226e00f9fa02b8851c9b2e34ac47da519d362c8d49851e1",
+      "rule_ids_applied": [
+        "R-IO-01",
+        "R-IO-02",
+        "R-IO-03",
+        "R-IDX-01",
+        "R-IDX-02",
+        "R-REC-01",
+        "R-REC-02",
+        "R-FAC-01",
+        "R-FAC-02",
+        "R-FAC-03",
+        "R-FAC-04",
+        "R-RNG-01",
+        "R-EST-01",
+        "R-EST-02",
+        "R-PRED-01",
+        "R-PKG-01",
+        "GOV-01"
+      ],
+      "change_summary": "",
+      "notes": [
+        "Estimator follows R-EST-02 v1.1: glm.fit numerical path reproduced in numpy (start values, stopping rule, SE from last-iteration QR)",
+        "pay_* positions resolved to names with an assertion against schema drift (R-IDX-01)",
+        "unknown factor levels raise instead of producing silent all-zero dummies"
+      ],
+      "static_guardrails": {
+        "passed": true,
+        "violations": [],
+        "checks": [
+          "G-04 syntax",
+          "G-01 imports",
+          "G-02 forbidden APIs",
+          "G-03 interface contract"
+        ]
+      },
+      "run": {
+        "ok": true,
+        "n_rows": 30000,
+        "n_train": 21001,
+        "n_test": 8999
+      },
+      "parity": {
+        "pass": true,
+        "checks": [
+          {
+            "check": "G-05 coefficient names: missing + extra",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "coefficient max rel diff",
+            "value": 3.037930672900145e-14,
+            "tolerance": 1e-06,
+            "pass": true
+          },
+          {
+            "check": "std error max rel diff",
+            "value": 5.0499449960581315e-15,
+            "tolerance": 1e-06,
+            "pass": true
+          },
+          {
+            "check": "rows: identical set",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "response values: rows differing",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "split membership: rows differing",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "prediction max abs diff (all rows)",
+            "value": 8.770761894538737e-15,
+            "tolerance": 1e-08,
+            "pass": true
+          },
+          {
+            "check": "binomial deviance abs diff",
+            "value": 0.0,
+            "tolerance": 1e-06,
+            "pass": true
+          }
+        ],
+        "evidence": {
+          "worst_terms": [
+            {
+              "term": "pay_5",
+              "estimate_r": 0.10049976929870297,
+              "estimate_py": 0.10049976929870602,
+              "rel_diff": 3.037930672900145e-14
+            },
+            {
+              "term": "pay_2",
+              "estimate_r": 0.04046063753608107,
+              "estimate_py": 0.04046063753607993,
+              "rel_diff": 2.8125572643930406e-14
+            },
+            {
+              "term": "education2",
+              "estimate_r": -0.029816857166514717,
+              "estimate_py": -0.029816857166515453,
+              "rel_diff": 2.4668017481070463e-14
+            },
+            {
+              "term": "pay_amt1",
+              "estimate_r": -6.972138937965761e-06,
+              "estimate_py": -6.972138937965864e-06,
+              "rel_diff": 1.4700078057778036e-14
+            },
+            {
+              "term": "education3",
+              "estimate_r": -0.0696433499214047,
+              "estimate_py": -0.06964334992140565,
+              "rel_diff": 1.374958786186837e-14
+            },
+            {
+              "term": "pay_3",
+              "estimate_r": 0.14751341256345674,
+              "estimate_py": 0.14751341256345488,
+              "rel_diff": 1.2606471058671846e-14
+            },
+            {
+              "term": "(Intercept)",
+              "estimate_r": -1.2259151019037402,
+              "estimate_py": -1.2259151019037269,
+              "rel_diff": 1.0867535830836013e-14
+            },
+            {
+              "term": "pay_0",
+              "estimate_r": 0.9091779694301938,
+              "estimate_py": 0.9091779694301875,
+              "rel_diff": 6.960431789091293e-15
+            }
+          ],
+          "binomial_deviance_all_r": 26737.397112146056,
+          "binomial_deviance_all_py": 26737.397112146056
+        }
+      },
+      "verdict": "PASS"
+    }
+  ],
+  "mlflow_run_id": "0418f4d805af43b5864378a2ee9e881f",
+  "human_review": {
+    "reviewer": "Thanh",
+    "decision": "approve",
+    "comment": "Approved by user instruction in Claude Code session; reviewed via factory reports",
+    "ts_utc": "2026-11-13T15:55:29Z",
+    "artefact_sha256": {
+      "HUMAN_REVIEW.md": "c7214888db20b19f163b7b8049e2f9d76ce37a36aa691f39e70568104c925dda",
+      "MIGRATION_REPORT.md": "901c466bf01b729c202485c612becfb8e1926ca1f78d026353185fcb667818d7",
+      "m2_taiwan_pd.py": "ed70c5e3cb53ffecc226e00f9fa02b8851c9b2e34ac47da519d362c8d49851e1",
+      "manifest.json": "26d47122dacadd557470f8d3f9afce243a7df92b726e53e673b3cf3ff5b9feeb",
+      "requirements.txt": "0b9884fba4f5400a9c5c29fb25b50c4dc3c378aec18317f2248da15d0d53838b"
+    }
+  }
+}

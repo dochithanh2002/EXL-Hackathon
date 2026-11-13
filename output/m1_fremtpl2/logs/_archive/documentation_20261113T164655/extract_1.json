@@ -1,0 +1,282 @@
+{
+  "purpose": "Estimate the expected number of motor third-party liability (TPL) claims per policy for a French motor portfolio, as a claim-frequency model (GLM1) relative to the policy's exposure (lines 2, 46-49).",
+  "intended_use": "Per model.yaml governance (quoted, not established from code): 'Technical claim-frequency model feeding the motor TPL risk premium (simulated insurer)'. The code itself only fits the model and produces fitted claim-frequency predictions on the learning and test samples (lines 51-52).",
+  "out_of_scope_use": "Claim severity or total loss cost estimation (the model predicts claim counts only, lines 47-49); use on portfolios outside the French motor TPL data the model was fitted on (line 11); individual underwriting or claims decisions; direct use as a final customer price without the actuarial and fairness review required for the age input (DrivAgeGLM); scoring policies whose driver age or vehicle age falls outside the lookup tables built in lines 23 and 27-28.",
+  "methodology": "A generalised linear model with a Poisson response distribution and log link is fitted by R glm() (lines 47-49). The log of policy Exposure enters as an offset, so the model estimates a claim rate per unit of exposure, and the expected count scales proportionally with exposure (line 49). All nine inputs enter additively on the log scale with no interactions (lines 47-48). Categorical inputs use R default treatment contrasts with explicit reference levels set for VehAgeGLM, DrivAgeGLM, VehBrand and Region (lines 25, 30, 36-37). The data are split at random into a learning sample and a test sample (the source comment states 90% / 10%) with set.seed(100) (lines 40-44); the model is fitted on the learning sample only (line 49) and predictions on the response scale are produced for both samples (lines 51-52).",
+  "target_definition": "ClaimNb: the number of claims recorded on the policy during the observation period, capped at 4 before fitting (line 14). It is modelled as a Poisson count with log(Exposure) as offset, where Exposure (policy duration in years) is capped at 1 (lines 15, 49).",
+  "variables": [
+    {
+      "name": "ClaimNb",
+      "role": "target",
+      "kind": "numeric",
+      "description": "Number of claims on the policy (count response).",
+      "levels": [],
+      "level_meaning": {},
+      "transformation": "Capped at 4 with pmin; source comment says counts above 4 are treated as data errors (lines 13-14).",
+      "source_lines": [13, 14, 47]
+    },
+    {
+      "name": "VehPowerGLM",
+      "role": "input",
+      "kind": "categorical",
+      "description": "Vehicle power class, derived from VehPower.",
+      "levels": ["4", "5", "6", "7", "8", "9"],
+      "level_meaning": {"9": "VehPower of 9 or above (levels above 9 merged into 9)"},
+      "transformation": "VehPower capped at 9 with pmin and converted to a factor; reference level is the first R level '4' (lines 20-21).",
+      "source_lines": [20, 21, 47]
+    },
+    {
+      "name": "VehAgeGLM",
+      "role": "input",
+      "kind": "categorical",
+      "description": "Vehicle age class, derived from VehAge (age of the vehicle in years).",
+      "levels": ["2", "1", "3"],
+      "level_meaning": {"1": "VehAge in [0,1) (new vehicle)", "2": "VehAge in [1,10] (reference)", "3": "VehAge above 10"},
+      "transformation": "VehAge mapped through a lookup table covering vehicle ages 0 to 110 into three classes, converted to a factor and releveled so class '2' is the reference (lines 22-25).",
+      "source_lines": [22, 23, 24, 25, 47]
+    },
+    {
+      "name": "DrivAgeGLM",
+      "role": "input",
+      "kind": "categorical",
+      "description": "Driver age band, derived from DrivAge (age of the driver). Age is a protected characteristic (model.yaml protected_attributes: DrivAge).",
+      "levels": ["5", "1", "2", "3", "4", "6", "7"],
+      "level_meaning": {"1": "18-20", "2": "21-25", "3": "26-30", "4": "31-40", "5": "41-50 (reference)", "6": "51-70", "7": "71+ (lookup covers ages up to 100)"},
+      "transformation": "DrivAge mapped through a lookup table covering ages 18 to 100 into seven bands, converted to a factor and releveled so band '5' is the reference (lines 26-30).",
+      "source_lines": [26, 27, 28, 29, 30, 47]
+    },
+    {
+      "name": "BonusMalusGLM",
+      "role": "input",
+      "kind": "numeric",
+      "description": "Bonus-malus (no-claims discount / surcharge) level of the policyholder, derived from BonusMalus.",
+      "levels": [],
+      "level_meaning": {},
+      "transformation": "BonusMalus capped at 150 with pmin and stored as integer; enters linearly on the log scale (lines 31-32).",
+      "source_lines": [31, 32, 47]
+    },
+    {
+      "name": "VehBrand",
+      "role": "input",
+      "kind": "categorical",
+      "description": "Vehicle brand (coded categories).",
+      "levels": ["B1", "B10", "B11", "B12", "B13", "B14", "B2", "B3", "B4", "B5", "B6"],
+      "level_meaning": {"B1": "reference level (source comment: largest class)"},
+      "transformation": "Converted to a factor and releveled with reference 'B1' (lines 35-36).",
+      "source_lines": [35, 36, 47]
+    },
+    {
+      "name": "VehGas",
+      "role": "input",
+      "kind": "binary",
+      "description": "Vehicle fuel type.",
+      "levels": ["Diesel", "Regular"],
+      "level_meaning": {"Diesel": "diesel fuel (reference, first alphabetical level)", "Regular": "regular (petrol) fuel"},
+      "transformation": "Converted to a factor with R default level order (line 38).",
+      "source_lines": [38, 47]
+    },
+    {
+      "name": "DensityGLM",
+      "role": "input",
+      "kind": "numeric",
+      "description": "Population density of the policyholder's location, on the log scale, derived from Density.",
+      "levels": [],
+      "level_meaning": {},
+      "transformation": "Natural log of Density; enters linearly (lines 33-34).",
+      "source_lines": [33, 34, 48]
+    },
+    {
+      "name": "Region",
+      "role": "input",
+      "kind": "categorical",
+      "description": "French region of the policy (coded categories).",
+      "levels": ["R24", "R11", "R21", "R22", "R23", "R25", "R26", "R31", "R41", "R42", "R43", "R52", "R53", "R54", "R72", "R73", "R74", "R82", "R83", "R91", "R93", "R94"],
+      "level_meaning": {"R24": "reference level (source comment: largest class)"},
+      "transformation": "Converted to a factor and releveled with reference 'R24' (lines 35, 37).",
+      "source_lines": [35, 37, 48]
+    },
+    {
+      "name": "AreaGLM",
+      "role": "input",
+      "kind": "ordinal_as_numeric",
+      "description": "Area code of the policyholder's location, derived from Area (ordinal codes A to F).",
+      "levels": [],
+      "level_meaning": {"1": "A", "2": "B", "3": "C", "4": "D", "5": "E", "6": "F"},
+      "transformation": "Area converted to a factor (alphabetical order) and then to its integer code 1..6, used as a continuous variable (lines 18-19).",
+      "source_lines": [18, 19, 48]
+    }
+  ],
+  "preprocessing": [
+    {
+      "order": 1,
+      "description": "Read the freMTPL2freq CSV, treating both double and single quotes as string delimiters so that the OpenML single-quoted strings are unquoted; strings are not converted to factors.",
+      "columns": [],
+      "source_lines": [7, 11],
+      "author_rationale": "Header comment: data as exported by OpenML (strings in single quotes).",
+      "is_assumption": false
+    },
+    {
+      "order": 2,
+      "description": "Cap the claim count ClaimNb at 4 (values above 4 set to 4, not removed).",
+      "columns": ["ClaimNb"],
+      "source_lines": [13, 14],
+      "author_rationale": "Claim counts above 4 are treated as data errors (case study, Sec. 2).",
+      "is_assumption": true
+    },
+    {
+      "order": 3,
+      "description": "Cap Exposure at 1 year (values above 1 set to 1).",
+      "columns": ["Exposure"],
+      "source_lines": [13, 15],
+      "author_rationale": "Exposures above one year are treated as data errors (case study, Sec. 2).",
+      "is_assumption": true
+    },
+    {
+      "order": 4,
+      "description": "Map Area A..F to integer codes 1..6 (AreaGLM) and use it as a continuous variable.",
+      "columns": ["Area", "AreaGLM"],
+      "source_lines": [18, 19],
+      "author_rationale": "Area is ordinal (case study, Sec. 3.1).",
+      "is_assumption": true
+    },
+    {
+      "order": 5,
+      "description": "Cap VehPower at 9 and convert to a factor (VehPowerGLM).",
+      "columns": ["VehPower", "VehPowerGLM"],
+      "source_lines": [20, 21],
+      "author_rationale": "Levels above 9 merged into 9 (case study, Sec. 3.1).",
+      "is_assumption": true
+    },
+    {
+      "order": 6,
+      "description": "Band VehAge into three classes via a lookup table for ages 0 to 110 and set class '2' as reference (VehAgeGLM). Vehicle ages outside the table would produce missing values.",
+      "columns": ["VehAge", "VehAgeGLM"],
+      "source_lines": [22, 23, 24, 25],
+      "author_rationale": "Three classes [0,1), [1,10], (10,inf) (case study, Sec. 3.1).",
+      "is_assumption": true
+    },
+    {
+      "order": 7,
+      "description": "Band DrivAge into seven classes via a lookup table for ages 18 to 100 and set class '5' (41-50) as reference (DrivAgeGLM). Driver ages outside the table would produce missing values.",
+      "columns": ["DrivAge", "DrivAgeGLM"],
+      "source_lines": [26, 27, 28, 29, 30],
+      "author_rationale": "Seven age classes from the case study, Sec. 3.1.",
+      "is_assumption": true
+    },
+    {
+      "order": 8,
+      "description": "Cap BonusMalus at 150 and keep it continuous (BonusMalusGLM).",
+      "columns": ["BonusMalus", "BonusMalusGLM"],
+      "source_lines": [31, 32],
+      "author_rationale": "BonusMalus capped at 150, continuous (case study, Sec. 3.1).",
+      "is_assumption": true
+    },
+    {
+      "order": 9,
+      "description": "Take the natural log of Density (DensityGLM) and use it as a continuous variable.",
+      "columns": ["Density", "DensityGLM"],
+      "source_lines": [33, 34],
+      "author_rationale": "Density log-transformed, continuous (case study, Sec. 3.1).",
+      "is_assumption": true
+    },
+    {
+      "order": 10,
+      "description": "Convert VehBrand and Region to factors with reference levels 'B1' and 'R24'; convert VehGas to a factor.",
+      "columns": ["VehBrand", "Region", "VehGas"],
+      "source_lines": [35, 36, 37, 38],
+      "author_rationale": "References B1 and R24 are the largest classes (source comment).",
+      "is_assumption": true
+    },
+    {
+      "order": 11,
+      "description": "Random learning / test split with set.seed(100), sampling rows without replacement for the learning sample; the remainder forms the test sample. Not stratified and not time-based.",
+      "columns": [],
+      "source_lines": [40, 41, 42, 43, 44],
+      "author_rationale": "learning / test split: 90% / 10% (case study, Sec. 2).",
+      "is_assumption": false
+    }
+  ],
+  "variable_selection": "No variable selection procedure is present in the code. The formula is fixed (lines 47-48) and, per the source comments, follows the published GLM1 specification of the Noll, Salzmann & Wuthrich (2018) case study (lines 2-6, 17). No stepwise selection, significance-based removal or regularisation is performed, and all inputs are retained regardless of their significance.",
+  "assumptions": [
+    "Claim counts are Poisson distributed given the inputs (mean equals variance; no over-dispersion or zero-inflation is modelled) (line 49).",
+    "The expected claim count is proportional to exposure, enforced by the log(Exposure) offset with a fixed coefficient (line 49).",
+    "Effects are multiplicative and additive on the log scale with no interactions between inputs (lines 47-48).",
+    "AreaGLM: the effect of Area is log-linear across the ordered codes A to F, i.e. equally spaced steps (lines 18-19).",
+    "BonusMalusGLM and DensityGLM (log Density) have log-linear effects on claim frequency (lines 31-34).",
+    "Claim counts above 4 and exposures above one year are data errors and can be capped rather than investigated or removed (lines 13-15).",
+    "Policies are independent and the random learning / test split gives a representative hold-out sample (lines 40-44).",
+    "All DrivAge values lie within the lookup range 18 to 100 and all VehAge values within 0 to 110 (lines 23, 27-29).",
+    "Density is strictly positive so that its log is finite (line 34).",
+    "The source comments state the code was reconstructed from the published case study because the original notebook could not be retrieved; it is assumed to reproduce the intended legacy model (lines 3-6)."
+  ],
+  "limitations": [
+    {
+      "text": "Driver age is a direct model input: DrivAgeGLM, the banded driver age derived from the protected attribute DrivAge, enters the formula. Age is a protected characteristic under the Equality Act 2010; its use in insurance pricing relies on the Schedule 3 exception and requires documented actuarial justification and a Consumer Duty fair-value assessment. No such justification is present in the evidence.",
+      "severity": "High",
+      "disclosure_ids": ["D-01:DrivAgeGLM"],
+      "source_lines": [26, 27, 28, 29, 30, 47]
+    },
+    {
+      "text": "Values are capped before fitting with pmin: the response ClaimNb is capped at 4 and Exposure (the offset) is capped at 1, and the inputs VehPower (at 9) and BonusMalus (at 150) are capped. Capping the response and the exposure changes what the model estimates: frequency for policies with many claims is understated and the extreme records are treated as data errors without investigation. Capping inputs also prevents the model from distinguishing risk above the caps.",
+      "severity": "High",
+      "disclosure_ids": ["D-06"],
+      "source_lines": [13, 14, 15, 20, 21, 31, 32]
+    },
+    {
+      "text": "Several terms are not statistically significant in the final model, including DrivAgeGLM1, DrivAgeGLM7, VehBrandB10, VehBrandB13, VehBrandB14, VehBrandB2, VehBrandB3, VehBrandB4, VehBrandB6, RegionR21, RegionR22, RegionR25, RegionR26, RegionR42, RegionR43, RegionR53, RegionR74, RegionR82, RegionR94 and AreaGLM. They are retained because the formula is fixed with no selection step, which adds estimation noise to pricing relativities, notably for sparse brand and region levels.",
+      "severity": "Medium",
+      "disclosure_ids": ["D-05"],
+      "source_lines": [47, 48]
+    },
+    {
+      "text": "The Poisson family assumes equidispersion; over-dispersion is not tested or modelled in the code, so standard errors and significance assessments may be understated.",
+      "severity": "Medium",
+      "disclosure_ids": [],
+      "source_lines": [49]
+    },
+    {
+      "text": "Lookup-table banding of DrivAge (ages 18 to 100) and VehAge (ages 0 to 110) yields missing values for ages outside these ranges; glm() would then silently drop such rows by default and predict() would return missing predictions. There is no explicit check or handling.",
+      "severity": "Medium",
+      "disclosure_ids": [],
+      "source_lines": [23, 24, 27, 28, 29, 49, 52]
+    },
+    {
+      "text": "AreaGLM treats the ordinal Area codes as equally spaced numeric values, imposing a log-linear trend across areas that is not tested in the code.",
+      "severity": "Low",
+      "disclosure_ids": [],
+      "source_lines": [18, 19]
+    },
+    {
+      "text": "The model is a reconstruction from a published case study, not the original legacy code (the original notebook could not be retrieved), and no supporting documents are listed in model.yaml; the developer's original intent and any changes since cannot be verified.",
+      "severity": "Medium",
+      "disclosure_ids": [],
+      "source_lines": [3, 4, 5, 6]
+    },
+    {
+      "text": "Validation design is limited to a single random hold-out split; there is no out-of-time validation, cross-validation, or performance evaluation code, and no assessment of stability over time.",
+      "severity": "Medium",
+      "disclosure_ids": [],
+      "source_lines": [40, 41, 42, 43, 44, 51, 52]
+    },
+    {
+      "text": "No interactions are included, so combined effects (for example between driver age and bonus-malus level) are not captured.",
+      "severity": "Low",
+      "disclosure_ids": [],
+      "source_lines": [47, 48]
+    }
+  ],
+  "code_vs_docs_discrepancies": [
+    "No supporting documents are listed in model.yaml (supporting_docs is empty), so no code-versus-document comparison was possible. The source comments cite the case study (Sec. 2 and Sec. 3.1) but the paper itself is not part of the evidence.",
+    "Line 13 comment describes claim counts above 4 and exposures above one year as 'data errors', but the code (lines 14-15) does not remove or correct these records; it caps them, keeping the records in the fit."
+  ],
+  "open_questions": [
+    "What actuarial and statistical justification supports using driver age (DrivAgeGLM) as a pricing input under the Equality Act 2010 Schedule 3 exception, and has a Consumer Duty fair-value / differential-outcomes review been performed?",
+    "Can the original legacy code or notebook be retrieved to confirm that this reconstruction matches the model in production?",
+    "Is capping ClaimNb and Exposure (rather than investigating or excluding the records) approved by the model owner, and how many records are affected?",
+    "Are there any DrivAge values outside 18 to 100, VehAge values above 110, or non-positive Density values in production data, and how should they be handled?",
+    "Has over-dispersion been assessed, and would a negative binomial or quasi-Poisson alternative be considered?",
+    "Should the non-significant VehBrand, Region, DrivAgeGLM and AreaGLM terms be merged or retained, and what is the owner's policy on this?",
+    "How are the model's fitted frequencies combined with severity and loadings to form the risk premium, and which downstream systems consume them?",
+    "model.yaml records last_independent_validation as 'none on record'; what is the planned validation and monitoring schedule for this Tier 1 model?"
+  ]
+}

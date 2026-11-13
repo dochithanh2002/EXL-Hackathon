@@ -1,0 +1,6 @@
+{
+  "name": "mrf",
+  "version": "2.0.0",
+  "description": "Agentic Model Risk Factory: document, migrate (R to Python with parity proof), validate and monitor legacy models under PRA SS1/23. Skills: /mrf:run, /mrf:new-model, /mrf:status, /mrf:approve, /mrf:monitor.",
+  "author": {"name": "EXL Hackathon team"}
+}

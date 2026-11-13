@@ -1,0 +1,297 @@
+{
+  "model": {
+    "class": [
+      "glm",
+      "lm"
+    ],
+    "family": "poisson",
+    "link": "log",
+    "formula": "ClaimNb ~ VehPowerGLM + VehAgeGLM + DrivAgeGLM + BonusMalusGLM + VehBrand + VehGas + DensityGLM + Region + AreaGLM",
+    "response": "ClaimNb",
+    "input_variables": [
+      "VehPowerGLM",
+      "VehAgeGLM",
+      "DrivAgeGLM",
+      "BonusMalusGLM",
+      "VehBrand",
+      "VehGas",
+      "DensityGLM",
+      "Region",
+      "AreaGLM"
+    ],
+    "factor_levels": {
+      "VehPowerGLM": [
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ],
+      "VehAgeGLM": [
+        "2",
+        "1",
+        "3"
+      ],
+      "DrivAgeGLM": [
+        "5",
+        "1",
+        "2",
+        "3",
+        "4",
+        "6",
+        "7"
+      ],
+      "VehBrand": [
+        "B1",
+        "B10",
+        "B11",
+        "B12",
+        "B13",
+        "B14",
+        "B2",
+        "B3",
+        "B4",
+        "B5",
+        "B6"
+      ],
+      "VehGas": [
+        "Diesel",
+        "Regular"
+      ],
+      "Region": [
+        "R24",
+        "R11",
+        "R21",
+        "R22",
+        "R23",
+        "R25",
+        "R26",
+        "R31",
+        "R41",
+        "R42",
+        "R43",
+        "R52",
+        "R53",
+        "R54",
+        "R72",
+        "R73",
+        "R74",
+        "R82",
+        "R83",
+        "R91",
+        "R93",
+        "R94"
+      ]
+    },
+    "contrasts": {
+      "VehPowerGLM": "contr.treatment",
+      "VehAgeGLM": "contr.treatment",
+      "DrivAgeGLM": "contr.treatment",
+      "VehBrand": "contr.treatment",
+      "VehGas": "contr.treatment",
+      "Region": "contr.treatment"
+    },
+    "n_coefficients": 49,
+    "converged": true,
+    "iterations": 6,
+    "deviance": 191651.269966774,
+    "null_deviance": 201966.364055248,
+    "aic": 254279.763151247,
+    "r_version": "R version 4.6.1 (2026-06-24)",
+    "r_packages_loaded": [
+      "compiler",
+      "jsonlite"
+    ]
+  },
+  "column_classes_after_preprocessing": {
+    "IDpol": "numeric",
+    "ClaimNb": "numeric",
+    "Exposure": "numeric",
+    "Area": "character",
+    "VehPower": "integer",
+    "VehAge": "integer",
+    "DrivAge": "integer",
+    "BonusMalus": "integer",
+    "VehBrand": "factor",
+    "VehGas": "factor",
+    "Density": "integer",
+    "Region": "factor",
+    "AreaGLM": "integer",
+    "VehPowerGLM": "factor",
+    "VehAgeGLM": "factor",
+    "DrivAgeGLM": "factor",
+    "BonusMalusGLM": "integer",
+    "DensityGLM": "numeric",
+    "fitGLM1": "numeric"
+  },
+  "split": {
+    "n_train": 610212,
+    "n_test": 67801,
+    "seed_used_by_harness": 100
+  },
+  "protected_attributes_in_data": [
+    "DrivAge"
+  ],
+  "protected_attributes_used_as_inputs": [
+    "DrivAgeGLM"
+  ],
+  "data_profile": {
+    "n_rows": 678013,
+    "columns": [
+      {
+        "name": "IDpol",
+        "dtype": "float64",
+        "n_unique": 678013,
+        "n_missing": 0
+      },
+      {
+        "name": "ClaimNb",
+        "dtype": "int64",
+        "n_unique": 11,
+        "n_missing": 0,
+        "levels": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          8,
+          9,
+          11,
+          16
+        ]
+      },
+      {
+        "name": "Exposure",
+        "dtype": "float64",
+        "n_unique": 181,
+        "n_missing": 0
+      },
+      {
+        "name": "Area",
+        "dtype": "str",
+        "n_unique": 6,
+        "n_missing": 0,
+        "levels": [
+          "'A'",
+          "'B'",
+          "'C'",
+          "'D'",
+          "'E'",
+          "'F'"
+        ]
+      },
+      {
+        "name": "VehPower",
+        "dtype": "int64",
+        "n_unique": 12,
+        "n_missing": 0,
+        "levels": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ]
+      },
+      {
+        "name": "VehAge",
+        "dtype": "int64",
+        "n_unique": 78,
+        "n_missing": 0
+      },
+      {
+        "name": "DrivAge",
+        "dtype": "int64",
+        "n_unique": 83,
+        "n_missing": 0
+      },
+      {
+        "name": "BonusMalus",
+        "dtype": "int64",
+        "n_unique": 115,
+        "n_missing": 0
+      },
+      {
+        "name": "VehBrand",
+        "dtype": "str",
+        "n_unique": 11,
+        "n_missing": 0,
+        "levels": [
+          "'B1'",
+          "'B10'",
+          "'B11'",
+          "'B12'",
+          "'B13'",
+          "'B14'",
+          "'B2'",
+          "'B3'",
+          "'B4'",
+          "'B5'",
+          "'B6'"
+        ]
+      },
+      {
+        "name": "VehGas",
+        "dtype": "str",
+        "n_unique": 2,
+        "n_missing": 0,
+        "levels": [
+          "'Diesel'",
+          "'Regular'"
+        ]
+      },
+      {
+        "name": "Density",
+        "dtype": "int64",
+        "n_unique": 1607,
+        "n_missing": 0
+      },
+      {
+        "name": "Region",
+        "dtype": "str",
+        "n_unique": 22,
+        "n_missing": 0
+      }
+    ]
+  },
+  "required_disclosures": {
+    "D-01:DrivAgeGLM": {
+      "why": "protected / sensitive attribute 'DrivAgeGLM' (derived from 'DrivAge') is a direct model input (Equality Act 2010, Consumer Duty)",
+      "keywords": [
+        "age",
+        "drivageglm"
+      ]
+    },
+    "D-06": {
+      "why": "values are capped / floored before fitting (pmin/pmax); capping a response or exposure changes what the model estimates",
+      "keywords": [
+        "cap",
+        "truncat",
+        "floor"
+      ],
+      "lines": [
+        14,
+        15,
+        21,
+        32
+      ]
+    },
+    "D-05": {
+      "why": "terms not significant at 5% in the final model: ['DrivAgeGLM1', 'DrivAgeGLM7', 'VehBrandB10', 'VehBrandB13', 'VehBrandB14', 'VehBrandB2', 'VehBrandB3', 'VehBrandB4', 'VehBrandB6', 'RegionR21', 'RegionR22', 'RegionR25', 'RegionR26', 'RegionR42', 'RegionR43', 'RegionR53', 'RegionR74', 'RegionR82', 'RegionR94', 'AreaGLM']",
+      "keywords": [
+        "significan"
+      ]
+    }
+  }
+}

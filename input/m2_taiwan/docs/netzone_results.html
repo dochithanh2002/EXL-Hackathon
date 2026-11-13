@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta charset="utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="pandoc" />
+
+
+
+
+<title>Defaul Credit Card of Taiwan Clients in 2005</title>
+
+<script src="__results___files/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="__results___files/bootstrap-3.3.5/css/journal.min.css" rel="stylesheet" />
+<script src="__results___files/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="__results___files/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="__results___files/bootstrap-3.3.5/shim/respond.min.js"></script>
+<script src="__results___files/navigation-1.1/tabsets.js"></script>
+<script src="__results___files/navigation-1.1/codefolding.js"></script>
+<link href="__results___files/highlightjs-1.1/default.css" rel="stylesheet" />
+<script src="__results___files/highlightjs-1.1/highlight.js"></script>
+
+<style type="text/css">code{white-space: pre;}</style>
+<style type="text/css">
+  pre:not([class]) {
+    background-color: white;
+  }
+</style>
+<script type="text/javascript">
+if (window.hljs && document.readyState && document.readyState === "complete") {
+   window.setTimeout(function() {
+      hljs.initHighlighting();
+   }, 0);
+}
+</script>
+
+
+
+<style type="text/css">
+h1 {
+  font-size: 34px;
+}
+h1.title {
+  font-size: 38px;
+}
+h2 {
+  font-size: 30px;
+}
+h3 {
+  font-size: 24px;
+}
+h4 {
+  font-size: 18px;
+}
+h5 {
+  font-size: 16px;
+}
+h6 {
+  font-size: 12px;
+}
+.table th:not([align]) {
+  text-align: left;
+}
+</style>
+
+
+<base target="_blank" /><base target="_blank" /><script src="https://www.kaggle.com/static/assets/runtime.js?v=f1b99646261b71cc" async defer></script><script src="https://www.kaggle.com/static/assets/notebookviewer.js?v=e1b2189b1dede4bc" async defer></script><script src="https://www.kaggle.com/static/assets/vendor.js?v=d65bb8768740f992" async defer></script><link href="https://www.kaggle.com/static/assets/notebookviewer.css?v=d2d1cf7f82e7031a" type="text/css" rel="stylesheet" /><link href="https://www.kaggle.com/static/assets/vendor.css?v=dne" type="text/css" rel="stylesheet" /></head>
+
+<body>
+                                        <script>
+function postHeightMessage() {
+  var mainDiv = document.getElementById('notebook') || document.getElementsByClassName('main-container')[0] || document.getElementsByClassName('bk-root')[0];
+  parent.postMessage(mainDiv.scrollHeight, "*");
+}
+document.addEventListener("DOMContentLoaded", postHeightMessage );
+window.onload = function() { postHeightMessage;
+    window.setTimeout(postHeightMessage, 500);
+    window.setTimeout(postHeightMessage, 1500);
+}
+</script>
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+code {
+  color: inherit;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+img {
+  max-width:100%;
+  height: auto;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+</style>
+
+
+
+<div class="container-fluid main-container">
+
+<!-- tabsets -->
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+</script>
+
+<!-- code folding -->
+<style type="text/css">
+.code-folding-btn { margin-bottom: 4px; }
+</style>
+<script>
+$(document).ready(function () {
+  window.initializeCodeFolding("hide" === "show");
+});
+</script>
+
+
+
+
+
+
+<div class="fluid-row" id="header">
+
+<div class="btn-group pull-right">
+<button type="button" class="btn btn-default btn-xs dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>Code</span> <span class="caret"></span></button>
+<ul class="dropdown-menu" style="min-width: 50px;">
+<li><a id="rmd-show-all-code" href="#">Show All Code</a></li>
+<li><a id="rmd-hide-all-code" href="#">Hide All Code</a></li>
+</ul>
+</div>
+
+
+
+<h1 class="title toc-ignore">Defaul Credit Card of Taiwan Clients in 2005</h1>
+
+</div>
+
+
+<div id="default-of-credit-card-clients-dataset" class="section level2 tabset">
+<h2>Default of Credit Card Clients Dataset</h2>
+<div id="overview" class="section level3">
+<h3>Overview</h3>
+<p><br></p>
+<p><strong>Dataset Information</strong></p>
+<p>This dataset contains information on default payments, demographic factors, credit data, history of payment, and bill statements of credit card clients in Taiwan from April 2005 to September 2005.</p>
+<p>I have put the column names to lower cases. Let’s quickly look at the dataset.</p>
+<ul>
+<li>There’re quite lots of features in dataset (25 columns)</li>
+<li><strong>id</strong> column is the client identifier, this is not important and will be removed.</li>
+<li>There’re few variables which I will convert to factor (such as sex, education, marriage). pay_0 and other pay_x features can considered to be factor variable, but let’s keep them as numeric for now.</li>
+</ul>
+<pre class="r"><code>dim(raw.credit)</code></pre>
+<pre><code>## [1] 30000    25</code></pre>
+<pre class="r"><code>summary(raw.credit)</code></pre>
+<pre><code>##        id          limit_bal            sex          education    
+##  Min.   :    1   Min.   :  10000   Min.   :1.000   Min.   :0.000  
+##  1st Qu.: 7501   1st Qu.:  50000   1st Qu.:1.000   1st Qu.:1.000  
+##  Median :15000   Median : 140000   Median :2.000   Median :2.000  
+##  Mean   :15000   Mean   : 167484   Mean   :1.604   Mean   :1.853  
+##  3rd Qu.:22500   3rd Qu.: 240000   3rd Qu.:2.000   3rd Qu.:2.000  
+##  Max.   :30000   Max.   :1000000   Max.   :2.000   Max.   :6.000  
+##     marriage          age            pay_0             pay_2        
+##  Min.   :0.000   Min.   :21.00   Min.   :-2.0000   Min.   :-2.0000  
+##  1st Qu.:1.000   1st Qu.:28.00   1st Qu.:-1.0000   1st Qu.:-1.0000  
+##  Median :2.000   Median :34.00   Median : 0.0000   Median : 0.0000  
+##  Mean   :1.552   Mean   :35.49   Mean   :-0.0167   Mean   :-0.1338  
+##  3rd Qu.:2.000   3rd Qu.:41.00   3rd Qu.: 0.0000   3rd Qu.: 0.0000  
+##  Max.   :3.000   Max.   :79.00   Max.   : 8.0000   Max.   : 8.0000  
+##      pay_3             pay_4             pay_5             pay_6        
+##  Min.   :-2.0000   Min.   :-2.0000   Min.   :-2.0000   Min.   :-2.0000  
+##  1st Qu.:-1.0000   1st Qu.:-1.0000   1st Qu.:-1.0000   1st Qu.:-1.0000  
+##  Median : 0.0000   Median : 0.0000   Median : 0.0000   Median : 0.0000  
+##  Mean   :-0.1662   Mean   :-0.2207   Mean   :-0.2662   Mean   :-0.2911  
+##  3rd Qu.: 0.0000   3rd Qu.: 0.0000   3rd Qu.: 0.0000   3rd Qu.: 0.0000  
+##  Max.   : 8.0000   Max.   : 8.0000   Max.   : 8.0000   Max.   : 8.0000  
+##    bill_amt1         bill_amt2        bill_amt3         bill_amt4      
+##  Min.   :-165580   Min.   :-69777   Min.   :-157264   Min.   :-170000  
+##  1st Qu.:   3559   1st Qu.:  2985   1st Qu.:   2666   1st Qu.:   2327  
+##  Median :  22382   Median : 21200   Median :  20088   Median :  19052  
+##  Mean   :  51223   Mean   : 49179   Mean   :  47013   Mean   :  43263  
+##  3rd Qu.:  67091   3rd Qu.: 64006   3rd Qu.:  60165   3rd Qu.:  54506  
+##  Max.   : 964511   Max.   :983931   Max.   :1664089   Max.   : 891586  
+##    bill_amt5        bill_amt6          pay_amt1         pay_amt2      
+##  Min.   :-81334   Min.   :-339603   Min.   :     0   Min.   :      0  
+##  1st Qu.:  1763   1st Qu.:   1256   1st Qu.:  1000   1st Qu.:    833  
+##  Median : 18104   Median :  17071   Median :  2100   Median :   2009  
+##  Mean   : 40311   Mean   :  38872   Mean   :  5664   Mean   :   5921  
+##  3rd Qu.: 50190   3rd Qu.:  49198   3rd Qu.:  5006   3rd Qu.:   5000  
+##  Max.   :927171   Max.   : 961664   Max.   :873552   Max.   :1684259  
+##     pay_amt3         pay_amt4         pay_amt5           pay_amt6       
+##  Min.   :     0   Min.   :     0   Min.   :     0.0   Min.   :     0.0  
+##  1st Qu.:   390   1st Qu.:   296   1st Qu.:   252.5   1st Qu.:   117.8  
+##  Median :  1800   Median :  1500   Median :  1500.0   Median :  1500.0  
+##  Mean   :  5226   Mean   :  4826   Mean   :  4799.4   Mean   :  5215.5  
+##  3rd Qu.:  4505   3rd Qu.:  4013   3rd Qu.:  4031.5   3rd Qu.:  4000.0  
+##  Max.   :896040   Max.   :621000   Max.   :426529.0   Max.   :528666.0  
+##  default.payment.next.month
+##  Min.   :0.0000            
+##  1st Qu.:0.0000            
+##  Median :0.0000            
+##  Mean   :0.2212            
+##  3rd Qu.:0.0000            
+##  Max.   :1.0000</code></pre>
+<pre class="r"><code>head(raw.credit,1)</code></pre>
+<pre><code>##   id limit_bal sex education marriage age pay_0 pay_2 pay_3 pay_4 pay_5
+## 1  1     20000   2         2        1  24     2     2    -1    -1    -2
+##   pay_6 bill_amt1 bill_amt2 bill_amt3 bill_amt4 bill_amt5 bill_amt6
+## 1    -2      3913      3102       689         0         0         0
+##   pay_amt1 pay_amt2 pay_amt3 pay_amt4 pay_amt5 pay_amt6
+## 1        0      689        0        0        0        0
+##   default.payment.next.month
+## 1                          1</code></pre>
+<p>Is there any missing data points in the dataset?</p>
+<ul>
+<li>There are no missing data.</li>
+</ul>
+<pre class="r"><code>missmap(raw.credit, main = &quot;Deafult credit card missing data heatmap&quot;, 
+        col=c(&quot;red&quot;, &quot;black&quot;), legend=F)</code></pre>
+<p><img src="__results___files/figure-html/check%20missing-1.png" width="672" /></p>
+<pre class="r"><code>colSums(sapply(raw.credit, is.na))</code></pre>
+<pre><code>##                         id                  limit_bal 
+##                          0                          0 
+##                        sex                  education 
+##                          0                          0 
+##                   marriage                        age 
+##                          0                          0 
+##                      pay_0                      pay_2 
+##                          0                          0 
+##                      pay_3                      pay_4 
+##                          0                          0 
+##                      pay_5                      pay_6 
+##                          0                          0 
+##                  bill_amt1                  bill_amt2 
+##                          0                          0 
+##                  bill_amt3                  bill_amt4 
+##                          0                          0 
+##                  bill_amt5                  bill_amt6 
+##                          0                          0 
+##                   pay_amt1                   pay_amt2 
+##                          0                          0 
+##                   pay_amt3                   pay_amt4 
+##                          0                          0 
+##                   pay_amt5                   pay_amt6 
+##                          0                          0 
+## default.payment.next.month 
+##                          0</code></pre>
+<p>Note that we have removed <strong>id</strong> from datasets as there’s no meaning in this context. We will proceed to next section before assigning any factor class to the variables.</p>
+</div>
+<div id="basic-visual-data-cleansing" class="section level3">
+<h3>Basic Visual &amp; Data Cleansing</h3>
+<p>This section will try to make more senses on each data point by visualization. I will also fix the data points if they are not making any senses from the given definition.</p>
+<ol style="list-style-type: decimal">
+<li>Look at Demographical variable data</li>
+</ol>
+<ul>
+<li>There are more female than male in the dataset.</li>
+<li>There are clients who finished university-level education.</li>
+<li>There are more single client than married, but the number is quite closed (53.2%:45.5%)</li>
+</ul>
+<p>Recap from data definition:</p>
+<ul>
+<li>EDUCATION: (1=graduate school, 2=university, 3=high school, 4=others, 5=unknown, 6=unknown)</li>
+<li>MARRIAGE: Marital status (1=married, 2=single, 3=others)</li>
+</ul>
+<pre class="r"><code># Plot Demographical data
+lets.plot(raw.credit, fun=barPlot, ii=2:4, ncol=2)</code></pre>
+<p><img src="__results___files/figure-html/Viz1-1.png" width="672" /></p>
+<p>Let’s fix the datapoint of education and marriage.</p>
+<ul>
+<li>For education, we will merge 0, 4, 5, 6 to 4 (others)</li>
+<li>For marriage, we will merge 0 to 3 (others)</li>
+</ul>
+<p><img src="__results___files/figure-html/data%20cleansing%201-1.png" width="672" /></p>
+<ol start="2" style="list-style-type: decimal">
+<li>Age data - the data looks ok,</li>
+</ol>
+<pre class="r"><code>lets.plot(raw.credit, fun=plotDen, ii=5, ncol=1)</code></pre>
+<p><img src="__results___files/figure-html/age%20viz-1.png" width="672" /></p>
+<ol start="3" style="list-style-type: decimal">
+<li>Quick look on the limit balance</li>
+</ol>
+<pre class="r"><code>lets.plot(raw.credit, fun=plotDen, ii=1, ncol=1)</code></pre>
+<p><img src="__results___files/figure-html/Viz2-1.png" width="672" /></p>
+<ol start="4" style="list-style-type: decimal">
+<li>What about repayment status</li>
+</ol>
+<p>Based on the data definition, we have the following:</p>
+<ul>
+<li>-1 = pay duly</li>
+<li>1 = payment delay for one month</li>
+<li>2 = payment delay for two months</li>
+</ul>
+<p>. ..</p>
+<ul>
+<li>8 = payment delay for eight months</li>
+</ul>
+<p>and so on …</p>
+<p>However, from the plot, we can see that there are a lot of -2 and 0 data points spreading out across repayment status.</p>
+<p>With this, I <strong>assume</strong> that -2, -1 and 0 have the same meaning. We will merge them to 0.</p>
+<pre class="r"><code>lets.plot(raw.credit, fun=barPlot, ii=6:11, ncol=2)</code></pre>
+<p><img src="__results___files/figure-html/repayment-1.png" width="672" /></p>
+<pre class="r"><code>for (i in seq(6, 11, 1)) {
+  raw.credit[which(raw.credit[[i]] %in% c(-2, -1, 0)),][[i]] &lt;- 0
+}</code></pre>
+<ol start="5" style="list-style-type: decimal">
+<li>Let’s quickly look at the bill statement and previous payment in each month.</li>
+</ol>
+<pre class="r"><code>lets.plot(raw.credit, fun=plotDen, ii=12:17, ncol=2)</code></pre>
+<p><img src="__results___files/figure-html/bill%20pay%20plot-1.png" width="672" /></p>
+<pre class="r"><code>lets.plot(raw.credit, fun=plotDen, ii=18:23, ncol=2)</code></pre>
+<p><img src="__results___files/figure-html/bill%20pay%20plot-2.png" width="672" /></p>
+<ol start="6" style="list-style-type: decimal">
+<li>Lastly, let’s look at the number of default payment next month.</li>
+</ol>
+<p>The default payment is around 22% of the total observations in the dataset.</p>
+<pre class="r"><code>lets.plot(raw.credit, fun=barPlot, ii=24, ncol=1)</code></pre>
+<p><img src="__results___files/figure-html/default%20plot-1.png" width="672" /></p>
+<pre class="r"><code>prop.table(table(raw.credit$default.payment.next.month))</code></pre>
+<pre><code>## 
+##      0      1 
+## 0.7788 0.2212</code></pre>
+<p>Let’s move to the next section.</p>
+</div>
+<div id="correlation" class="section level3">
+<h3>Correlation</h3>
+<p>Let’s explore the correlation between each data points.</p>
+<ol style="list-style-type: decimal">
+<li>I will use the mosaicplot to visualize the demographical data against the default payment.</li>
+</ol>
+<pre class="r"><code>mosaicplot(raw.credit$sex ~ raw.credit$default.payment.next.month, shade=F, color=T,
+           main=&quot;Gender affecting the default payment next month?&quot;,
+           ylab=&quot;Default payment next month (1-Y, 0-N)&quot;,
+           xlab=&quot;Gender (1-male, 2-female)&quot;
+          )</code></pre>
+<p><img src="__results___files/figure-html/gender%20edu%20martial-1.png" width="672" /></p>
+<pre class="r"><code>mosaicplot(raw.credit$education ~ raw.credit$default.payment.next.month, shade=F, color=T,
+           main=&quot;Education affecting the default payment next month?&quot;,
+           ylab=&quot;Default payment next month (1-Y, 0-N)&quot;,
+           xlab=&quot;Education  (1=graduate school, 2=university, 3=high school, 4=others)&quot;
+          )</code></pre>
+<p><img src="__results___files/figure-html/gender%20edu%20martial-2.png" width="672" /></p>
+<pre class="r"><code>mosaicplot(raw.credit$marriage ~ raw.credit$default.payment.next.month, shade=F, color=T,
+           main=&quot;Marital status affecting the default payment next month?&quot;,
+           ylab=&quot;Default payment next month (1-Y, 0-N)&quot;,
+           xlab=&quot;Marriage (1=married, 2=single, 3=others)&quot;
+          )</code></pre>
+<p><img src="__results___files/figure-html/gender%20edu%20martial-3.png" width="672" /></p>
+<pre class="r"><code>mosaicplot(paste0(raw.credit$sex, &#39;-&#39;, raw.credit$marriage) ~ raw.credit$default.payment.next.month,
+           shade =F, color = T, main= &quot;Gender with marital status against default credit?&quot;,
+           xlab=&quot;Gender - marital status&quot;, ylab=&quot;Default payment next month (1-Y, 0-N)&quot;)</code></pre>
+<p><img src="__results___files/figure-html/gender%20edu%20martial-4.png" width="672" /></p>
+<ol start="2" style="list-style-type: decimal">
+<li>Let’s combine everything</li>
+</ol>
+<p>It looks like the married women are more likely to default payment.</p>
+<pre class="r"><code>ggplot(raw.credit, aes(education, fill=default.payment.next.month)) +
+  stat_count() +
+  facet_wrap(~paste0(raw.credit$sex, &#39;-&#39;, raw.credit$marriage)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)
+          , legend.position = &quot;bottom&quot;
+          , legend.title = element_blank()
+        )  </code></pre>
+<p><img src="__results___files/figure-html/combine-1.png" width="672" /></p>
+<ol start="3" style="list-style-type: decimal">
+<li>Look at the repayment status of each month</li>
+</ol>
+<p>From pay_0 to pay_6, the definition is the same except it is reflected the repayment status of each month (-1=pay duly, 1=payment delay for one month, 2=payment delay for two months, … 8=payment delay for eight months, 9=payment delay for nine months and above).</p>
+<pre class="r"><code>repay.bar.plot &lt;- function(df, i, target) {
+  d &lt;- data.frame(x=df[[i]]) 
+  p &lt;- ggplot(d, aes(factor(x), fill=df[[target]])) + 
+    stat_count() + 
+    xlab(colnames(df)[i]) + 
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 0, hjust = 1)
+          , legend.position = &quot;right&quot;
+          , legend.title = element_blank()
+    )  
+  return(p)
+}
+
+
+repayment.plot &lt;- function(df, fun, ii, target, ncol) {
+  pp &lt;- list()
+  for (i in ii) {
+    p &lt;- fun(df=df, i=i, target=target)
+    pp &lt;- c(pp, list(p))
+  }
+  do.call(&quot;grid.arrange&quot;, c(pp, ncol=ncol))
+}
+
+repayment.plot(raw.credit, fun=repay.bar.plot, ii=6:11, target=24, ncol=2)</code></pre>
+<p><img src="__results___files/figure-html/repayment-to-default-1.png" width="672" /></p>
+<p>Let’s plot some corrplot to see if the data has any correlation.</p>
+<p>The figure and color are related to correlation coefficients with the number is the p-values. Any sig.level less than or equal to 0.01, it will be crossed out.</p>
+<pre class="r"><code>credit.corr &lt;- rcorr(as.matrix(tmp), type=c(&quot;pearson&quot;))
+colnames(credit.corr$r) &lt;- c(1:length(colnames(credit.corr$r)))
+colnames(credit.corr$P) &lt;- c(1:length(colnames(credit.corr$P)))
+
+corrplot(credit.corr$r, order=&quot;FPC&quot;, type=&quot;upper&quot;, method=&quot;square&quot;,
+         tl.col=&quot;black&quot;, tl.srt = 45, p.mat = credit.corr$P, addCoef.col = &quot;black&quot;,
+         number.cex = 0.5, sig.level = 0.01)</code></pre>
+<p><img src="__results___files/figure-html/corrplot-1.png" width="672" /></p>
+<p>Not much correlation to our binary <strong>‘default.payment.next.month’</strong> output. Let’s dive to the modeling part.</p>
+</div>
+<div id="model-building" class="section level3">
+<h3>Model Building</h3>
+<p>This section is to start building the model. Several model will be attempted to build and predict the default payment output.</p>
+<p>Separate the dataset onto training (70%) and testing (30%).</p>
+<pre class="r"><code>intraining &lt;- createDataPartition(y=raw.credit$default.payment.next.month, p=0.7, list=F)
+train.batch &lt;- raw.credit[intraining,]
+test.batch &lt;- raw.credit[-intraining,]</code></pre>
+<pre><code>## --- Distribution of training dataset --</code></pre>
+<pre><code>## 
+##     0     1 
+## 16355  4646</code></pre>
+<pre><code>## 
+##    0    1 
+## 0.78 0.22</code></pre>
+<pre><code>## 
+## --- Distribution of training dataset --</code></pre>
+<pre><code>## 
+##    0    1 
+## 7009 1990</code></pre>
+<pre><code>## 
+##    0    1 
+## 0.78 0.22</code></pre>
+<ol style="list-style-type: decimal">
+<li>Traditional Score using Logistic Regression</li>
+</ol>
+<pre class="r"><code>glm.m &lt;- glm(default.payment.next.month ~ ., data=train.batch, family=binomial)
+summary(glm.m)</code></pre>
+<pre><code>## 
+## Call:
+## glm(formula = default.payment.next.month ~ ., family = binomial, 
+##     data = train.batch)
+## 
+## Deviance Residuals: 
+##     Min       1Q   Median       3Q      Max  
+## -3.9556  -0.6088  -0.5292  -0.3294   3.5591  
+## 
+## Coefficients:
+##                  Estimate    Std. Error z value Pr(&gt;|z|)    
+## (Intercept) -1.3504568659  0.1081854533 -12.483  &lt; 2e-16 ***
+## limit_bal   -0.0000014978  0.0000001871  -8.005 1.19e-15 ***
+## sex2        -0.1663682052  0.0378739559  -4.393 1.12e-05 ***
+## education2  -0.0371670066  0.0435496824  -0.853  0.39342    
+## education3  -0.0868961122  0.0586885822  -1.481  0.13871    
+## education4  -1.2255061510  0.2363484631  -5.185 2.16e-07 ***
+## marriage2   -0.2160475453  0.0429457452  -5.031 4.89e-07 ***
+## marriage3    0.0235916669  0.1545739024   0.153  0.87869    
+## age          0.0028222897  0.0023154743   1.219  0.22289    
+## pay_0        0.8595509213  0.0299673218  28.683  &lt; 2e-16 ***
+## pay_2        0.0728778483  0.0316959208   2.299  0.02149 *  
+## pay_3        0.1447184961  0.0340214057   4.254 2.10e-05 ***
+## pay_4        0.0187459685  0.0381015810   0.492  0.62272    
+## pay_5        0.1090286908  0.0407891476   2.673  0.00752 ** 
+## pay_6        0.1475796670  0.0352592438   4.186 2.84e-05 ***
+## bill_amt1   -0.0000023052  0.0000012492  -1.845  0.06497 .  
+## bill_amt2    0.0000016222  0.0000016789   0.966  0.33392    
+## bill_amt3    0.0000027890  0.0000014992   1.860  0.06283 .  
+## bill_amt4   -0.0000001357  0.0000014924  -0.091  0.92758    
+## bill_amt5   -0.0000004365  0.0000018001  -0.242  0.80843    
+## bill_amt6   -0.0000004912  0.0000015043  -0.326  0.74405    
+## pay_amt1    -0.0000118611  0.0000026623  -4.455 8.38e-06 ***
+## pay_amt2    -0.0000111283  0.0000025839  -4.307 1.66e-05 ***
+## pay_amt3    -0.0000006537  0.0000018498  -0.353  0.72380    
+## pay_amt4    -0.0000020366  0.0000020381  -0.999  0.31768    
+## pay_amt5    -0.0000021646  0.0000021608  -1.002  0.31647    
+## pay_amt6    -0.0000028094  0.0000015887  -1.768  0.07700 .  
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## (Dispersion parameter for binomial family taken to be 1)
+## 
+##     Null deviance: 22196  on 21000  degrees of freedom
+## Residual deviance: 18679  on 20974  degrees of freedom
+## AIC: 18733
+## 
+## Number of Fisher Scoring iterations: 6</code></pre>
+<pre class="r"><code>glm.final &lt;- glm(default.payment.next.month ~ limit_bal+sex+education+marriage+
+                   pay_0+pay_2+pay_3+pay_5+pay_6+pay_amt1+pay_amt2, data=train.batch,
+                 family=binomial)
+summary(glm.final)</code></pre>
+<pre><code>## 
+## Call:
+## glm(formula = default.payment.next.month ~ limit_bal + sex + 
+##     education + marriage + pay_0 + pay_2 + pay_3 + pay_5 + pay_6 + 
+##     pay_amt1 + pay_amt2, family = binomial, data = train.batch)
+## 
+## Deviance Residuals: 
+##     Min       1Q   Median       3Q      Max  
+## -3.9593  -0.6059  -0.5281  -0.3475   3.3100  
+## 
+## Coefficients:
+##                  Estimate    Std. Error z value       Pr(&gt;|z|)    
+## (Intercept) -1.2464715831  0.0601064514 -20.738        &lt; 2e-16 ***
+## limit_bal   -0.0000015140  0.0000001738  -8.712        &lt; 2e-16 ***
+## sex2        -0.1739113382  0.0375086368  -4.637 0.000003542420 ***
+## education2  -0.0277543002  0.0432921129  -0.641       0.521462    
+## education3  -0.0658065656  0.0574427500  -1.146       0.251960    
+## education4  -1.2000012011  0.2357514468  -5.090 0.000000357853 ***
+## marriage2   -0.2404882395  0.0384488193  -6.255 0.000000000398 ***
+## marriage3    0.0283120743  0.1543996255   0.183       0.854509    
+## pay_0        0.8688694354  0.0298363252  29.121        &lt; 2e-16 ***
+## pay_2        0.0754848440  0.0314949315   2.397       0.016542 *  
+## pay_3        0.1581567233  0.0303531854   5.211 0.000000188284 ***
+## pay_5        0.1203090249  0.0359752028   3.344       0.000825 ***
+## pay_6        0.1481768121  0.0350330573   4.230 0.000023407770 ***
+## pay_amt1    -0.0000097448  0.0000023035  -4.230 0.000023324033 ***
+## pay_amt2    -0.0000094181  0.0000022051  -4.271 0.000019462892 ***
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## (Dispersion parameter for binomial family taken to be 1)
+## 
+##     Null deviance: 22196  on 21000  degrees of freedom
+## Residual deviance: 18708  on 20986  degrees of freedom
+## AIC: 18738
+## 
+## Number of Fisher Scoring iterations: 5</code></pre>
+<pre class="r"><code>test.x &lt;- select(test.batch, - default.payment.next.month)
+test.batch$glm_scor1 &lt;- predict(glm.final, type=&quot;response&quot;, test.x)
+pred &lt;- prediction(test.batch$glm_scor1, test.batch$default.payment.next.month)
+glm.perf &lt;- performance(pred, &quot;tpr&quot;, &quot;fpr&quot;)
+
+ggplot(test.batch, aes(default.payment.next.month, glm_scor1)) +
+  geom_boxplot() + theme_bw() +
+  ggtitle(&quot;GLM Score distribution&quot;) +
+  xlab(&quot;Default Payment&quot;) +
+  ylab(&quot;Default Score&quot;)</code></pre>
+<p><img src="__results___files/figure-html/roc%20glm-1.png" width="672" /></p>
+<pre class="r"><code># ROC
+plot(glm.perf, lty=1, col=&quot;blue&quot;, main=&quot;Logistic Regression Performance&quot;)
+abline(a=0, b= 1)</code></pre>
+<p><img src="__results___files/figure-html/roc%20glm-2.png" width="672" /></p>
+<pre class="r"><code>auc.perf &lt;- performance(pred, measure = &quot;auc&quot;)
+acc.perf &lt;- performance(pred, measure = &quot;acc&quot;)
+# AUC
+cat(paste0(&quot;AUC:: &quot;, auc.perf@y.values), &quot;\n&quot;)</code></pre>
+<pre><code>## AUC:: 0.754195252191898</code></pre>
+<pre class="r"><code># Get accuracy and cutoff
+ind &lt;- which.max( slot(acc.perf, &quot;y.values&quot;)[[1]] )
+acc &lt;- slot(acc.perf, &quot;y.values&quot;)[[1]][ind]
+cutoff &lt;- slot(acc.perf, &quot;x.values&quot;)[[1]][ind]
+
+print(c(accuracy= acc, cutoff = cutoff))</code></pre>
+<pre><code>##  accuracy    cutoff 
+## 0.8199800 0.4538829</code></pre>
+<pre class="r"><code># Draw Accuracy with cutoff
+plot(acc.perf)
+abline(v=cutoff)</code></pre>
+<p><img src="__results___files/figure-html/roc%20glm-3.png" width="672" /></p>
+<pre class="r"><code>glm.scor &lt;- select(test.batch,
+                   glm_scor1, 
+                   default.payment.next.month)
+
+glm.scor &lt;- mutate(glm.scor,
+                   predict_class = ifelse(glm_scor1 &gt;= cutoff, 1, 0))
+
+confusionMatrix(glm.scor$predict_class, glm.scor$default.payment.next.month, positive = &#39;1&#39;)</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    0    1
+##          0 6659 1270
+##          1  350  720
+##                                           
+##                Accuracy : 0.82            
+##                  95% CI : (0.8119, 0.8279)
+##     No Information Rate : 0.7789          
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
+##                                           
+##                   Kappa : 0.3737          
+##  Mcnemar&#39;s Test P-Value : &lt; 2.2e-16       
+##                                           
+##             Sensitivity : 0.36181         
+##             Specificity : 0.95006         
+##          Pos Pred Value : 0.67290         
+##          Neg Pred Value : 0.83983         
+##              Prevalence : 0.22114         
+##          Detection Rate : 0.08001         
+##    Detection Prevalence : 0.11890         
+##       Balanced Accuracy : 0.65594         
+##                                           
+##        &#39;Positive&#39; Class : 1               
+## </code></pre>
+<p>Eventually, we can see which top X variables are influenced the predicted score. In this example, I will select only top 2 variables.</p>
+<pre class="r"><code>glm.terms &lt;-predict(glm.final,type=&#39;terms&#39;,test.x)
+
+get.top.var &lt;- function(x,top=2){ 
+  res=names(x)[order(x, decreasing = TRUE)][1:top]
+  paste(res,collapse=&quot;;&quot;,sep=&quot;&quot;)
+}
+
+top.var &lt;- apply(glm.terms, 1, get.top.var, top=2)
+test.batch %&gt;% select(default.payment.next.month, glm_scor1) %&gt;%
+  cbind(top.var) %&gt;% head(5)</code></pre>
+<pre><code>##    default.payment.next.month  glm_scor1            top.var
+## 2                           1 0.19272500        pay_6;pay_2
+## 5                           0 0.15253181 limit_bal;marriage
+## 7                           0 0.04083023      sex;education
+## 9                           0 0.19556046     pay_3;marriage
+## 10                          0 0.17036448      limit_bal;sex</code></pre>
+<ol start="2" style="list-style-type: decimal">
+<li>Decision Tree <strong>(rpart library)</strong></li>
+</ol>
+<pre class="r"><code>rpart.model &lt;- rpart(default.payment.next.month ~.,data=train.batch)
+              
+plot(rpart.model);text(rpart.model)</code></pre>
+<p><img src="__results___files/figure-html/rpart-1.png" width="672" /></p>
+<pre class="r"><code>plotcp(rpart.model)</code></pre>
+<p><img src="__results___files/figure-html/rpart-2.png" width="672" /></p>
+<pre class="r"><code>printcp(rpart.model)</code></pre>
+<pre><code>## 
+## Classification tree:
+## rpart(formula = default.payment.next.month ~ ., data = train.batch)
+## 
+## Variables actually used in tree construction:
+## [1] pay_0
+## 
+## Root node error: 4646/21001 = 0.22123
+## 
+## n= 21001 
+## 
+##        CP nsplit rel error  xerror     xstd
+## 1 0.18252      0   1.00000 1.00000 0.012947
+## 2 0.01000      1   0.81748 0.81748 0.012006</code></pre>
+<pre class="r"><code>rpart.pred &lt;- predict(rpart.model, test.x, type=&quot;class&quot;)
+confusionMatrix(rpart.pred, test.batch$default.payment.next.month, positive = &#39;1&#39;)</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    0    1
+##          0 6744 1349
+##          1  265  641
+##                                           
+##                Accuracy : 0.8206          
+##                  95% CI : (0.8126, 0.8285)
+##     No Information Rate : 0.7789          
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
+##                                           
+##                   Kappa : 0.3532          
+##  Mcnemar&#39;s Test P-Value : &lt; 2.2e-16       
+##                                           
+##             Sensitivity : 0.32211         
+##             Specificity : 0.96219         
+##          Pos Pred Value : 0.70751         
+##          Neg Pred Value : 0.83331         
+##              Prevalence : 0.22114         
+##          Detection Rate : 0.07123         
+##    Detection Prevalence : 0.10068         
+##       Balanced Accuracy : 0.64215         
+##                                           
+##        &#39;Positive&#39; Class : 1               
+## </code></pre>
+<pre class="r"><code>test.batch$rpart_scor1 &lt;- predict(rpart.model,type=&#39;prob&#39;,test.x)
+pred2 &lt;- prediction(test.batch$rpart_scor1[, 2], test.batch$default.payment.next.month)
+rpart.perf1 &lt;- performance(pred2,&quot;tpr&quot;,&quot;fpr&quot;)
+
+
+plot(rpart.perf1, col=&#39;red&#39;, main=&#39;Rpart Tree performance&#39;)
+abline(a=0, b= 1)</code></pre>
+<p><img src="__results___files/figure-html/rpart-3.png" width="672" /></p>
+<ol start="3" style="list-style-type: decimal">
+<li>Random Forest</li>
+</ol>
+<pre class="r"><code>rand.model &lt;- randomForest(default.payment.next.month~.,data=train.batch, importance=T,
+                            ntree=500, keep.forest=T)
+
+varImpPlot(rand.model)</code></pre>
+<p><img src="__results___files/figure-html/randomForest-1.png" width="672" /></p>
+<pre class="r"><code>rand.pred &lt;- predict(rand.model, test.x, type=&quot;class&quot;)
+confusionMatrix(rand.pred, test.batch$default.payment.next.month, positive=&#39;1&#39;)</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    0    1
+##          0 6639 1267
+##          1  370  723
+##                                        
+##                Accuracy : 0.8181       
+##                  95% CI : (0.81, 0.826)
+##     No Information Rate : 0.7789       
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16    
+##                                        
+##                   Kappa : 0.3703       
+##  Mcnemar&#39;s Test P-Value : &lt; 2.2e-16    
+##                                        
+##             Sensitivity : 0.36332      
+##             Specificity : 0.94721      
+##          Pos Pred Value : 0.66148      
+##          Neg Pred Value : 0.83974      
+##              Prevalence : 0.22114      
+##          Detection Rate : 0.08034      
+##    Detection Prevalence : 0.12146      
+##       Balanced Accuracy : 0.65526      
+##                                        
+##        &#39;Positive&#39; Class : 1            
+## </code></pre>
+<pre class="r"><code>rand.prob &lt;- predict(rand.model, test.x, type=&#39;prob&#39;)[,2]
+pred4 &lt;- prediction(rand.prob,test.batch$default.payment.next.month)
+
+rf.perf1 &lt;- performance(pred4,&quot;tpr&quot;,&quot;fpr&quot;)
+
+plot(glm.perf,col=&#39;red&#39;,lty=1, main=&#39;ROC Logistic VS. Rpart tree VS. Random Forest&#39;); 
+plot(rpart.perf1, col=&#39;blue&#39;,lty=2,add=T); 
+plot(rf.perf1, col=&#39;green&#39;, lty=3, add=T);
+legend(0.6,0.6,c(&#39;logistic regression&#39;,&#39;rpart tree&#39;, &#39;randomForest&#39;),
+       col=c(&#39;red&#39;,&#39;blue&#39;,&#39;green&#39;),lwd=3)</code></pre>
+<p><img src="__results___files/figure-html/randomForest-2.png" width="672" /></p>
+<p>Final print the AUC of all 3 predictions…</p>
+<pre class="r"><code>#simple model
+glm.auc &lt;- performance(pred,&quot;auc&quot;)
+cat(&quot;\n=== Logistic Regression ===\n&quot;)</code></pre>
+<pre><code>## 
+## === Logistic Regression ===</code></pre>
+<pre class="r"><code>cat(paste0(glm.auc@y.name,&quot;:: &quot;, round(glm.auc@y.values[[1]], 2)))</code></pre>
+<pre><code>## Area under the ROC curve:: 0.75</code></pre>
+<pre class="r"><code>cat(paste0(&quot;\nKS :: &quot;, 
+           round(max(attr(glm.perf,&#39;y.values&#39;)[[1]]-attr(glm.perf,&#39;x.values&#39;)[[1]]),2)))</code></pre>
+<pre><code>## 
+## KS :: 0.4</code></pre>
+<pre class="r"><code># rpart
+rpart.auc &lt;- performance(pred2,&quot;auc&quot;)
+cat(&quot;\n\n=== Rpart tree ===\n&quot;)</code></pre>
+<pre><code>## 
+## 
+## === Rpart tree ===</code></pre>
+<pre class="r"><code>cat(paste0(rpart.auc@y.name,&quot;:: &quot;, round(rpart.auc@y.values[[1]],2)))</code></pre>
+<pre><code>## Area under the ROC curve:: 0.64</code></pre>
+<pre class="r"><code>cat(paste0(&quot;\nKS :: &quot;, 
+           round(max(attr(rpart.perf1,&#39;y.values&#39;)[[1]]-attr(rpart.perf1,&#39;x.values&#39;)[[1]]),2)))</code></pre>
+<pre><code>## 
+## KS :: 0.28</code></pre>
+<pre class="r"><code># RF
+rf.auc &lt;- performance(pred4,&quot;auc&quot;)
+cat(&quot;\n\n=== Random Forest ===\n&quot;)</code></pre>
+<pre><code>## 
+## 
+## === Random Forest ===</code></pre>
+<pre class="r"><code>cat(paste0(rf.auc@y.name,&quot;:: &quot;, round(rf.auc@y.values[[1]], 2)))</code></pre>
+<pre><code>## Area under the ROC curve:: 0.77</code></pre>
+<pre class="r"><code>cat(paste0(&quot;\nKS :: &quot;, 
+           round(max(attr(rf.perf1,&#39;y.values&#39;)[[1]]-attr(rf.perf1,&#39;x.values&#39;)[[1]]),2)))</code></pre>
+<pre><code>## 
+## KS :: 0.41</code></pre>
+</div>
+</div>
+
+
+
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

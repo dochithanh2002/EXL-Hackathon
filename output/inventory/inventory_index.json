@@ -1,0 +1,84 @@
+{
+  "models": {
+    "M2": {
+      "model_name": "Taiwan Card-Default Logistic PD (Traditional Score)",
+      "status": "DRAFT - AWAITING HUMAN APPROVAL",
+      "language": "R",
+      "model_type": "glm binomial/logit",
+      "protected_inputs": [
+        "sex",
+        "education",
+        "marriage"
+      ],
+      "n_limitations_high": 5,
+      "record": "output/m2_taiwan/reports/documentation/inventory_M2.json",
+      "model_card": "output/m2_taiwan/reports/documentation/MODEL_CARD_M2.md",
+      "updated_utc": "2026-11-13T16:33:09Z",
+      "monitoring": {
+        "last_run_utc": "2026-11-13T16:41:56+00:00",
+        "batches": {
+          "2005-09 cohort": "AMBER",
+          "2005-08 re-score": "RED"
+        },
+        "revalidation_required": true,
+        "reasons": [
+          "max_csi = 0.6175 (RED; amber/red at 0.1/0.25), driven by pay_0"
+        ],
+        "report": "output/m2_taiwan/reports/monitoring/MONITORING_REPORT.md"
+      },
+      "documentation_status": "AWAITING_HUMAN_APPROVAL",
+      "migration_status": "AWAITING_HUMAN_APPROVAL",
+      "python_module": "output/m2_taiwan/model/m2_taiwan_pd.py",
+      "parity_recheck_pass": true,
+      "validation": {
+        "overall_rag": "AMBER",
+        "fairness_rag": "RED",
+        "report": "output/m2_taiwan/reports/validation_report_M2.html",
+        "date_utc": "2026-11-13T16:41:33+00:00"
+      },
+      "last_factory_run": "reports/inventory/FACTORY_RUN_M2.md",
+      "input": "input/m2_taiwan",
+      "output": "output/m2_taiwan",
+      "last_run_summary": "output/m2_taiwan/reports/RUN_SUMMARY.md"
+    },
+    "M1": {
+      "model_name": "French Motor TPL Claim Frequency (Poisson GLM1)",
+      "status": "DRAFT - AWAITING HUMAN APPROVAL",
+      "language": "R",
+      "model_type": "glm poisson/log",
+      "protected_inputs": [
+        "DrivAgeGLM"
+      ],
+      "n_limitations_high": 2,
+      "record": "output/m1_fremtpl2/reports/documentation/inventory_M1.json",
+      "model_card": "output/m1_fremtpl2/reports/documentation/MODEL_CARD_M1.md",
+      "updated_utc": "2026-11-13T16:48:29Z",
+      "monitoring": {
+        "last_run_utc": "2026-11-13T16:52:27+00:00",
+        "batches": {
+          "test cohort": "GREEN",
+          "young-driver growth": "RED"
+        },
+        "revalidation_required": true,
+        "reasons": [
+          "max_age_band_ae_dev = 0.2631 (RED; amber/red at 0.1/0.2)"
+        ],
+        "report": "output/m1_fremtpl2/reports/monitoring/MONITORING_REPORT.md"
+      },
+      "documentation_status": "AWAITING_HUMAN_APPROVAL",
+      "migration_status": "AWAITING_HUMAN_APPROVAL",
+      "python_module": "output/m1_fremtpl2/model/m1_fremtpl2_freq.py",
+      "parity_recheck_pass": true,
+      "validation": {
+        "overall_rag": "AMBER",
+        "fairness_rag": "AMBER",
+        "report": "output/m1_fremtpl2/reports/validation_report_M1.html",
+        "date_utc": "2026-11-13T16:50:16+00:00"
+      },
+      "last_factory_run": "reports/inventory/FACTORY_RUN_M1.md",
+      "input": "input/m1_fremtpl2",
+      "output": "output/m1_fremtpl2",
+      "last_run_summary": "output/m1_fremtpl2/reports/RUN_SUMMARY.md"
+    }
+  }
+}

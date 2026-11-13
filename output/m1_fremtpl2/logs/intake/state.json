@@ -1,0 +1,34 @@
+{
+  "stages": {
+    "hash": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:46:55Z",
+      "hashes": {
+        "model_yaml": "38152693ac960ee3e097f3dcb189a6dbfd4a9b02a171f65900dc10167f2654cf",
+        "legacy_script": "e7f35adf9c79f8c50857c5cb42883d178411f4619895ccf851fcc15927d7ef2b",
+        "data": "5008e249ac75b345a180fa8cba7db50a01f2617415be5de2d110f0ad096bcdaf",
+        "thresholds": "6a7b68939687cbcc8718c0f900e265c967b486aefbb64e02dcc92d04ad51fb69",
+        "rulebook": "37fce5672c63ed3d027d0b3661cf9e7a653f2f4f677344409c75159b6a44ce91"
+      }
+    },
+    "capture": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:47:05Z",
+      "reference_dir": "output/m1_fremtpl2/model/reference",
+      "r_stdout": "captured 678013 predictions to /Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/output/m1_fremtpl2/model/reference"
+    },
+    "scan": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:47:05Z",
+      "n_triggered": 12
+    }
+  },
+  "input_hashes": {
+    "model_yaml": "38152693ac960ee3e097f3dcb189a6dbfd4a9b02a171f65900dc10167f2654cf",
+    "legacy_script": "e7f35adf9c79f8c50857c5cb42883d178411f4619895ccf851fcc15927d7ef2b",
+    "data": "5008e249ac75b345a180fa8cba7db50a01f2617415be5de2d110f0ad096bcdaf",
+    "thresholds": "6a7b68939687cbcc8718c0f900e265c967b486aefbb64e02dcc92d04ad51fb69",
+    "rulebook": "37fce5672c63ed3d027d0b3661cf9e7a653f2f4f677344409c75159b6a44ce91"
+  },
+  "status": "DONE"
+}

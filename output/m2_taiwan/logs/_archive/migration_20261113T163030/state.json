@@ -1,0 +1,172 @@
+{
+  "stages": {
+    "analyse": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:22:27Z",
+      "escalations": []
+    },
+    "plan": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:22:27Z",
+      "coverage": "pass",
+      "escalations": []
+    },
+    "test_and_repair": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:22:28Z",
+      "iterations": 1,
+      "final": "output/m2_taiwan/logs/migration/candidates/candidate_1.py"
+    },
+    "package": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:22:28Z",
+      "output": "output/m2_taiwan/model"
+    }
+  },
+  "hashes": {
+    "analysis": "427edce6ce1e9603accaea9d8541ebbf506a9f33fbcffe148015e8f9fe557202",
+    "plan": "248fde4c80d8b72693f99cc49a1a97fa551d3fc03e13eb80ecf485f1b12ebacb"
+  },
+  "iterations": [
+    {
+      "iteration": 1,
+      "file": "output/m2_taiwan/logs/migration/candidates/candidate_1.py",
+      "sha256": "ed70c5e3cb53ffecc226e00f9fa02b8851c9b2e34ac47da519d362c8d49851e1",
+      "change_summary": "",
+      "static_guardrails": {
+        "passed": true,
+        "violations": [],
+        "checks": [
+          "G-04 syntax",
+          "G-01 imports",
+          "G-02 forbidden APIs",
+          "G-03 interface contract"
+        ]
+      },
+      "run": {
+        "ok": true,
+        "n_rows": 30000,
+        "n_train": 21001,
+        "n_test": 8999
+      },
+      "parity": {
+        "pass": true,
+        "checks": [
+          {
+            "check": "G-05 coefficient names: missing + extra",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "coefficient max rel diff",
+            "value": 3.037930672900145e-14,
+            "tolerance": 1e-06,
+            "pass": true
+          },
+          {
+            "check": "std error max rel diff",
+            "value": 5.0499449960581315e-15,
+            "tolerance": 1e-06,
+            "pass": true
+          },
+          {
+            "check": "rows: identical set",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "response values: rows differing",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "split membership: rows differing",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "prediction NA pattern: rows differing",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "prediction max abs diff (rows predicted by both)",
+            "value": 8.770761894538737e-15,
+            "tolerance": 1e-08,
+            "pass": true
+          },
+          {
+            "check": "binomial deviance abs diff",
+            "value": 0.0,
+            "tolerance": 1e-06,
+            "pass": true
+          }
+        ],
+        "evidence": {
+          "worst_terms": [
+            {
+              "term": "pay_5",
+              "estimate_r": 0.10049976929870297,
+              "estimate_py": 0.10049976929870602,
+              "rel_diff": 3.037930672900145e-14
+            },
+            {
+              "term": "pay_2",
+              "estimate_r": 0.04046063753608107,
+              "estimate_py": 0.04046063753607993,
+              "rel_diff": 2.8125572643930406e-14
+            },
+            {
+              "term": "education2",
+              "estimate_r": -0.029816857166514717,
+              "estimate_py": -0.029816857166515453,
+              "rel_diff": 2.4668017481070463e-14
+            },
+            {
+              "term": "pay_amt1",
+              "estimate_r": -6.972138937965761e-06,
+              "estimate_py": -6.972138937965864e-06,
+              "rel_diff": 1.4700078057778036e-14
+            },
+            {
+              "term": "education3",
+              "estimate_r": -0.0696433499214047,
+              "estimate_py": -0.06964334992140565,
+              "rel_diff": 1.374958786186837e-14
+            },
+            {
+              "term": "pay_3",
+              "estimate_r": 0.14751341256345674,
+              "estimate_py": 0.14751341256345488,
+              "rel_diff": 1.2606471058671846e-14
+            },
+            {
+              "term": "(Intercept)",
+              "estimate_r": -1.2259151019037402,
+              "estimate_py": -1.2259151019037269,
+              "rel_diff": 1.0867535830836013e-14
+            },
+            {
+              "term": "pay_0",
+              "estimate_r": 0.9091779694301938,
+              "estimate_py": 0.9091779694301875,
+              "rel_diff": 6.960431789091293e-15
+            }
+          ],
+          "deviance_family": "binomial",
+          "deviance_rows": 30000,
+          "deviance_r": 26737.397112146056,
+          "deviance_py": 26737.397112146056
+        }
+      },
+      "verdict": "PASS"
+    }
+  ],
+  "status": "AWAITING_HUMAN_APPROVAL",
+  "mlflow_run_id": "cf8ac2caa551424485622e29c608ca3e"
+}

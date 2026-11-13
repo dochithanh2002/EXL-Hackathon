@@ -1,0 +1,172 @@
+{
+  "stages": {
+    "analyse": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:48:07Z",
+      "escalations": []
+    },
+    "plan": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:48:20Z",
+      "coverage": "pass",
+      "escalations": []
+    },
+    "test_and_repair": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:49:27Z",
+      "iterations": 1,
+      "final": "output/m1_fremtpl2/logs/migration/candidates/candidate_1.py"
+    },
+    "package": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:49:30Z",
+      "output": "output/m1_fremtpl2/model"
+    }
+  },
+  "hashes": {
+    "analysis": "51244e3e0cdaad81742e286abf6f7b953f06a89772289724b3ebaab1fde0cd7b",
+    "plan": "e8745f488e86f45e775643f62d35dfdca93942a36d3f870f01b7430037909609"
+  },
+  "iterations": [
+    {
+      "iteration": 1,
+      "file": "output/m1_fremtpl2/logs/migration/candidates/candidate_1.py",
+      "sha256": "fda45c0fbca2682bc540a35908b7eb3f4a71c6bad60f745cca35c3c36db00a74",
+      "change_summary": "",
+      "static_guardrails": {
+        "passed": true,
+        "violations": [],
+        "checks": [
+          "G-04 syntax",
+          "G-01 imports",
+          "G-02 forbidden APIs",
+          "G-03 interface contract"
+        ]
+      },
+      "run": {
+        "ok": true,
+        "n_rows": 678013,
+        "n_train": 610212,
+        "n_test": 67801
+      },
+      "parity": {
+        "pass": true,
+        "checks": [
+          {
+            "check": "G-05 coefficient names: missing + extra",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "coefficient max rel diff",
+            "value": 9.869676926672826e-13,
+            "tolerance": 1e-06,
+            "pass": true
+          },
+          {
+            "check": "std error max rel diff",
+            "value": 7.241881947656443e-14,
+            "tolerance": 1e-06,
+            "pass": true
+          },
+          {
+            "check": "rows: identical set",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "response values: rows differing",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "split membership: rows differing",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "prediction NA pattern: rows differing",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "prediction max abs diff (rows predicted by both)",
+            "value": 6.195044477408373e-14,
+            "tolerance": 1e-08,
+            "pass": true
+          },
+          {
+            "check": "poisson deviance abs diff",
+            "value": 0.0,
+            "tolerance": 1e-06,
+            "pass": true
+          }
+        ],
+        "evidence": {
+          "worst_terms": [
+            {
+              "term": "AreaGLM",
+              "estimate_r": 0.016465472622546194,
+              "estimate_py": 0.016465472622562444,
+              "rel_diff": 9.869676926672826e-13
+            },
+            {
+              "term": "DrivAgeGLM1",
+              "estimate_r": 0.07228555418879344,
+              "estimate_py": 0.07228555418874255,
+              "rel_diff": 7.040113126661918e-13
+            },
+            {
+              "term": "DrivAgeGLM7",
+              "estimate_r": 0.004932238227834739,
+              "estimate_py": 0.004932238227832624,
+              "rel_diff": 4.2891182080684334e-13
+            },
+            {
+              "term": "RegionR82",
+              "estimate_r": 0.009217266706149746,
+              "estimate_py": 0.009217266706153329,
+              "rel_diff": 3.886405907623423e-13
+            },
+            {
+              "term": "RegionR94",
+              "estimate_r": 0.016919015044792388,
+              "estimate_py": 0.016919015044798567,
+              "rel_diff": 3.652154102984433e-13
+            },
+            {
+              "term": "VehBrandB2",
+              "estimate_r": 0.0031070095066958116,
+              "estimate_py": 0.003107009506694823,
+              "rel_diff": 3.18245689038243e-13
+            },
+            {
+              "term": "DensityGLM",
+              "estimate_r": 0.032427495227908366,
+              "estimate_py": 0.0324274952278985,
+              "rel_diff": 3.04282124228456e-13
+            },
+            {
+              "term": "VehBrandB6",
+              "estimate_r": -0.005439053501400614,
+              "estimate_py": -0.005439053501402049,
+              "rel_diff": 2.639215951821683e-13
+            }
+          ],
+          "deviance_family": "poisson",
+          "deviance_rows": 678013,
+          "deviance_r": 212609.20095871482,
+          "deviance_py": 212609.20095871482
+        }
+      },
+      "verdict": "PASS"
+    }
+  ],
+  "status": "AWAITING_HUMAN_APPROVAL",
+  "mlflow_run_id": "143523617c5945f3ac26646299968639"
+}

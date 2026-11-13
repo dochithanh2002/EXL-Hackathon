@@ -1,0 +1,34 @@
+{
+  "stages": {
+    "facts": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:36:33Z",
+      "n_variables": 9,
+      "disclosures": [
+        "D-01:DrivAgeGLM",
+        "D-06",
+        "D-05"
+      ]
+    },
+    "verify": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:37:46Z",
+      "iterations": 1
+    },
+    "render": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:37:49Z",
+      "output": "output/m1_fremtpl2/reports/documentation"
+    }
+  },
+  "iterations": [
+    {
+      "iteration": 1,
+      "file": "output/m1_fremtpl2/logs/documentation/extract_1.json",
+      "violations": [],
+      "verdict": "PASS"
+    }
+  ],
+  "status": "AWAITING_HUMAN_APPROVAL",
+  "mlflow_run_id": "f6e881e2de25465c9f30b064f4b4e957"
+}

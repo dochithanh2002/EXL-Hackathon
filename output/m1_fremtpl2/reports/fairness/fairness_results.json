@@ -1,0 +1,145 @@
+{
+  "model_id": "M1",
+  "timestamp_utc": "2026-11-13T16:50:16+00:00",
+  "champion": {
+    "module": "output/m1_fremtpl2/model/m1_fremtpl2_freq.py",
+    "module_sha256": "fda45c0fbca2682bc540a35908b7eb3f4a71c6bad60f745cca35c3c36db00a74",
+    "manifest_module_sha256": "fda45c0fbca2682bc540a35908b7eb3f4a71c6bad60f745cca35c3c36db00a74",
+    "migration_status": "AWAITING_HUMAN_APPROVAL",
+    "migration_iterations": 1,
+    "human_review": null,
+    "migrated_by": "Claude Opus 5.5 (Claude Code, migration-agent)",
+    "reference_dir": "output/m1_fremtpl2/model/reference"
+  },
+  "protected_characteristic": "age (driver age bands are a rating factor)",
+  "ae_by_age_band": [
+    {
+      "age_band": "18-20",
+      "policies": 623,
+      "exposure": 230.25009955835017,
+      "actual": 42.0,
+      "expected": 56.99662012581049,
+      "ae": 0.7368857996718409,
+      "ci_lo": 0.5310824688492397,
+      "ci_hi": 0.9960555319451647,
+      "p_value": 0.04676112395414616,
+      "flag": "over-predicts",
+      "premium_relativity_vs_41_50": 2.320030925277949
+    },
+    {
+      "age_band": "21-25",
+      "policies": 3176,
+      "exposure": 1356.9845078224419,
+      "actual": 207.0,
+      "expected": 219.05451058817073,
+      "ae": 0.9449702699305125,
+      "ci_lo": 0.8206167145625893,
+      "ci_hi": 1.0828442427887022,
+      "p_value": 0.43755174563556326,
+      "flag": "ok",
+      "premium_relativity_vs_41_50": 1.5247223163438508
+    },
+    {
+      "age_band": "26-30",
+      "policies": 6593,
+      "exposure": 2962.462539860768,
+      "actual": 324.0,
+      "expected": 314.63897068778215,
+      "ae": 1.0297516524788877,
+      "ci_lo": 0.9206651601106878,
+      "ci_hi": 1.1482085730276002,
+      "p_value": 0.6124446535806533,
+      "flag": "ok",
+      "premium_relativity_vs_41_50": 1.0067504699858074
+    },
+    {
+      "age_band": "31-40",
+      "policies": 17167,
+      "exposure": 8528.739418369638,
+      "actual": 774.0,
+      "expected": 758.5984171344539,
+      "ae": 1.0203026825757484,
+      "ci_lo": 0.9496795054033872,
+      "ci_hi": 1.09478738545101,
+      "p_value": 0.5855390450167309,
+      "flag": "ok",
+      "premium_relativity_vs_41_50": 0.8570303826819877
+    },
+    {
+      "age_band": "41-50",
+      "policies": 16502,
+      "exposure": 8863.83753798937,
+      "actual": 903.0,
+      "expected": 921.2248843768929,
+      "ae": 0.9802166824996048,
+      "ci_lo": 0.9173177764553423,
+      "ci_hi": 1.0462926205835428,
+      "p_value": 0.5616707211462592,
+      "flag": "ok",
+      "premium_relativity_vs_41_50": 1.0000000000000002
+    },
+    {
+      "age_band": "51-70",
+      "policies": 19791,
+      "exposure": 11374.19466352272,
+      "actual": 1007.0,
+      "expected": 1082.7616857571275,
+      "ae": 0.9300292144118947,
+      "ci_lo": 0.8734668601967915,
+      "ci_hi": 0.989293037993078,
+      "p_value": 0.02092212419794748,
+      "flag": "over-predicts",
+      "premium_relativity_vs_41_50": 0.9214292721403685
+    },
+    {
+      "age_band": "71+",
+      "policies": 3949,
+      "exposure": 2690.454226364249,
+      "actual": 250.0,
+      "expected": 267.8743404287194,
+      "ae": 0.9332734131977239,
+      "ci_lo": 0.8211611283069875,
+      "ci_hi": 1.0564196055113322,
+      "p_value": 0.2877586383738073,
+      "flag": "ok",
+      "premium_relativity_vs_41_50": 0.9805038004141503
+    }
+  ],
+  "bands_mispriced": [
+    {
+      "band": "18-20",
+      "ae": 0.7368857996718409,
+      "p_value": 0.04676112395414616,
+      "relativity": 2.320030925277949,
+      "exposure": 230.25009955835017,
+      "direction": "over-predicts"
+    },
+    {
+      "band": "51-70",
+      "ae": 0.9300292144118947,
+      "p_value": 0.02092212419794748,
+      "relativity": 0.9214292721403685,
+      "exposure": 11374.19466352272,
+      "direction": "over-predicts"
+    }
+  ],
+  "worst_band": {
+    "band": "51-70",
+    "ae": 0.9300292144118947
+  },
+  "max_premium_relativity": 2.320030925277949,
+  "max_relativity_band": "18-20",
+  "lr_test_driver_age": {
+    "LR": 648.3506987064611,
+    "df": 6,
+    "p": 8.622713361017033e-137
+  },
+  "proxy_auc_young_driver": 0.9369029963108466,
+  "statistical_rag": "AMBER",
+  "legal_rag": "AMBER",
+  "legal_note": "Age is a permitted rating factor in UK insurance only where it is based on relevant and reliable actuarial data (Equality Act 2010 Sch.3 para 20A). The age bands are statistically significant and calibrated; the owner must document that evidence and the FCA Consumer Duty fair-value assessment.",
+  "recommendation": {
+    "variant": "keep driver age with documented actuarial justification; monitor A/E by age band"
+  },
+  "overall_rag": "AMBER"
+}

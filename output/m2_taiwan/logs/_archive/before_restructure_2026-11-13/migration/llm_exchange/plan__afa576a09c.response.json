@@ -1,0 +1,123 @@
+{
+ "steps": [
+  {
+   "order": 1,
+   "r_construct": "read.csv with check.names=TRUE",
+   "python_approach": "pd.read_csv(path); rename columns with an R make.names equivalent: regex-replace [^A-Za-z0-9._] with '.', and prefix 'X' if the name starts with a digit or invalid character.",
+   "rule_ids": [
+    "R-IO-01"
+   ]
+  },
+  {
+   "order": 2,
+   "r_construct": "colnames <- tolower(colnames)",
+   "python_approach": "df.columns = [c.lower() for c in df.columns], applied after make.names.",
+   "rule_ids": [
+    "R-IO-02"
+   ]
+  },
+  {
+   "order": 3,
+   "r_construct": "raw.credit$id <- NULL; row order",
+   "python_approach": "df = df.drop(columns=['id']); keep the RangeIndex and never sort or filter rows.",
+   "rule_ids": [
+    "R-IO-03"
+   ]
+  },
+  {
+   "order": 4,
+   "r_construct": "education[education %in% c(0,4,5,6)] <- 4; marriage[marriage == 0] <- 3",
+   "python_approach": "df.loc[df['education'].isin([0,4,5,6]), 'education'] = 4; df.loc[df['marriage'] == 0, 'marriage'] = 3, in this order.",
+   "rule_ids": [
+    "R-REC-01",
+    "R-REC-02",
+    "R-IDX-02"
+   ]
+  },
+  {
+   "order": 5,
+   "r_construct": "for (i in seq(6,11)) raw.credit[which(x[[i]] %in% c(-2,-1,0)),][[i]] <- 0",
+   "python_approach": "Resolve positions 6..11 after the id drop to names ['pay_0','pay_2','pay_3','pay_4','pay_5','pay_6'] and loop over the NAMES: df.loc[df[c].isin([-2,-1,0]), c] = 0. Add an assertion that these are the columns at those positions, so upstream schema drift fails loudly.",
+   "rule_ids": [
+    "R-IDX-01",
+    "R-IDX-02",
+    "R-REC-01"
+   ]
+  },
+  {
+   "order": 6,
+   "r_construct": "as.factor(sex/education/marriage)",
+   "python_approach": "Keep the codes as integers. The design matrix builds treatment dummies from the FIXED level sets captured from R xlevels: sex {1,2}, education {1,2,3,4}, marriage {1,2,3}. The first level is the reference, and columns are named '<var><level>'.",
+   "rule_ids": [
+    "R-FAC-01",
+    "R-FAC-02"
+   ]
+  },
+  {
+   "order": 7,
+   "r_construct": "as.factor(response) in binomial glm",
+   "python_approach": "TARGET='default.payment.next.month'; y = (df[TARGET] == 1).astype(float), so the event is the second level '1'.",
+   "rule_ids": [
+    "R-FAC-03"
+   ]
+  },
+  {
+   "order": 8,
+   "r_construct": "caret::createDataPartition train/test split",
+   "python_approach": "Not implemented. fit() receives the training rows chosen by the harness from the R capture; caret is dropped.",
+   "rule_ids": [
+    "R-RNG-01",
+    "R-PKG-01"
+   ]
+  },
+  {
+   "order": 9,
+   "r_construct": "intercept + model.matrix column order",
+   "python_approach": "design_matrix(df) returns columns in R order: '(Intercept)'=1.0, limit_bal, sex2, education2, education3, education4, marriage2, marriage3, pay_0, pay_2, pay_3, pay_5, pay_6, pay_amt1, pay_amt2, as float64.",
+   "rule_ids": [
+    "R-FAC-04",
+    "R-FAC-02"
+   ]
+  },
+  {
+   "order": 10,
+   "r_construct": "glm(family=binomial) with default glm.control (epsilon=1e-8, maxit=25)",
+   "python_approach": "numpy IRLS mirroring stats::glm.fit: mustart=(y+0.5)/2, eta=logit(mustart); each iteration computes mu_eta=mu(1-mu), z=eta+(y-mu)/mu_eta, w=sqrt(mu_eta), solves the QR of X*w against z*w, and updates eta and mu; it stops when |dev-dev_old|/(|dev|+0.1) < 1e-8 or after 25 iterations. No statsmodels: its convergence path differs (v1.1 lesson).",
+   "rule_ids": [
+    "R-EST-01",
+    "R-EST-02"
+   ]
+  },
+  {
+   "order": 11,
+   "r_construct": "predict(type='response')",
+   "python_approach": "result.predict(design_matrix(df)), which gives probabilities on the response scale from the same design function.",
+   "rule_ids": [
+    "R-PRED-01"
+   ]
+  },
+  {
+   "order": 12,
+   "r_construct": "coefficients / summary",
+   "python_approach": "Standard errors = sqrt(diag(inv(R) inv(R)')), with R from the LAST iteration's QR (summary.glm, dispersion=1). coefficients(result) returns term, estimate, std_error with R term names. The result container is a plain class (no dataclass, robust to how the module is loaded).",
+   "rule_ids": [
+    "R-EST-02",
+    "R-FAC-02"
+   ]
+  },
+  {
+   "order": 13,
+   "r_construct": "protected attributes sex, marriage, education used as inputs",
+   "python_approach": "Migrated unchanged. They are listed in the module docstring and the migration report for validation.",
+   "rule_ids": [
+    "GOV-01"
+   ]
+  }
+ ],
+ "packages": [
+  "numpy",
+  "pandas"
+ ],
+ "unmapped": [],
+ "escalations": []
+}

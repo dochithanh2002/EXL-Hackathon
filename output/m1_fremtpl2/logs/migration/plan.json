@@ -1,0 +1,15 @@
+{
+  "steps": [
+    {"order": 1, "r_construct": "read.csv(quote = \"\\\"'\", stringsAsFactors = FALSE), check.names=TRUE", "python_approach": "pd.read_csv(csv_path) keeping RangeIndex; apply make.names to column names; for every string column (pd.api.types.is_string_dtype) strip one pair of surrounding single quotes as R does. Never sort/reset_index.", "rule_ids": ["R-IO-01", "R-IO-04", "R-IO-03"]},
+    {"order": 2, "r_construct": "pmin caps on ClaimNb (4) and Exposure (1)", "python_approach": "Series.clip(upper=...) in the R order, before any feature derivation.", "rule_ids": ["R-REC-02"]},
+    {"order": 3, "r_construct": "as.integer(factor(Area)); as.factor(pmin(VehPower, 9)); lookup-table recodes for VehAge and DrivAge; relevel(); pmin(BonusMalus,150); log(Density); relevel(as.factor(VehBrand/Region)); as.factor(VehGas)", "python_approach": "AreaGLM = 1-based position of Area in its sorted unique levels; VehPowerGLM, VehAgeGLM, DrivAgeGLM kept as level strings built with explicit numpy lookup arrays (positional column 2 of the lookup matrix = class code); out-of-table values become NaN. BonusMalusGLM = clip(150); DensityGLM = np.log(Density). Factor reference levels come from meta.json xlevels (first level = reference).", "rule_ids": ["R-FAC-01", "R-REC-02", "R-IDX-01", "GOV-01"]},
+    {"order": 4, "r_construct": "model.matrix with contr.treatment and intercept", "python_approach": "design_matrix(df): '(Intercept)' column of 1.0 first, then for each formula term in order either the numeric column or explicit 0/1 dummies '<var><level>' for every non-reference level in captured xlevels; unknown levels / NA -> NaN row. Columns == TERMS.", "rule_ids": ["R-FAC-02", "R-FAC-04"]},
+    {"order": 5, "r_construct": "set.seed(100); sample(); learn/test split", "python_approach": "Not re-implemented. fit() uses only the rows it is given (frozen R split from the harness).", "rule_ids": ["R-RNG-01"]},
+    {"order": 6, "r_construct": "glm(..., family = poisson(), offset = log(Exposure)), na.action = na.omit", "python_approach": "Numpy IRLS mirroring glm.fit: mustart = y + 0.1, eta = log(mustart), z = eta - offset + (y-mu)/mu, w = sqrt(mu), QR least squares, linkinv pmax(exp(eta), DBL_EPSILON), stopping rule |dev-devold|/(|dev|+0.1) < 1e-8, maxit 25; SEs from the R factor of the last iteration's weighted QR (dispersion 1). Rows incomplete in any formula variable, response or Exposure are dropped before fitting.", "rule_ids": ["R-EST-02", "R-EST-03", "R-NA-01"]},
+    {"order": 7, "r_construct": "predict(d.glm1, newdata = test, type = \"response\")", "python_approach": "exp(X @ beta + log(Exposure)) with X from the same design_matrix; NaN wherever any input is missing, never imputed.", "rule_ids": ["R-PRED-01", "R-NA-01", "R-EST-03"]},
+    {"order": 8, "r_construct": "DrivAge (protected) used in DrivAgeGLM", "python_approach": "Migrated faithfully without change; recorded as a risk for validation.", "rule_ids": ["GOV-01"]}
+  ],
+  "packages": ["numpy", "pandas"],
+  "unmapped": [],
+  "escalations": []
+}

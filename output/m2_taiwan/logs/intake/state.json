@@ -1,0 +1,36 @@
+{
+  "stages": {
+    "hash": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:22:20Z",
+      "hashes": {
+        "model_yaml": "2830020bd83c8fc8d7dec466eb8caed26502df0f3f7cbcffc26e8a52da07d256",
+        "legacy_script": "b78cf83bbf12f74f7a0d1bd4ad19d4344ca0a6046f58df9f60dbcfbbe5d36354",
+        "data": "4edce6da569b2c30788a85fd98a9bafb1a983e8ca1a7aac875dd7ff853cbd0bb",
+        "thresholds": "dc565ba6ca6bab5f799180acb77828b79580c52c63414d47d9034248d5981a28",
+        "rulebook": "fcb8a5df9e7f5785a6b36bfd695e8e6b78133a59211588b976ecf7cbd5bd6ed1",
+        "doc:docs/netzone_results.txt": "57f0ed3c16e4e43096c46e3e33fe8f5b3f913449b1170b7d888c86434d94d3cd"
+      }
+    },
+    "capture": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:22:22Z",
+      "reference_dir": "output/m2_taiwan/model/reference",
+      "r_stdout": "captured 30000 predictions to /Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/output/m2_taiwan/model/reference"
+    },
+    "scan": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:22:22Z",
+      "n_triggered": 17
+    }
+  },
+  "input_hashes": {
+    "model_yaml": "2830020bd83c8fc8d7dec466eb8caed26502df0f3f7cbcffc26e8a52da07d256",
+    "legacy_script": "b78cf83bbf12f74f7a0d1bd4ad19d4344ca0a6046f58df9f60dbcfbbe5d36354",
+    "data": "4edce6da569b2c30788a85fd98a9bafb1a983e8ca1a7aac875dd7ff853cbd0bb",
+    "thresholds": "dc565ba6ca6bab5f799180acb77828b79580c52c63414d47d9034248d5981a28",
+    "rulebook": "fcb8a5df9e7f5785a6b36bfd695e8e6b78133a59211588b976ecf7cbd5bd6ed1",
+    "doc:docs/netzone_results.txt": "57f0ed3c16e4e43096c46e3e33fe8f5b3f913449b1170b7d888c86434d94d3cd"
+  },
+  "status": "DONE"
+}

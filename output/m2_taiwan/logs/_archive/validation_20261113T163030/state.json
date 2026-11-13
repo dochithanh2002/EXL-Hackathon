@@ -1,0 +1,76 @@
+{
+  "stages": {
+    "validate": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:23:08Z",
+      "steps": [
+        "seed_sensitivity",
+        "parity",
+        "validate",
+        "fairness",
+        "report"
+      ]
+    }
+  },
+  "started_utc": "2026-11-13T16:22:41Z",
+  "steps": [
+    {
+      "cmd": "Rscript agent/validators/m2_taiwan/seed_sensitivity.R input/m2_taiwan/data/taiwan_default.csv output/m2_taiwan/reports/validation",
+      "exit": 0,
+      "seconds": 10.2,
+      "tail": [
+        "n_seeds                mean                  sd                p2_5 ",
+        "       2.000000e+02        7.589913e-01        5.379275e-03        7.479825e-01 ",
+        "             median               p97_5   reported_notebook reported_percentile ",
+        "       7.591947e-01        7.689134e-01        7.542000e-01        1.850000e-01"
+      ]
+    },
+    {
+      "cmd": "python -m agent.validators.m2_taiwan.parity",
+      "exit": 0,
+      "seconds": 3.0,
+      "tail": [
+        "PASS  AIC abs diff                                                           3.274e-11  (tol 1e-06)",
+        "PASS  test AUC abs diff                                                      0.000e+00  (tol 1e-12)",
+        "PASS  test KS abs diff                                                       0.000e+00  (tol 1e-12)",
+        "PASS  decisions differing at PD 0.50 cut-off 0.5000 (excl. 0 exact-tie rows) 0.000e+00  (tol 0e+00)",
+        "PASS  decisions differing at 80% approval cut-off 0.2877 (excl. 0 exact-tie rows) 0.000e+00  (tol 0e+00)",
+        "PASS  sklearn coef max rel diff vs R                                         1.414e-10  (tol 1e-04)",
+        "PASS  sklearn PD max abs diff vs R                                           4.204e-11  (tol 1e-06)",
+        "PARITY: PASS"
+      ]
+    },
+    {
+      "cmd": "python -m agent.validators.m2_taiwan.validate",
+      "exit": 0,
+      "seconds": 7.3,
+      "tail": [
+        "{'discrimination': 'GREEN', 'calibration': 'GREEN', 'stability': 'AMBER'} overall: AMBER"
+      ]
+    },
+    {
+      "cmd": "python -m agent.validators.m2_taiwan.fairness",
+      "exit": 0,
+      "seconds": 6.1,
+      "tail": [
+        "  edu_g  pd_0.50        DIR 0.880 (excl small 0.913) SPD 0.116 EOd 0.049 AUCrange 0.135 calgap 0.71pp (Other/unknown) flags []",
+        "  edu_g  approve_80pct  DIR 0.844 (excl small 0.898) SPD 0.142 EOd 0.056 AUCrange 0.135 calgap 0.71pp (Other/unknown) flags []",
+        "  mar_g  pd_0.50        DIR 0.990 (excl small 0.990) SPD 0.009 EOd 0.010 AUCrange 0.014 calgap 1.19pp (Other) flags []",
+        "  mar_g  approve_80pct  DIR 0.990 (excl small 0.997) SPD 0.008 EOd 0.012 AUCrange 0.014 calgap 1.19pp (Other) flags []",
+        "",
+        "proxy AUC: {'sex=female': 0.5876437537388866, 'age<=25': 0.7787131274986456, 'age>=56': 0.5191955381095527, 'marital=single': 0.5616784683400349} ",
+        "statistical: GREEN legal: RED overall: RED ",
+        "recommendation: {'variant': 'B_no_sex_marriage', 'auc_change': 0.0015011926518023744, 'sex_dir_change': 0.02412068056167438, 'new_flags': {'age_g': ['calibration gap 2.3pp > 2.0pp (46-55)']}}"
+      ]
+    },
+    {
+      "cmd": "python -m agent.validators.m2_taiwan.report",
+      "exit": 0,
+      "seconds": 1.3,
+      "tail": [
+        "wrote /Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/output/m2_taiwan/reports/validation_report_M2.md and .html"
+      ]
+    }
+  ],
+  "status": "DONE"
+}

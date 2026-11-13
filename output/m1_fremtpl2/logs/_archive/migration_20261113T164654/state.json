@@ -1,0 +1,215 @@
+{
+  "stages": {
+    "analyse": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:37:18Z",
+      "escalations": []
+    },
+    "plan": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:37:36Z",
+      "coverage": "pass",
+      "escalations": []
+    },
+    "test_and_repair": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:38:45Z",
+      "iterations": 2,
+      "final": "output/m1_fremtpl2/logs/migration/candidates/candidate_2.py"
+    },
+    "package": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:38:49Z",
+      "output": "output/m1_fremtpl2/model"
+    }
+  },
+  "hashes": {
+    "analysis": "972af9ac132c3d13729bfbf90f7ccf508b724f77f3154f8206e5a5bd1828fe89",
+    "plan": "49907f97cf0aaefa916faf301e29ddc8230ffcd3c124442a1edc5ece2c162426"
+  },
+  "iterations": [
+    {
+      "iteration": 1,
+      "file": "output/m1_fremtpl2/logs/migration/candidates/candidate_1.py",
+      "sha256": "21da3fa798bbb436f8161d4a00631a97f1f6b56d627ff04c1590d8c9951a8325",
+      "change_summary": "",
+      "static_guardrails": {
+        "passed": false,
+        "violations": [
+          {
+            "guardrail": "G-03",
+            "message": "contract function 'design_matrix' missing",
+            "line": null
+          },
+          {
+            "guardrail": "G-03",
+            "message": "module-level constant TERMS missing (TARGET = response column, TERMS = R coefficient names in order)",
+            "line": null
+          }
+        ],
+        "checks": [
+          "G-04 syntax",
+          "G-01 imports",
+          "G-02 forbidden APIs",
+          "G-03 interface contract"
+        ]
+      },
+      "failure": {
+        "stage": "static_guardrails",
+        "violations": [
+          {
+            "guardrail": "G-03",
+            "message": "contract function 'design_matrix' missing",
+            "line": null
+          },
+          {
+            "guardrail": "G-03",
+            "message": "module-level constant TERMS missing (TARGET = response column, TERMS = R coefficient names in order)",
+            "line": null
+          }
+        ]
+      },
+      "verdict": "FAIL"
+    },
+    {
+      "iteration": 2,
+      "file": "output/m1_fremtpl2/logs/migration/candidates/candidate_2.py",
+      "sha256": "06fbd2cf470a672d6e3e8f463d6d2f9203d579e9658724113e647e16a30f2e2c",
+      "change_summary": "Added the G-03 contract items missing from iteration 1: module constant TERMS (R coefficient names in order, derived from captured xlevels) and public design_matrix(df) returning exactly TERMS columns (incomplete rows all-NaN). Model logic unchanged.",
+      "static_guardrails": {
+        "passed": true,
+        "violations": [],
+        "checks": [
+          "G-04 syntax",
+          "G-01 imports",
+          "G-02 forbidden APIs",
+          "G-03 interface contract"
+        ]
+      },
+      "run": {
+        "ok": true,
+        "n_rows": 678013,
+        "n_train": 610212,
+        "n_test": 67801
+      },
+      "parity": {
+        "pass": true,
+        "checks": [
+          {
+            "check": "G-05 coefficient names: missing + extra",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "coefficient max rel diff",
+            "value": 9.768535916322636e-13,
+            "tolerance": 1e-06,
+            "pass": true
+          },
+          {
+            "check": "std error max rel diff",
+            "value": 7.195901744814179e-14,
+            "tolerance": 1e-06,
+            "pass": true
+          },
+          {
+            "check": "rows: identical set",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "response values: rows differing",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "split membership: rows differing",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "prediction NA pattern: rows differing",
+            "value": 0.0,
+            "tolerance": 0.0,
+            "pass": true
+          },
+          {
+            "check": "prediction max abs diff (rows predicted by both)",
+            "value": 6.061817714453355e-14,
+            "tolerance": 1e-08,
+            "pass": true
+          },
+          {
+            "check": "poisson deviance abs diff",
+            "value": 0.0,
+            "tolerance": 1e-06,
+            "pass": true
+          }
+        ],
+        "evidence": {
+          "worst_terms": [
+            {
+              "term": "AreaGLM",
+              "estimate_r": 0.016465472622546194,
+              "estimate_py": 0.016465472622562278,
+              "rel_diff": 9.768535916322636e-13
+            },
+            {
+              "term": "DrivAgeGLM1",
+              "estimate_r": 0.07228555418879344,
+              "estimate_py": 0.07228555418874323,
+              "rel_diff": 6.946040166965591e-13
+            },
+            {
+              "term": "DrivAgeGLM7",
+              "estimate_r": 0.004932238227834739,
+              "estimate_py": 0.00493223822783254,
+              "rel_diff": 4.457939588951816e-13
+            },
+            {
+              "term": "RegionR82",
+              "estimate_r": 0.009217266706149746,
+              "estimate_py": 0.009217266706153433,
+              "rel_diff": 3.9993281131718034e-13
+            },
+            {
+              "term": "RegionR94",
+              "estimate_r": 0.016919015044792388,
+              "estimate_py": 0.016919015044798827,
+              "rel_diff": 3.80595059805677e-13
+            },
+            {
+              "term": "VehBrandB2",
+              "estimate_r": 0.0031070095066958116,
+              "estimate_py": 0.003107009506694865,
+              "rel_diff": 3.047062891098616e-13
+            },
+            {
+              "term": "DensityGLM",
+              "estimate_r": 0.032427495227908366,
+              "estimate_py": 0.03242749522789862,
+              "rel_diff": 3.0064443357312287e-13
+            },
+            {
+              "term": "VehBrandB6",
+              "estimate_r": -0.005439053501400614,
+              "estimate_py": -0.005439053501401974,
+              "rel_diff": 2.5004777114540177e-13
+            }
+          ],
+          "deviance_family": "poisson",
+          "deviance_rows": 678013,
+          "deviance_r": 212609.20095871482,
+          "deviance_py": 212609.20095871482
+        }
+      },
+      "verdict": "PASS"
+    }
+  ],
+  "status": "AWAITING_HUMAN_APPROVAL",
+  "mlflow_run_id": "3331990fb52d4ea3a41e0c44123910e1"
+}

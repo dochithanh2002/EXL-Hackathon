@@ -1,0 +1,71 @@
+{"ts_utc": "2026-11-13T16:23:25Z", "stage": "intake", "event": "stage_done:hash", "hashes": {"model_yaml": "38152693ac960ee3e097f3dcb189a6dbfd4a9b02a171f65900dc10167f2654cf", "legacy_script": "e7f35adf9c79f8c50857c5cb42883d178411f4619895ccf851fcc15927d7ef2b", "data": "5008e249ac75b345a180fa8cba7db50a01f2617415be5de2d110f0ad096bcdaf", "thresholds": "dc565ba6ca6bab5f799180acb77828b79580c52c63414d47d9034248d5981a28", "rulebook": "fcb8a5df9e7f5785a6b36bfd695e8e6b78133a59211588b976ecf7cbd5bd6ed1"}}
+{"ts_utc": "2026-11-13T16:23:36Z", "stage": "intake", "event": "stage_done:capture", "reference_dir": "output/m1_fremtpl2/model/reference", "r_stdout": "captured 678013 predictions to /Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/output/m1_fremtpl2/model/reference"}
+{"ts_utc": "2026-11-13T16:23:36Z", "stage": "intake", "event": "stage_done:scan", "n_triggered": 11}
+{"ts_utc": "2026-11-13T16:23:36Z", "stage": "migration", "event": "stage_done:analyse", "escalations": []}
+{"ts_utc": "2026-11-13T16:23:36Z", "stage": "migration", "event": "stage_done:plan", "coverage": "pass", "escalations": []}
+{"ts_utc": "2026-11-13T16:23:48Z", "stage": "migration", "event": "iteration", "iteration": 1, "sha256": "161c792478439e62a1d97bfda2e1952f18172f1d2cc5aff4500a2004d2bed076", "verdict": "PASS"}
+{"ts_utc": "2026-11-13T16:23:48Z", "stage": "migration", "event": "stage_done:test_and_repair", "iterations": 1, "final": "output/m1_fremtpl2/logs/migration/candidates/candidate_1.py"}
+{"ts_utc": "2026-11-13T16:23:48Z", "stage": "migration", "event": "stage_done:package", "output": "output/m1_fremtpl2/model"}
+{"ts_utc": "2026-11-13T16:23:49Z", "stage": "migration", "event": "mlflow_logged", "run_name": "agent_migration", "mlflow_run_id": "0305ea942d8f4717bc6f17281d3c7302", "experiment": "m1-fremtpl2-frequency"}
+{"ts_utc": "2026-11-13T16:23:50Z", "stage": "documentation", "event": "stage_done:facts", "n_variables": 9, "disclosures": ["D-01:DrivAgeGLM", "D-06", "D-05"]}
+{"ts_utc": "2026-11-13T16:23:50Z", "stage": "documentation", "event": "verify", "iteration": 1, "verdict": "PASS", "n_violations": 0}
+{"ts_utc": "2026-11-13T16:23:50Z", "stage": "documentation", "event": "stage_done:verify", "iterations": 1}
+{"ts_utc": "2026-11-13T16:23:51Z", "stage": "documentation", "event": "stage_done:render", "output": "output/m1_fremtpl2/reports/documentation"}
+{"ts_utc": "2026-11-13T16:23:51Z", "stage": "documentation", "event": "mlflow_logged", "run_name": "agent_documentation", "mlflow_run_id": "09ce4a81d21940f99f9991f17f836eed", "experiment": "m1-fremtpl2-frequency"}
+{"ts_utc": "2026-11-13T16:24:11Z", "stage": "validation", "event": "step", "cmd": "python -m agent.validators.m1_fremtpl2.parity", "exit": 0, "seconds": 19.1}
+{"ts_utc": "2026-11-13T16:26:11Z", "stage": "validation", "event": "step", "cmd": "python -m agent.validators.m1_fremtpl2.validate", "exit": 0, "seconds": 119.5}
+{"ts_utc": "2026-11-13T16:26:12Z", "stage": "validation", "event": "step", "cmd": "python -m agent.validators.m1_fremtpl2.report", "exit": 0, "seconds": 1.2}
+{"ts_utc": "2026-11-13T16:26:12Z", "stage": "validation", "event": "stage_done:validate", "steps": ["parity", "validate", "report"]}
+{"ts_utc": "2026-11-13T16:26:30Z", "stage": "monitoring", "event": "step", "cmd": "python -m agent.validators.m1_fremtpl2.monitor", "exit": 0, "seconds": 18.0}
+{"ts_utc": "2026-11-13T16:26:30Z", "stage": "monitoring", "event": "stage_done:monitor"}
+{"ts_utc": "2026-11-13T16:36:11Z", "stage": "intake", "event": "reset", "archived_stage": "monitoring", "to": "output/m1_fremtpl2/logs/_archive/monitoring_20261113T163611"}
+{"ts_utc": "2026-11-13T16:36:11Z", "stage": "intake", "event": "reset", "archived_stage": "validation", "to": "output/m1_fremtpl2/logs/_archive/validation_20261113T163611"}
+{"ts_utc": "2026-11-13T16:36:12Z", "stage": "intake", "event": "reset", "archived_stage": "migration", "to": "output/m1_fremtpl2/logs/_archive/migration_20261113T163612"}
+{"ts_utc": "2026-11-13T16:36:12Z", "stage": "intake", "event": "reset", "archived_stage": "documentation", "to": "output/m1_fremtpl2/logs/_archive/documentation_20261113T163612"}
+{"ts_utc": "2026-11-13T16:36:12Z", "stage": "intake", "event": "reset", "archived_stage": "intake", "to": "output/m1_fremtpl2/logs/_archive/intake_20261113T163612"}
+{"ts_utc": "2026-11-13T16:36:16Z", "stage": "intake", "event": "stage_done:hash", "hashes": {"model_yaml": "38152693ac960ee3e097f3dcb189a6dbfd4a9b02a171f65900dc10167f2654cf", "legacy_script": "e7f35adf9c79f8c50857c5cb42883d178411f4619895ccf851fcc15927d7ef2b", "data": "5008e249ac75b345a180fa8cba7db50a01f2617415be5de2d110f0ad096bcdaf", "thresholds": "dc565ba6ca6bab5f799180acb77828b79580c52c63414d47d9034248d5981a28", "rulebook": "fcb8a5df9e7f5785a6b36bfd695e8e6b78133a59211588b976ecf7cbd5bd6ed1"}}
+{"ts_utc": "2026-11-13T16:36:26Z", "stage": "intake", "event": "stage_done:capture", "reference_dir": "output/m1_fremtpl2/model/reference", "r_stdout": "captured 678013 predictions to /Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/output/m1_fremtpl2/model/reference"}
+{"ts_utc": "2026-11-13T16:36:26Z", "stage": "intake", "event": "stage_done:scan", "n_triggered": 11}
+{"ts_utc": "2026-11-13T16:36:33Z", "stage": "documentation", "event": "stage_done:facts", "n_variables": 9, "disclosures": ["D-01:DrivAgeGLM", "D-06", "D-05"]}
+{"ts_utc": "2026-11-13T16:37:18Z", "stage": "migration", "event": "stage_done:analyse", "escalations": []}
+{"ts_utc": "2026-11-13T16:37:36Z", "stage": "migration", "event": "stage_done:plan", "coverage": "pass", "escalations": []}
+{"ts_utc": "2026-11-13T16:37:46Z", "stage": "documentation", "event": "verify", "iteration": 1, "verdict": "PASS", "n_violations": 0}
+{"ts_utc": "2026-11-13T16:37:46Z", "stage": "documentation", "event": "stage_done:verify", "iterations": 1}
+{"ts_utc": "2026-11-13T16:37:49Z", "stage": "documentation", "event": "stage_done:render", "output": "output/m1_fremtpl2/reports/documentation"}
+{"ts_utc": "2026-11-13T16:37:50Z", "stage": "documentation", "event": "mlflow_logged", "run_name": "agent_documentation", "mlflow_run_id": "f6e881e2de25465c9f30b064f4b4e957", "experiment": "m1-fremtpl2-frequency"}
+{"ts_utc": "2026-11-13T16:38:15Z", "stage": "migration", "event": "iteration", "iteration": 1, "sha256": "21da3fa798bbb436f8161d4a00631a97f1f6b56d627ff04c1590d8c9951a8325", "verdict": "FAIL", "failure_stage": "static_guardrails"}
+{"ts_utc": "2026-11-13T16:38:45Z", "stage": "migration", "event": "iteration", "iteration": 2, "sha256": "06fbd2cf470a672d6e3e8f463d6d2f9203d579e9658724113e647e16a30f2e2c", "verdict": "PASS"}
+{"ts_utc": "2026-11-13T16:38:45Z", "stage": "migration", "event": "stage_done:test_and_repair", "iterations": 2, "final": "output/m1_fremtpl2/logs/migration/candidates/candidate_2.py"}
+{"ts_utc": "2026-11-13T16:38:49Z", "stage": "migration", "event": "stage_done:package", "output": "output/m1_fremtpl2/model"}
+{"ts_utc": "2026-11-13T16:38:50Z", "stage": "migration", "event": "mlflow_logged", "run_name": "agent_migration", "mlflow_run_id": "3331990fb52d4ea3a41e0c44123910e1", "experiment": "m1-fremtpl2-frequency"}
+{"ts_utc": "2026-11-13T16:39:35Z", "stage": "validation", "event": "step", "cmd": "python -m agent.validators.m1_fremtpl2.parity", "exit": 0, "seconds": 21.0}
+{"ts_utc": "2026-11-13T16:41:54Z", "stage": "validation", "event": "step", "cmd": "python -m agent.validators.m1_fremtpl2.validate", "exit": 0, "seconds": 139.2}
+{"ts_utc": "2026-11-13T16:41:55Z", "stage": "validation", "event": "step", "cmd": "python -m agent.validators.m1_fremtpl2.report", "exit": 0, "seconds": 0.8}
+{"ts_utc": "2026-11-13T16:41:55Z", "stage": "validation", "event": "stage_done:validate", "steps": ["parity", "validate", "report"]}
+{"ts_utc": "2026-11-13T16:42:50Z", "stage": "monitoring", "event": "step", "cmd": "python -m agent.validators.m1_fremtpl2.monitor", "exit": 0, "seconds": 13.4}
+{"ts_utc": "2026-11-13T16:42:50Z", "stage": "monitoring", "event": "stage_done:monitor"}
+{"ts_utc": "2026-11-13T16:46:54Z", "stage": "monitoring", "event": "reset", "archived_to": "output/m1_fremtpl2/logs/_archive/monitoring_20261113T164654"}
+{"ts_utc": "2026-11-13T16:46:54Z", "stage": "validation", "event": "reset", "archived_to": "output/m1_fremtpl2/logs/_archive/validation_20261113T164654"}
+{"ts_utc": "2026-11-13T16:46:54Z", "stage": "migration", "event": "reset", "archived_to": "output/m1_fremtpl2/logs/_archive/migration_20261113T164654"}
+{"ts_utc": "2026-11-13T16:46:55Z", "stage": "documentation", "event": "reset", "archived_to": "output/m1_fremtpl2/logs/_archive/documentation_20261113T164655"}
+{"ts_utc": "2026-11-13T16:46:55Z", "stage": "intake", "event": "reset", "archived_to": "output/m1_fremtpl2/logs/_archive/intake_20261113T164655"}
+{"ts_utc": "2026-11-13T16:46:55Z", "stage": "intake", "event": "stage_done:hash", "hashes": {"model_yaml": "38152693ac960ee3e097f3dcb189a6dbfd4a9b02a171f65900dc10167f2654cf", "legacy_script": "e7f35adf9c79f8c50857c5cb42883d178411f4619895ccf851fcc15927d7ef2b", "data": "5008e249ac75b345a180fa8cba7db50a01f2617415be5de2d110f0ad096bcdaf", "thresholds": "6a7b68939687cbcc8718c0f900e265c967b486aefbb64e02dcc92d04ad51fb69", "rulebook": "37fce5672c63ed3d027d0b3661cf9e7a653f2f4f677344409c75159b6a44ce91"}}
+{"ts_utc": "2026-11-13T16:47:05Z", "stage": "intake", "event": "stage_done:capture", "reference_dir": "output/m1_fremtpl2/model/reference", "r_stdout": "captured 678013 predictions to /Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/output/m1_fremtpl2/model/reference"}
+{"ts_utc": "2026-11-13T16:47:05Z", "stage": "intake", "event": "stage_done:scan", "n_triggered": 12}
+{"ts_utc": "2026-11-13T16:47:13Z", "stage": "documentation", "event": "stage_done:facts", "n_variables": 9, "disclosures": ["D-01:DrivAgeGLM", "D-06", "D-05"]}
+{"ts_utc": "2026-11-13T16:48:07Z", "stage": "migration", "event": "stage_done:analyse", "escalations": []}
+{"ts_utc": "2026-11-13T16:48:20Z", "stage": "migration", "event": "stage_done:plan", "coverage": "pass", "escalations": []}
+{"ts_utc": "2026-11-13T16:48:26Z", "stage": "documentation", "event": "verify", "iteration": 1, "verdict": "PASS", "n_violations": 0}
+{"ts_utc": "2026-11-13T16:48:26Z", "stage": "documentation", "event": "stage_done:verify", "iterations": 1}
+{"ts_utc": "2026-11-13T16:48:29Z", "stage": "documentation", "event": "stage_done:render", "output": "output/m1_fremtpl2/reports/documentation"}
+{"ts_utc": "2026-11-13T16:48:30Z", "stage": "documentation", "event": "mlflow_logged", "run_name": "agent_documentation", "mlflow_run_id": "dbf60130a7df428dbb427167adaa418e", "experiment": "m1-fremtpl2-frequency"}
+{"ts_utc": "2026-11-13T16:49:27Z", "stage": "migration", "event": "iteration", "iteration": 1, "sha256": "fda45c0fbca2682bc540a35908b7eb3f4a71c6bad60f745cca35c3c36db00a74", "verdict": "PASS"}
+{"ts_utc": "2026-11-13T16:49:27Z", "stage": "migration", "event": "stage_done:test_and_repair", "iterations": 1, "final": "output/m1_fremtpl2/logs/migration/candidates/candidate_1.py"}
+{"ts_utc": "2026-11-13T16:49:30Z", "stage": "migration", "event": "stage_done:package", "output": "output/m1_fremtpl2/model"}
+{"ts_utc": "2026-11-13T16:49:31Z", "stage": "migration", "event": "mlflow_logged", "run_name": "agent_migration", "mlflow_run_id": "143523617c5945f3ac26646299968639", "experiment": "m1-fremtpl2-frequency"}
+{"ts_utc": "2026-11-13T16:50:07Z", "stage": "validation", "event": "step", "cmd": "python -m agent.validators.m1_fremtpl2.parity", "exit": 0, "seconds": 17.7}
+{"ts_utc": "2026-11-13T16:51:35Z", "stage": "validation", "event": "step", "cmd": "python -m agent.validators.m1_fremtpl2.validate", "exit": 0, "seconds": 87.8}
+{"ts_utc": "2026-11-13T16:51:36Z", "stage": "validation", "event": "step", "cmd": "python -m agent.validators.m1_fremtpl2.report", "exit": 0, "seconds": 0.9}
+{"ts_utc": "2026-11-13T16:51:36Z", "stage": "validation", "event": "stage_done:validate", "steps": ["parity", "validate", "report"]}
+{"ts_utc": "2026-11-13T16:52:29Z", "stage": "monitoring", "event": "step", "cmd": "python -m agent.validators.m1_fremtpl2.monitor", "exit": 0, "seconds": 9.6}
+{"ts_utc": "2026-11-13T16:52:29Z", "stage": "monitoring", "event": "stage_done:monitor"}

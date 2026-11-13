@@ -1,0 +1,67 @@
+{
+  "stages": {
+    "intake": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:24:43Z",
+      "hashes": {
+        "legacy_script": "0473ee55ce04a4439564fc92fa7ccb05dec1659d018b0affdc1747e1fed72c08",
+        "data": "5008e249ac75b345a180fa8cba7db50a01f2617415be5de2d110f0ad096bcdaf",
+        "agent_code": "271bb787f7b822314444969c5394fad00fcc3ee4d3e45193500171c64049fa8e",
+        "inventory_yaml": "17697f6cb722ce86bc71f3e15a7443641d4a2feaf80ed5781da005063a6cd84d"
+      }
+    },
+    "capture": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:24:52Z",
+      "reused": false,
+      "reference_dir": "runs/M1/doc/reference"
+    },
+    "facts": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:24:52Z",
+      "n_variables": 9,
+      "disclosures": [
+        "D-01:DrivAgeGLM",
+        "D-06",
+        "D-05"
+      ]
+    },
+    "extract_and_verify": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:25:49Z",
+      "iterations": 1
+    },
+    "render": {
+      "status": "done",
+      "ts_utc": "2026-11-13T15:25:49Z",
+      "output": "runs/M1/doc/output"
+    }
+  },
+  "status": "APPROVED",
+  "input_hashes": {
+    "legacy_script": "0473ee55ce04a4439564fc92fa7ccb05dec1659d018b0affdc1747e1fed72c08",
+    "data": "5008e249ac75b345a180fa8cba7db50a01f2617415be5de2d110f0ad096bcdaf",
+    "agent_code": "271bb787f7b822314444969c5394fad00fcc3ee4d3e45193500171c64049fa8e",
+    "inventory_yaml": "17697f6cb722ce86bc71f3e15a7443641d4a2feaf80ed5781da005063a6cd84d"
+  },
+  "reference_dir": "runs/M1/doc/reference",
+  "iterations": [
+    {
+      "iteration": 1,
+      "step": "doc_extract",
+      "violations": [],
+      "verdict": "PASS"
+    }
+  ],
+  "mlflow_run_id": "75bac04b59fe4b418f83572289d0637a",
+  "human_review": {
+    "reviewer": "Thanh",
+    "decision": "approve",
+    "comment": "Approved by user instruction in Claude Code session; reviewed via factory reports",
+    "ts_utc": "2026-11-13T15:55:28Z",
+    "artefact_sha256": {
+      "MODEL_CARD_M1.md": "f2ea19f3c8376949ee83579ea1299069ff61d0aa7122a38126449d284efca7a8",
+      "inventory_M1.json": "e689391e34530c646a7a0a8e91bd3f8c37bae6404e836ba65dd01d4f1cb42863"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "ok": false,
+  "error_type": "ValueError",
+  "error": "VehBrand: levels [\"'B1'\", \"'B10'\", \"'B11'\", \"'B12'\", \"'B13'\", \"'B14'\", \"'B2'\", \"'B3'\", \"'B4'\", \"'B5'\", \"'B6'\"] not seen by the R model",
+  "traceback": "Traceback (most recent call last):\n  File \"/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/r2py_agent/candidate_runner.py\", line 49, in main\n    res = mod.fit(train)\n  File \"/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/runs/M1/candidates/candidate_1.py\", line 114, in fit\n    Xdf = design_matrix(train)\n  File \"/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/runs/M1/candidates/candidate_1.py\", line 87, in design_matrix\n    raise ValueError(f\"{v}: levels {sorted(unknown)} not seen by the R model\")\nValueError: VehBrand: levels [\"'B1'\", \"'B10'\", \"'B11'\", \"'B12'\", \"'B13'\", \"'B14'\", \"'B2'\", \"'B3'\", \"'B4'\", \"'B5'\", \"'B6'\"] not seen by the R model\n"
+}

@@ -1,0 +1,49 @@
+{
+  "stages": {
+    "validate": {
+      "status": "done",
+      "ts_utc": "2026-11-13T16:26:12Z",
+      "steps": [
+        "parity",
+        "validate",
+        "report"
+      ]
+    }
+  },
+  "started_utc": "2026-11-13T16:23:52Z",
+  "steps": [
+    {
+      "cmd": "python -m agent.validators.m1_fremtpl2.parity",
+      "exit": 0,
+      "seconds": 19.1,
+      "tail": [
+        "PASS  std error max rel diff                                  7.161e-14  (tol 1e-06)",
+        "PASS  expected claims max abs diff (all 678,013 rows)         6.262e-14  (tol 1e-10)",
+        "PASS  residual deviance abs diff                              1.324e-08  (tol 1e-06)",
+        "PASS  AIC-equivalent: deviance + 2k abs diff                  1.324e-08  (tol 1e-06)",
+        "PASS  test Poisson loss abs diff                              1.066e-14  (tol 1e-10)",
+        "PASS  statsmodels coef max rel diff vs R                      7.009e-08  (tol 1e-04)",
+        "PASS  statsmodels expected claims max abs diff vs R           7.079e-09  (tol 1e-06)",
+        "PARITY: PASS"
+      ]
+    },
+    {
+      "cmd": "python -m agent.validators.m1_fremtpl2.validate",
+      "exit": 0,
+      "seconds": 119.5,
+      "tail": [
+        "{'predictive_power': 'GREEN', 'calibration': 'AMBER', 'stability': 'AMBER', 'specification': 'AMBER'} fairness: AMBER overall: AMBER",
+        "test loss x100 30.9109  null 32.3984  GBM 29.8078  Gini 0.265  A/E 0.9685"
+      ]
+    },
+    {
+      "cmd": "python -m agent.validators.m1_fremtpl2.report",
+      "exit": 0,
+      "seconds": 1.2,
+      "tail": [
+        "wrote /Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/output/m1_fremtpl2/reports/validation_report_M1.md and .html"
+      ]
+    }
+  ],
+  "status": "DONE"
+}

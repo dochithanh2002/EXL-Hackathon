@@ -1,0 +1,166 @@
+{
+  "model_id": "M1",
+  "started_utc": "2026-11-13T15:56:14Z",
+  "finished_utc": "2026-11-13T15:58:47Z",
+  "documentation": {
+    "status": "APPROVED",
+    "verify_iterations": 1,
+    "model_card": "runs/M1/doc/output/MODEL_CARD_M1.md",
+    "review": {
+      "reviewer": "Thanh",
+      "decision": "approve",
+      "comment": "Approved by user instruction in Claude Code session; reviewed via factory reports",
+      "ts_utc": "2026-11-13T15:55:28Z",
+      "artefact_sha256": {
+        "MODEL_CARD_M1.md": "f2ea19f3c8376949ee83579ea1299069ff61d0aa7122a38126449d284efca7a8",
+        "inventory_M1.json": "e689391e34530c646a7a0a8e91bd3f8c37bae6404e836ba65dd01d4f1cb42863"
+      }
+    }
+  },
+  "migration": {
+    "status": "APPROVED",
+    "iterations": 2,
+    "verdict": "PASS",
+    "module": "runs/M1/output/m1_fremtpl2_freq.py",
+    "review": {
+      "reviewer": "Thanh",
+      "decision": "approve",
+      "comment": "Approved by user instruction in Claude Code session; reviewed via factory reports",
+      "ts_utc": "2026-11-13T15:55:26Z",
+      "artefact_sha256": {
+        "HUMAN_REVIEW.md": "f001708fae5c492ffcc0b0d47aaaabcd34dcf795dab6e9402d41f5887963199c",
+        "MIGRATION_REPORT.md": "8e020846e912192d11b6133988d621712107264be91a3dbb2b37f73ed45f446f",
+        "m1_fremtpl2_freq.py": "161c792478439e62a1d97bfda2e1952f18172f1d2cc5aff4500a2004d2bed076",
+        "manifest.json": "5799191a936d907e78775b8acf2a0f4477704dfd7f3e57dc60722567eb1b394f",
+        "requirements.txt": "0b9884fba4f5400a9c5c29fb25b50c4dc3c378aec18317f2248da15d0d53838b"
+      }
+    }
+  },
+  "parity_recheck": {
+    "pass": true,
+    "checks_passed": 11,
+    "checks": 11
+  },
+  "validation": {
+    "overall_rag": "AMBER",
+    "discrimination": null,
+    "calibration": "AMBER",
+    "stability": "AMBER",
+    "test_auc": null,
+    "report": "reports/m1/validation_report_M1.html",
+    "areas": {
+      "predictive_power": "GREEN",
+      "calibration": "AMBER",
+      "stability": "AMBER",
+      "specification": "AMBER"
+    },
+    "headline": {
+      "name": "test Poisson deviance loss x100",
+      "value": 30.910946729292437
+    }
+  },
+  "fairness": {
+    "overall_rag": "AMBER",
+    "statistical_rag": "AMBER",
+    "legal_rag": "AMBER",
+    "recommended_variant": "keep driver age with documented actuarial justification; monitor A/E by age band"
+  },
+  "monitoring": {
+    "revalidation_required": true,
+    "batches": {
+      "test cohort": "GREEN",
+      "young-driver growth": "RED"
+    }
+  },
+  "llm_usage": {
+    "migration": {
+      "calls": 4,
+      "live_calls": 4,
+      "cached_calls": 0,
+      "total_input_tokens": 0,
+      "output_tokens": 0,
+      "cost_usd": 0
+    },
+    "documentation": {
+      "calls": 1,
+      "live_calls": 1,
+      "cached_calls": 0,
+      "total_input_tokens": 0,
+      "output_tokens": 0,
+      "cost_usd": 0
+    }
+  },
+  "paths": {
+    "parity_report": "reports/m1/parity/parity_report_M1.md",
+    "fairness": "reports/m1/fairness/fairness_results.json",
+    "monitoring_report": "reports/m1/monitoring/MONITORING_REPORT.md"
+  },
+  "config": "legacy_models/m1_fremtpl2/migration.yaml",
+  "awaiting_human": [],
+  "steps": [
+    {
+      "cmd": "/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/.venv/bin/python -m r2py_agent discover .",
+      "exit": 0,
+      "seconds": 0.6,
+      "tail": [
+        "8 model files found -> reports/inventory/DISCOVERY.md"
+      ]
+    },
+    {
+      "cmd": "/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/.venv/bin/python -m r2py_agent document legacy_models/m1_fremtpl2/migration.yaml --backend manual",
+      "exit": 0,
+      "seconds": 0.3,
+      "tail": [
+        "DONE -> /Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/runs/M1/doc/output  (status: RUNNING)"
+      ]
+    },
+    {
+      "cmd": "/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/.venv/bin/python -m r2py_agent run legacy_models/m1_fremtpl2/migration.yaml --backend manual",
+      "exit": 0,
+      "seconds": 0.3,
+      "tail": [
+        "DONE -> /Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/runs/M1/output  (status: RUNNING)"
+      ]
+    },
+    {
+      "cmd": "/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/.venv/bin/python -m src.m1.parity",
+      "exit": 0,
+      "seconds": 19.2,
+      "tail": [
+        "PASS  residual deviance abs diff                              1.324e-08  (tol 1e-06)",
+        "PASS  AIC-equivalent: deviance + 2k abs diff                  1.324e-08  (tol 1e-06)",
+        "PASS  test Poisson loss abs diff                              1.066e-14  (tol 1e-10)",
+        "PASS  statsmodels coef max rel diff vs R                      7.009e-08  (tol 1e-04)",
+        "PASS  statsmodels expected claims max abs diff vs R           7.079e-09  (tol 1e-06)",
+        "PARITY: PASS"
+      ]
+    },
+    {
+      "cmd": "/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/.venv/bin/python -m src.m1.validate",
+      "exit": 0,
+      "seconds": 120.9,
+      "tail": [
+        "{'predictive_power': 'GREEN', 'calibration': 'AMBER', 'stability': 'AMBER', 'specification': 'AMBER'} fairness: AMBER overall: AMBER",
+        "test loss x100 30.9109  null 32.3984  GBM 29.8078  Gini 0.265  A/E 0.9685"
+      ]
+    },
+    {
+      "cmd": "/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/.venv/bin/python -m src.m1.report",
+      "exit": 0,
+      "seconds": 1.1,
+      "tail": [
+        "wrote /Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/reports/m1/validation_report_M1.md and .html"
+      ]
+    },
+    {
+      "cmd": "/Users/dochithanh/Documents/Ireland Master/Trinity/EXL Hackathon/.venv/bin/python -m src.m1.monitor",
+      "exit": 0,
+      "seconds": 12.1,
+      "tail": [
+        "test cohort            GREEN  ",
+        "young-driver growth    RED    max_csi = 0.1004 (AMBER; amber/red at 0.1/0.25), driven by DrivAgeGLM; max_age_band_ae_dev = 0.2631 (RED; amber/red at 0.1/0.2)",
+        "RE-VALIDATION REQUIRED"
+      ]
+    }
+  ]
+}

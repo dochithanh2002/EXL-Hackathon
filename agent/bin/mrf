@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Model Risk Factory tool belt. Called by the agents (agent/agents/*.md) from the repository root.
+# Usage: agent/bin/mrf <command> <model> [...]     (agent/bin/mrf --help)
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PY="$ROOT/.venv/bin/python"; [ -x "$PY" ] || PY="python3"
+cd "$ROOT"
+export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}" MLFLOW_DISABLE_AGENT_HINT=1
+exec "$PY" -m agent.tools "$@"

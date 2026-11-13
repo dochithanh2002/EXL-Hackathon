@@ -1,0 +1,184 @@
+{
+  "triggered_rules": {
+    "R-IO-01": {
+      "severity": "MUST",
+      "why": "pattern /\\bread\\.csv\\(/ matched 1x"
+    },
+    "R-FAC-01": {
+      "severity": "MUST",
+      "why": "pattern /\\b(as\\.)?factor\\(/ matched 7x"
+    },
+    "R-RNG-01": {
+      "severity": "MUST",
+      "why": "pattern /set\\.seed|sample\\(|createDataPartition/ matched 2x"
+    },
+    "R-EST-02": {
+      "severity": "MUST",
+      "why": "pattern /\\bglm\\(/ matched 1x"
+    },
+    "R-EST-03": {
+      "severity": "MUST",
+      "why": "pattern /poisson|Gamma|offset\\s*=/ matched 2x"
+    },
+    "R-PRED-01": {
+      "severity": "MUST",
+      "why": "pattern /\\bpredict\\(/ matched 1x"
+    },
+    "R-FAC-02": {
+      "severity": "MUST",
+      "why": "factors in formula: ['VehPowerGLM', 'VehAgeGLM', 'DrivAgeGLM', 'VehBrand', 'VehGas', 'Region']"
+    },
+    "R-IO-03": {
+      "severity": "MUST",
+      "why": "always applies"
+    },
+    "R-FAC-04": {
+      "severity": "MUST",
+      "why": "always applies"
+    },
+    "R-REC-02": {
+      "severity": "MUST",
+      "why": "always applies"
+    },
+    "GOV-01": {
+      "severity": "MUST",
+      "why": "always applies"
+    },
+    "R-NA-01": {
+      "severity": "MUST",
+      "why": "glm/lm default na.action = na.omit"
+    }
+  },
+  "data_profile": {
+    "n_rows": 678013,
+    "columns": [
+      {
+        "name": "IDpol",
+        "dtype": "float64",
+        "n_unique": 678013,
+        "n_missing": 0
+      },
+      {
+        "name": "ClaimNb",
+        "dtype": "int64",
+        "n_unique": 11,
+        "n_missing": 0,
+        "levels": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          8,
+          9,
+          11,
+          16
+        ]
+      },
+      {
+        "name": "Exposure",
+        "dtype": "float64",
+        "n_unique": 181,
+        "n_missing": 0
+      },
+      {
+        "name": "Area",
+        "dtype": "str",
+        "n_unique": 6,
+        "n_missing": 0,
+        "levels": [
+          "'A'",
+          "'B'",
+          "'C'",
+          "'D'",
+          "'E'",
+          "'F'"
+        ]
+      },
+      {
+        "name": "VehPower",
+        "dtype": "int64",
+        "n_unique": 12,
+        "n_missing": 0,
+        "levels": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ]
+      },
+      {
+        "name": "VehAge",
+        "dtype": "int64",
+        "n_unique": 78,
+        "n_missing": 0
+      },
+      {
+        "name": "DrivAge",
+        "dtype": "int64",
+        "n_unique": 83,
+        "n_missing": 0
+      },
+      {
+        "name": "BonusMalus",
+        "dtype": "int64",
+        "n_unique": 115,
+        "n_missing": 0
+      },
+      {
+        "name": "VehBrand",
+        "dtype": "str",
+        "n_unique": 11,
+        "n_missing": 0,
+        "levels": [
+          "'B1'",
+          "'B10'",
+          "'B11'",
+          "'B12'",
+          "'B13'",
+          "'B14'",
+          "'B2'",
+          "'B3'",
+          "'B4'",
+          "'B5'",
+          "'B6'"
+        ]
+      },
+      {
+        "name": "VehGas",
+        "dtype": "str",
+        "n_unique": 2,
+        "n_missing": 0,
+        "levels": [
+          "'Diesel'",
+          "'Regular'"
+        ]
+      },
+      {
+        "name": "Density",
+        "dtype": "int64",
+        "n_unique": 1607,
+        "n_missing": 0
+      },
+      {
+        "name": "Region",
+        "dtype": "str",
+        "n_unique": 22,
+        "n_missing": 0
+      }
+    ]
+  },
+  "protected_attributes": [
+    "DrivAge"
+  ]
+}

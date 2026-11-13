@@ -1,0 +1,17 @@
+pandas
+numpy
+scikit-learn
+statsmodels
+fairlearn
+mlflow
+azure-ai-ml
+azure-identity
+azureml-mlflow
+kaggle
+xlrd
+openpyxl
+matplotlib
+markdown
+pydantic
+pyyaml
+scipy

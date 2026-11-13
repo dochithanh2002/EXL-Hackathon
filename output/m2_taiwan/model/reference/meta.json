@@ -1,0 +1,60 @@
+{
+  "r_version": "R version 4.6.1 (2026-06-24)",
+  "seed": 2026,
+  "runtime_s": 1.15070199966431,
+  "packages": ["MASS", "Matrix", "ModelMetrics", "R6", "RColorBrewer", "Rcpp", "S7", "caret", "class", "cli", "codetools", "compiler", "data.table", "dplyr", "farver", "foreach", "future", "future.apply", "generics", "ggplot2", "globals", "glue", "gower", "grid", "gtable", "hardhat", "ipred", "iterators", "jsonlite", "lattice", "lava", "lifecycle", "listenv", "lubridate", "magrittr", "nlme", "nnet", "pROC", "parallel", "parallelly", "pillar", "pkgconfig", "plyr", "prodlim", "purrr", "recipes", "reshape2", "rlang", "rpart", "scales", "splines", "stats4", "stringi", "stringr", "survival", "tibble", "tidyselect", "timeDate", "timechange", "tools", "vctrs", "withr"],
+  "class": ["glm", "lm"],
+  "formula": "default.payment.next.month ~ limit_bal + sex + education + marriage +      pay_0 + pay_2 + pay_3 + pay_5 + pay_6 + pay_amt1 + pay_amt2",
+  "family": "binomial",
+  "link": "logit",
+  "terms": ["(Intercept)", "limit_bal", "sex2", "education2", "education3", "education4", "marriage2", "marriage3", "pay_0", "pay_2", "pay_3", "pay_5", "pay_6", "pay_amt1", "pay_amt2"],
+  "response": "default.payment.next.month",
+  "response_levels": ["0", "1"],
+  "xlevels": {
+    "sex": ["1", "2"],
+    "education": ["1", "2", "3", "4"],
+    "marriage": ["1", "2", "3"]
+  },
+  "contrasts": {
+    "sex": "contr.treatment",
+    "education": "contr.treatment",
+    "marriage": "contr.treatment"
+  },
+  "n_train": 21001,
+  "n_test": 8999,
+  "converged": true,
+  "iterations": 6,
+  "null_deviance": 22196.2617795277,
+  "deviance": 18587.8388471168,
+  "aic": 18617.8388471168,
+  "control": {
+    "epsilon": 1e-08,
+    "maxit": 25
+  },
+  "column_classes_after_preprocessing": {
+    "limit_bal": "integer",
+    "sex": "factor",
+    "education": "factor",
+    "marriage": "factor",
+    "age": "integer",
+    "pay_0": "numeric",
+    "pay_2": "numeric",
+    "pay_3": "numeric",
+    "pay_4": "numeric",
+    "pay_5": "numeric",
+    "pay_6": "numeric",
+    "bill_amt1": "integer",
+    "bill_amt2": "integer",
+    "bill_amt3": "integer",
+    "bill_amt4": "integer",
+    "bill_amt5": "integer",
+    "bill_amt6": "integer",
+    "pay_amt1": "integer",
+    "pay_amt2": "integer",
+    "pay_amt3": "integer",
+    "pay_amt4": "integer",
+    "pay_amt5": "integer",
+    "pay_amt6": "integer",
+    "default.payment.next.month": "factor"
+  }
+}

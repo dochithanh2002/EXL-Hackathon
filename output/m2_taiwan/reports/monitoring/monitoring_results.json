@@ -1,0 +1,156 @@
+{
+  "model_id": "M2",
+  "timestamp_utc": "2026-11-13T16:41:56+00:00",
+  "champion": {
+    "module": "output/m2_taiwan/model/m2_taiwan_pd.py",
+    "module_sha256": "9d9c4e58426ba49be28c637592d01d4fe421d17094e7866841be03086db63eea",
+    "manifest_module_sha256": "9d9c4e58426ba49be28c637592d01d4fe421d17094e7866841be03086db63eea",
+    "migration_status": "AWAITING_HUMAN_APPROVAL",
+    "migration_iterations": 1,
+    "human_review": null,
+    "migrated_by": "Claude Opus 5.5 (Claude Code, migration-agent)",
+    "reference_dir": "output/m2_taiwan/model/reference"
+  },
+  "baseline": {
+    "validated_test_auc": 0.7402449542619647,
+    "cutoff_80": 0.28772137273360776,
+    "validation_timestamp": "2026-11-13T16:41:33+00:00"
+  },
+  "thresholds": {
+    "score_psi": [
+      0.1,
+      0.25
+    ],
+    "max_csi": [
+      0.1,
+      0.25
+    ],
+    "auc_drop": [
+      0.03,
+      0.05
+    ],
+    "citl_pp": [
+      1.0,
+      2.0
+    ],
+    "min_dir": [
+      0.85,
+      0.8
+    ],
+    "max_group_cal_gap_pp": [
+      1.5,
+      2.0
+    ]
+  },
+  "min_group_size": 200,
+  "batches": [
+    {
+      "batch": "2005-09 cohort",
+      "note": "Simulated batch: held-out test clients scored as at Sep-2005, observed default outcome.",
+      "has_outcome": true,
+      "metrics": {
+        "n": 8999,
+        "mean_pd": 0.21870680413744886,
+        "approval_rate_at_dev_cutoff": 0.809089898877653,
+        "score_psi": 0.001607266552113695,
+        "csi": {
+          "limit_bal": 0.0011385385916014173,
+          "pay_0": 0.0002930362923435769,
+          "pay_2": 7.167193907558825e-05,
+          "pay_3": 1.5331843161753652e-05,
+          "pay_5": 0.0,
+          "pay_6": 0.00045615154039989575,
+          "pay_amt1": 0.0013450637601828414,
+          "pay_amt2": 0.0016910923217841028,
+          "sex": 8.522341640684705e-06,
+          "education": 0.00016346826091808732,
+          "marriage": 0.00034877530593484794
+        },
+        "max_csi": 0.0016910923217841028,
+        "max_csi_variable": "pay_amt2",
+        "dir_by_group": {
+          "sex_g": 0.9332749238339301,
+          "age_g": 0.9140082742165968,
+          "edu_g": 0.9069063810329899,
+          "mar_g": 0.9513155957589332
+        },
+        "min_dir": 0.9069063810329899,
+        "observed_default_rate": 0.22113568174241582,
+        "auc": 0.7402449542619647,
+        "auc_drop": 0.0,
+        "citl_pp": 0.24288776049669614,
+        "group_cal_gap_pp": {
+          "sex_g": 0.746406107273137,
+          "age_g": 1.5899410249300638,
+          "edu_g": 0.5612927484788477,
+          "mar_g": 0.9604353628263479
+        },
+        "max_group_cal_gap_pp": 1.5899410249300638
+      },
+      "ratings": {
+        "score_psi": "GREEN",
+        "max_csi": "GREEN",
+        "auc_drop": "GREEN",
+        "citl_pp": "GREEN",
+        "min_dir": "GREEN",
+        "max_group_cal_gap_pp": "AMBER"
+      },
+      "overall": "AMBER",
+      "breaches": [
+        "max_group_cal_gap_pp = 1.5899 (AMBER; amber/red at 1.5/2.0)"
+      ],
+      "revalidation_trigger": false
+    },
+    {
+      "batch": "2005-08 re-score",
+      "note": "Simulated batch: the same clients re-scored with inputs shifted one month back (Mar-2005 repayment status is unobserved and carried). Default outcome not yet observed.",
+      "has_outcome": false,
+      "metrics": {
+        "n": 8999,
+        "mean_pd": 0.21494477102722925,
+        "approval_rate_at_dev_cutoff": 0.8437604178242026,
+        "score_psi": 0.08261356708563916,
+        "csi": {
+          "limit_bal": 0.0011385385916014173,
+          "pay_0": 0.6175273241460307,
+          "pay_2": 0.0005943488804961653,
+          "pay_3": 0.007305284753905281,
+          "pay_5": 0.0,
+          "pay_6": 0.00045615154039989575,
+          "pay_amt1": 0.0071626107726573685,
+          "pay_amt2": 0.04553914772892037,
+          "sex": 8.522341640684705e-06,
+          "education": 0.00016346826091808732,
+          "marriage": 0.00034877530593484794
+        },
+        "max_csi": 0.6175273241460307,
+        "max_csi_variable": "pay_0",
+        "dir_by_group": {
+          "sex_g": 0.9554567518765845,
+          "age_g": 0.9332524309247532,
+          "edu_g": 0.9120813104540056,
+          "mar_g": 0.974678055245678
+        },
+        "min_dir": 0.9120813104540056,
+        "auc": null,
+        "auc_drop": null,
+        "citl_pp": null,
+        "max_group_cal_gap_pp": null
+      },
+      "ratings": {
+        "score_psi": "GREEN",
+        "max_csi": "RED",
+        "auc_drop": "N/A",
+        "citl_pp": "N/A",
+        "min_dir": "GREEN",
+        "max_group_cal_gap_pp": "N/A"
+      },
+      "overall": "RED",
+      "breaches": [
+        "max_csi = 0.6175 (RED; amber/red at 0.1/0.25), driven by pay_0"
+      ],
+      "revalidation_trigger": true
+    }
+  ],
+  "revalidation_required": true
+}
