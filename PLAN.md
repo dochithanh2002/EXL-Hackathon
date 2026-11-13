@@ -1,6 +1,6 @@
 # Plan: agentic R → Python ML transformation platform
 
-Status: build step 1 done (section 12). Date: 2026-11-13.
+Status: build steps 1–2 done (section 12). Date: 2026-11-13.
 
 A Python control plane owns all workflow, execution and approval logic. A small Node service hosts Pi for the
 four agents. A React UI is the data scientist's (DS) workspace. Everything runs locally as plain processes; a

@@ -61,3 +61,9 @@ def test_startup_recovers_interrupted_jobs(tmp_path):
         body = c.get(f"/api/projects/{pid}").json()
     assert body["state"]["reason"] == "interrupted" and body["running_job"] is None
     assert jid
+
+
+def test_environment_reports_version_and_readiness(client):
+    body = client.get("/api/environment").json()
+    assert len(body["version"]) == 64 and set(body["lockfiles"]) == {"renv.lock", "uv.lock"}
+    assert all(body[e] == "ready" or "bootstrap.sh" in body[e] for e in ("r", "python"))

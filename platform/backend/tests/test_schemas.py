@@ -39,6 +39,16 @@ def test_baseline_key_ignores_tolerances_and_kpis():
     assert canonical_hash(spec(r_packages=["MASS"]).baseline_key()) != canonical_hash(a.baseline_key())
 
 
+@pytest.mark.parametrize("change", [
+    {"split": {"method": "sample", "r_code": "idx <- sample(nrow(df), 0.7 * nrow(df))", "seed": 2}},
+    {"split": {"method": "sample", "r_code": "idx <- sample(nrow(df), 0.7 * nrow(df))", "seed": None}},
+    {"response": "defaulted"},
+])
+def test_baseline_key_covers_every_input_of_the_baseline_run(change):
+    """The harness also consumes the seed and the response, so changing either must not reuse a baseline."""
+    assert canonical_hash(spec(**change).baseline_key()) != canonical_hash(spec().baseline_key())
+
+
 def test_report_claims_may_not_contain_literal_numbers():
     ok = {"sections": [{"heading": "Parity", "claims": [
         {"text": "Coefficients match to {{v1.coef_rel}}.", "evidence_ids": ["v1"]}]}]}

@@ -3,6 +3,7 @@ import sqlite3
 import pytest
 
 from controlplane import support
+from controlplane.schemas import canonical_hash
 from controlplane.workflow import Reason, Status, Step, Store
 from controlplane.workflow.machine import (
     BaselineSucceeded, Bindings, CandidateApproved, CandidateValidated, FilesUploaded, GateError, InputFile,
@@ -94,3 +95,22 @@ def test_evidence_roundtrip(store):
     eid, h = store.record(pid, "validation", {"pass": True, "checks": []})
     got = store.evidence(pid, eid)
     assert got["hash"] == h and got["body"] == {"pass": True, "checks": []}
+
+
+def confirm(store, pid, spec):
+    v = store.add_spec(pid, spec, support.load())
+    s = store.state(pid)
+    return store.apply(pid, SpecConfirmed(version=v, tier=s.drafted_tier, proven=s.drafted_proven,
+                                          baseline_key=canonical_hash(spec.baseline_key()), parity_risk_accepted=True))
+
+
+def test_changing_the_seed_restarts_the_baseline(store):
+    pid = store.create_project("m4")
+    store.apply(pid, FilesUploaded(files=FILES))
+    confirm(store, pid, spec())
+    store.apply(pid, BaselineSucceeded(spec_version=1, baseline_id="b1"))
+    split = spec().split.model_dump()
+    s = confirm(store, pid, spec(tolerances={"coef_rel": 1e-4}))
+    assert (s.step, s.baseline_id) == (Step.TRANSLATION, "b1")           # tolerances only: baseline reused
+    s = confirm(store, pid, spec(tolerances={"coef_rel": 1e-4}, split=split | {"seed": 2}))
+    assert (s.step, s.baseline_id) == (Step.BASELINE, None)              # new seed: baseline rerun

@@ -10,7 +10,8 @@ from typing import Annotated
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 
-from ..schemas import ROLES
+from ..environments import EnvironmentNotReady, Environments
+from ..schemas import ROLES, sha256_file
 from ..settings import Settings
 from ..workflow import GateError, NotFound, Store
 from ..workflow.machine import FilesUploaded, InputFile
@@ -45,6 +46,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/health")
     def health():
         return {"ok": True}
+
+    @app.get("/api/environment")
+    def environment():
+        envs = Environments()
+        status = {}
+        for name, check in (("r", envs.r), ("python", envs.py)):
+            try:
+                check()
+                status[name] = "ready"
+            except EnvironmentNotReady as e:
+                status[name] = str(e)
+        return {"version": envs.version(), "lockfiles": {n: sha256_file(p) for n, p in envs.lockfiles.items()},
+                **status}
 
     @app.get("/api/schemas/{role}")
     def schema(role: str):

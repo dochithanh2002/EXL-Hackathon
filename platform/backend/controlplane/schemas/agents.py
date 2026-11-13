@@ -33,7 +33,7 @@ class SplitDefinition(Contract):
 class BaselineObjects(Contract):
     model: str = Field(description="Name of the fitted model object in baseline.R")
     train: str = Field(description="Name of the training data frame in baseline.R")
-    test: str = Field(description="Name of the test data frame in baseline.R")
+    test: str | None = Field(description="Name of the test data frame in baseline.R; null if R has no test set")
 
 
 Kpi = Literal["auc", "gini", "actual_expected", "rmse", "mae", "deviance", "aic", "log_loss"]
@@ -72,13 +72,15 @@ class ModelSpec(Contract):
     unsupported_items: list[str] = Field(description="Constructs in the uploaded code that cannot be translated")
     substitutions: list[Substitution]
     r_packages: list[str] = Field(description="R packages baseline.R loads")
-    baseline_r: str = Field(description="Minimal slice of the uploaded code that produces the target model")
+    baseline_r: str = Field(description="Minimal slice of the uploaded code that produces the target model. It reads "
+                                        "the dataset as inputs/<file name> with read.csv or read.table and keeps R's "
+                                        "row names, which trace every row back to the dataset file")
     baseline_objects: BaselineObjects
 
     def baseline_key(self) -> dict:
-        """The fields that determine the R baseline run. Equal keys mean a confirmed baseline can be reused."""
+        """Every spec field the R baseline run consumes. Equal keys mean a confirmed baseline can be reused."""
         return {"baseline_r": self.baseline_r, "baseline_objects": self.baseline_objects.model_dump(),
-                "r_packages": sorted(self.r_packages)}
+                "r_packages": sorted(self.r_packages), "seed": self.split.seed, "response": self.response}
 
 
 # ---------------------------------------------------------------- Translator
