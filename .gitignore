@@ -1,6 +1,9 @@
+.DS_Store
 .venv/
+node_modules/
 __pycache__/
 .pytest_cache/
-agent/config/azure.env
-output/mlflow/
-input/*/data/
+*.env
+!*.env.example
+legacy/output/mlflow/
+legacy/input/*/data/
