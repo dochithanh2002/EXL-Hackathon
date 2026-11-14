@@ -109,11 +109,13 @@ class FilesUploaded(Frozen):
 
 
 class SpecDrafted(Frozen):
-    """`tier` and `proven` come from the support matrix, not from the Analyst."""
+    """`tier` and `proven` come from the support matrix for a known pair; `limitation` is the Analyst's explanation
+    when no faithful Python implementation is possible."""
     type: Literal["spec_drafted"] = "spec_drafted"
     version: int = Field(ge=1)
     tier: Tier
     proven: bool
+    limitation: str = ""
 
 
 class DsMessaged(Frozen):
@@ -260,7 +262,7 @@ def apply(s: ProjectState, e: Event) -> ProjectState:
             _at(s, Step.ALIGNMENT, Status.WORKING)
             return _move(s, Step.ALIGNMENT, Status.AWAITING_DS, Reason.ANALYST_REPLIED)
 
-        case SpecDrafted(version=v, tier=tier, proven=proven):
+        case SpecDrafted(version=v, tier=tier, proven=proven, limitation=limitation):
             _require(s.step != Step.INTAKE, "upload files first")
             _require(v > max(s.drafted_version or 0, s.spec_version or 0), f"spec v{v} is not newer than the last")
             s = s.model_copy(update={"drafted_version": v, "drafted_tier": tier, "drafted_proven": proven})
@@ -268,7 +270,7 @@ def apply(s: ProjectState, e: Event) -> ProjectState:
                 return s
             if tier == "unsupported":
                 return _move(s, Step.ALIGNMENT, Status.AWAITING_DS, Reason.UNSUPPORTED,
-                             "the model has no statsmodels counterpart")
+                             limitation or "no faithful Python implementation is possible")
             return _move(s, Step.ALIGNMENT, Status.AWAITING_DS, Reason.SPEC_DRAFTED)
 
         case SpecConfirmed(version=v, tier=tier, proven=proven, baseline_key=key, parity_risk_accepted=accepted):
@@ -280,7 +282,7 @@ def apply(s: ProjectState, e: Event) -> ProjectState:
             _require(proven == s.drafted_proven, "proven flag does not match the draft")
             _require(tier != "unsupported", "an unsupported model cannot be confirmed")
             _require(tier != "approximate" or accepted, "an approximate-tier model needs explicit DS acceptance")
-            _require(proven or accepted, "an exact-tier pair without a passing fixture needs explicit DS acceptance")
+            _require(proven or accepted, "a pair without a passing fixture needs explicit DS acceptance")
             reset = dict(spec_version=v, spec_tier=tier, spec_proven=proven, candidate_hash=None,
                          validation_id=None, validation_passed=None, repairs=0, ds_comment=None, diagnosis_id=None,
                          approval=None, report_id=None, bundle_id=None)

@@ -83,7 +83,7 @@ def test_the_analyst_can_read_code_but_not_the_dataset(analyst):
 
 
 def errors(analyst, **overrides) -> list[str]:
-    spec, errs = analyst.check(poisson_spec(**overrides).model_dump(mode="json"))
+    spec, errs = analyst.check(poisson_spec().model_dump(mode="json") | overrides)
     assert (spec is None) == bool(errs)
     return errs
 
@@ -97,12 +97,17 @@ def test_spec_checks(analyst):
         "baseline_r loads ['MASS'], which r_packages does not list"]
     assert errors(analyst, baseline_r="x <- dplyr::filter(df)\n" + r, r_packages=["dplyr"]) == []
     assert "stable R environment has no ['randomForest']" in errors(analyst, r_packages=["randomForest"])[0]
-    assert errors(analyst, baseline_objects={"model": "model", "train": "train", "test": None}) == [
+    assert errors(analyst, baseline_objects={"model": "model", "train": "train", "test": "test"}) == [
         "baseline_objects.model 'model' does not appear in baseline_r"]
-    assert errors(analyst, family="binomialish")[0].startswith("support_tier is 'exact'")
+    assert errors(analyst, support_tier="approximate")[0].startswith("support_tier is 'approximate' but stats::glm")
+    assert errors(analyst, family="tweedie", support_tier="approximate") == []    # outside the matrix: attempted
     rf = dict(r_function="randomForest::randomForest", support_tier="unsupported", r_packages=["randomForest"],
-              baseline_r="library(randomForest)\n" + r)
+              baseline_r="library(randomForest)\n" + r, python_implementation="none",
+              limitation="the forest cannot be rebuilt without scikit-learn")
     assert errors(analyst, **rf) == []                                 # an unsupported model can still be drafted
+    assert "limitation: explain why" in errors(analyst, **rf | {"limitation": None})[0]
+    assert "scikit-learn implementations are excluded" in errors(
+        analyst, python_implementation="sklearn.ensemble.RandomForestClassifier")[0]
     spec, errs = analyst.check({"formula": 1})
     assert spec is None and "target_model: Field required" in errs
 

@@ -13,7 +13,7 @@ from pydantic import ValidationError
 
 from controlplane.report import _words, known
 from controlplane.schemas import canonical_hash
-from controlplane.schemas.agents import Claim, Section
+from controlplane.schemas.agents import Claim
 from controlplane.tracking import Tracker
 from tests.fake_llm import text, tool
 from tests.test_analyst import agent_service, configure, cp, llm, settle  # noqa: F401
@@ -24,10 +24,30 @@ from tests.test_translator import DRIFTED, submit, translate
 REPAIRED = POISSON_PY.replace("RPoisson", "Poisson2")
 
 
-def report(*sections) -> dict:
-    return tool("submit_report", {"sections": [{"heading": h, "claims": [{"text": t, "evidence_ids": ids}
-                                                                         for t, ids in claims]}
-                                               for h, claims in sections]})
+QUESTIONS = ("sample_suitability", "stability", "calibration", "decision_performance")
+
+
+def report(validation: str, decision: str, spec: str = "spec-v1", **sections) -> dict:
+    """A complete narrative citing what each section must; `sections` replaces any section's claims."""
+    def c(*claims):
+        return [{"text": t, "evidence_ids": ids} for t, ids in claims]
+    body = {
+        "scope": c(("The migration covers `{{" + spec + ".r_function}}`.", [spec])),
+        "model_and_data_semantics": c(("The response is {{" + spec + ".response_type}}, predicted as "
+                                       "{{" + spec + ".prediction.units}}.", [spec])),
+        "parity_results": c(("The validation passed.", [validation])),
+        "financial_assessment": {q: c(("This question is {{assessment." + q + ".status}}.", ["assessment"]))
+                                 for q in QUESTIONS},
+        "skipped_checks": c(("{{" + validation + ".checks_unavailable}} checks were unavailable.", [validation])),
+        "limitations": c(("The spec records the limits of the migration.", [spec])),
+        "acceptance_decision": c(("The DS accepted the migration.", [decision])),
+    }
+    for name, claims in sections.items():
+        if name in QUESTIONS:
+            body["financial_assessment"][name] = c(*claims)
+        else:
+            body[name] = c(*claims)
+    return tool("submit_report", body)
 
 
 def assign_reporter(cp) -> None:
@@ -49,18 +69,21 @@ def test_the_report_cites_recorded_evidence_and_the_bundle_reruns(cp, llm, envs,
     v1, v2 = [v["id"] for v in cp.get(f"/api/projects/{pid}/evidence", params={"kind": "validation"}).json()]
     b, d = s["baseline_id"], s["diagnosis_id"]
     decision = f"decision-{len(cp.get(f'/api/projects/{pid}/transitions').json()) + 1}"
-    good = report(("Translation", [
-        ("The R baseline in `baseline.R` fit `{{spec-v1.r_function}}` with a {{spec-v1.family}} family on {{" + b + ".n_fit}} "
-         "training rows.", ["spec-v1", b]),
-        ("The first candidate failed the {{" + v1 + ".failed_checks}} check; {{" + d + ".root_cause}}", [v1, d]),
+    good = report(v2, decision, scope=[
+        ("The R reference in `baseline.R` fit `{{spec-v1.r_function}}` with a {{spec-v1.family}} family on {{" + b
+         + ".n_fit}} training rows.", ["spec-v1", b]),
+        ("The first candidate failed the {{" + v1 + ".failed_checks}} check; {{" + d + ".root_cause}}", [v1, d])],
+        parity_results=[
         ("The repaired candidate, with its `Poisson2` family, passed {{" + v2 + ".checks_passed}} of {{" + v2
-         + ".checks_total}} checks; the largest coefficient difference was {{" + v2 + ".coefficient_max_rel_diff}} "
-         "against {{" + v2 + ".coefficient_max_rel_diff.tolerance}}.", [v2]),
-        ("The DS approved it.", [decision])]))
+         + ".checks_required}} required checks; the largest coefficient difference was {{" + v2
+         + ".coefficient_estimates.max_abs_diff}} against an rtol of {{" + v2 + ".coefficient_estimates.rtol}}.",
+         [v2])])
     llm.script = [
-        report(("Result", [("All 19 checks passed.", [v2])])),
-        report(("Result", [("See {{" + v2 + ".nonexistent}}, {{spec-v1.version}}, `x9`, `InventedEstimator`, "
-                             "`９９９` and `Poisson2.age`.", [v2, "evidence-x"])])),
+        report(v2, decision, parity_results=[("All 19 checks passed.", [v2])]),
+        report(v2, decision, parity_results=[
+            ("See {{" + v2 + ".nonexistent}}, {{spec-v1.version}}, `x9`, `InventedEstimator`, `９９９` and "
+             "`Poisson2.age`.", [v2, "evidence-x"])],
+            stability=[("Stable.", [v2])], acceptance_decision=[("Accepted.", ["spec-v1"])]),
         good, text("Reported.")]
     assert cp.post(f"/api/projects/{pid}/approve", json=bindings(s)).status_code == 200
     s = settle(cp, pid, timeout=120)
@@ -72,21 +95,32 @@ def test_the_report_cites_recorded_evidence_and_the_bundle_reruns(cp, llm, envs,
                   "cites spec-v1, which is not in the claim's evidence_ids", "`x9` is not a known project name",
                   "`InventedEstimator` is not a known project name", "`９９９` is not a known project name",
                   "`Poisson2.age` is not a known project name",
-                  f"the report must cite {decision}"):
+                  "financial_assessment.stability: cite assessment, the evidence this section reports",
+                  f"acceptance_decision: cite {decision}", f"the report must cite {decision}"):
         assert error in sent, error
-    assert '"coefficient_max_rel_diff.tolerance"' in sent and "secret-" not in sent
+    assert '"coefficient_estimates.rtol"' in sent and '"sample_suitability.status"' in sent and "secret-" not in sent
 
     rep = cp.get(f"/api/projects/{pid}/report").json()
     assert rep["id"] == s["report_id"]
     md = rep["body"]["markdown"]
     v = cp.get(f"/api/projects/{pid}/evidence/{v2}").json()["body"]
     n_checks = len(v["checks"])
-    assert "{{" not in md and f"passed {n_checks} of {n_checks} checks" in md
+    assert "{{" not in md and f"passed {n_checks} of {n_checks} required checks" in md
     assert "with a poisson family on 140 training rows. [spec-v1, " + b + "]" in md
-    assert "against 1.000e-06." in md and f"[{decision}]" in md
-    assert "## Coefficients" in md and "| `areaB` |" in md
+    assert "against an rtol of 1.000e-06." in md and f"[{decision}]" in md
+    assert "### Coefficients" in md and "| `areaB` |" in md
     assert "The offset is scaled by a constant." in md                            # the attempts table
-    assert "| 0 |" in md and "| 1 |" in md and "approved" in md
+    assert "| 0 |" in md and "| 1 |" in md and "accepted" in md
+    # the fixed template, with parity kept apart from business fitness
+    headings = [line for line in md.splitlines() if line.startswith("## ")]
+    assert headings == ["## Scope", "## Model and data semantics", "## Parity results",
+                        "## Financial model assessment", "## Skipped or unavailable checks", "## Limitations",
+                        "## Acceptance decision", "## Appendix: reproducibility"]
+    assert "### Decision performance\n\n**Not assessed.** Needs: a binary event" in md     # a count model
+    assert "### Stability\n\n**Partially assessed.** Needs: a PSI threshold." in md
+    assert "This question is partially assessed. [assessment]" in md
+    assert "It is not a statement that the model is fit for business use" in md
+    assert "| Prediction | scalar, count: claims per policy; aligned on row |" in md
 
     # ---- deliverables
     bundle = cp.get(f"/api/projects/{pid}/deliverables").json()
@@ -111,7 +145,7 @@ def test_the_report_cites_recorded_evidence_and_the_bundle_reruns(cp, llm, envs,
     dataset = cp.settings.project_dir(pid) / "inputs" / "claims.csv"
     rerun = subprocess.run([envs.py(), "verify.py", dataset], cwd=root, capture_output=True, text=True)
     assert rerun.returncode == 0, rerun.stdout + rerun.stderr
-    assert "pass  coefficient max rel diff" in rerun.stdout and "FAIL" not in rerun.stdout
+    assert "pass  coefficient estimates  max |diff|" in rerun.stdout and "FAIL" not in rerun.stdout
     assert [line.split("  ")[1] for line in rerun.stdout.splitlines() if line.startswith("pass  ")] == (
         [check["name"] for check in v["checks"]])
     other = tmp_path / "claims.csv"
@@ -143,8 +177,7 @@ def test_a_report_without_a_reporter_model_fails_and_can_be_retried(cp, llm):
 
     assign_reporter(cp)
     decision = f"decision-{len(cp.get(f'/api/projects/{pid}/transitions').json()) - 1}"
-    llm.script = [report(("Result", [("The validation passed and the DS approved it.",
-                                      [s["validation_id"], decision])])), text("Reported.")]
+    llm.script = [report(s["validation_id"], decision), text("Reported.")]
     assert cp.post(f"/api/projects/{pid}/retry").status_code == 200
     s = settle(cp, pid, timeout=120)
     assert (s["step"], s["status"]) == (7, "done"), s
@@ -152,17 +185,15 @@ def test_a_report_without_a_reporter_model_fails_and_can_be_retried(cp, llm):
 
 
 def test_claims_allow_digits_only_in_placeholders_and_code_spans():
-    Claim(text="`NumberOfTime30-59DaysPastDueNotWorse` has {{validation-a.kpi.test.auc.r}}.", evidence_ids=["x"])
+    Claim(text="`NumberOfTime30-59DaysPastDueNotWorse` has {{validation-a.metric.test.auc.r}}.", evidence_ids=["x"])
     for bad in ("It took 3 attempts.", "Version v2 passed.", "{{validation-a}} is 1", "Error ９９９.", "Error ²."):
         with pytest.raises(ValidationError):
             Claim(text=bad, evidence_ids=["x"])
-    with pytest.raises(ValidationError, match="headings cannot hold placeholders"):
-        Section(heading="{{spec-v1.version}}", claims=[{"text": "ok", "evidence_ids": ["x"]}])
     assert json.dumps(Claim.model_json_schema())                              # still a plain JSON Schema
 
 
 def test_code_spans_may_hold_names_with_digits_but_not_numbers():
-    words = _words('{"columns": ["NumberOfTime30-59DaysPastDueNotWorse", "SeriousDlqin2yrs", "x"], "coef_rel": 1e-06}',
+    words = _words('{"columns": ["NumberOfTime30-59DaysPastDueNotWorse", "SeriousDlqin2yrs", "x"], "rtol": 1e-06}',
                    "np.log1p(df.x)", "NumberOfTime30.59DaysPastDueNotWorse", "stats::glm", "cs-training.csv")
     assert all(known(t, words) for t in ("NumberOfTime30-59DaysPastDueNotWorse", "NumberOfTime30.59DaysPastDueNotWorse",
                                         "SeriousDlqin2yrs", "log1p", "np.log1p", "stats::glm", "cs-training.csv", "x"))

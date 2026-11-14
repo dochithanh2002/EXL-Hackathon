@@ -18,7 +18,7 @@ export function Settings() {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
       <h1 className="text-lg font-semibold">Settings</h1>
-      <Panel title="Model endpoints" actions={editing === null && <Button size="sm" onClick={() => setEditing("new")}>Add endpoint</Button>}>
+      <Panel title="LLM endpoints" actions={editing === null && <Button size="sm" onClick={() => setEditing("new")}>Add endpoint</Button>}>
         <div className="flex flex-col gap-4">
           {editing !== null && <EndpointForm endpoint={editing === "new" ? null : editing} onDone={() => setEditing(null)} />}
           <ErrorText error={endpoints.error} />
@@ -29,7 +29,7 @@ export function Settings() {
                   <TH>Name</TH>
                   <TH>API</TH>
                   <TH>Base URL</TH>
-                  <TH>Models</TH>
+                  <TH>LLMs</TH>
                   <TH />
                 </TR>
               </THead>
@@ -117,7 +117,7 @@ function EndpointForm({ endpoint, onDone }: { endpoint: Endpoint | null; onDone:
         <Input name="base_url" type="url" required defaultValue={endpoint?.base_url} placeholder="https://…/v1" />
       </Label>
       <Label>
-        Models
+        LLMs
         <Input name="models" required defaultValue={endpoint?.models.join(", ")} placeholder="comma separated" />
       </Label>
       <Label>
@@ -136,15 +136,15 @@ function EndpointForm({ endpoint, onDone }: { endpoint: Endpoint | null; onDone:
 function Roles({ endpoints }: { endpoints: Endpoint[] }) {
   const roles = useQuery({ queryKey: ["roles"], queryFn: () => get<Record<Role, RoleModel | null>>("/api/settings/roles") });
   return (
-    <Panel title="Agent models">
+    <Panel title="LLM per agent">
       <ErrorText error={roles.error} />
       {roles.data && (
         <Table>
           <THead>
             <TR>
-              <TH>Role</TH>
+              <TH>Agent</TH>
               <TH>Endpoint</TH>
-              <TH>Model</TH>
+              <TH>LLM</TH>
               <TH>Reasoning</TH>
               <TH />
             </TR>

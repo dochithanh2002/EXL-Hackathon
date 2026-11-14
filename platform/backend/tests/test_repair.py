@@ -20,7 +20,8 @@ LEAKY = POISSON_PY.replace("df.index = pd.RangeIndex(1, len(df) + 1)",
 def diagnosis(**change) -> dict:
     return tool("submit_diagnosis", {
         "root_cause": "The offset is scaled by a constant.", "evidence": ["every coefficient moved"],
-        "repair_instructions": ["Pass offset=np.log(exposure) without scaling."], "spec_change_needed": False} | change)
+        "repair_instructions": ["Pass offset=np.log(exposure) without scaling."], "spec_change_needed": False,
+        "category": "specification" if change.get("spec_change_needed") else "migration_defect"} | change)
 
 
 def repaired(module: str, changes: str = "Removed the offset scaling.") -> dict:
@@ -68,7 +69,8 @@ def test_a_failed_candidate_is_diagnosed_and_the_repair_passes(cp, llm):
 
     sent = llm.sent(turns(llm, "Diagnostician"))
     assert "* 0.99" in llm.sent(turns(llm, "Diagnostician")[:1])
-    assert '"coefficient max rel diff"' in sent and '"term": "areaB"' in sent
+    assert '"coefficient estimates"' in sent and '"term": "areaB"' in sent
+    assert '"reference_levels"' in sent and '"sample_suitability"' in sent        # design and assessment summaries
     assert "repair_instructions must not be empty" in sent
     assert not any(n in sent for n in r_numbers + py_numbers) and "secret-" not in sent
 
@@ -80,7 +82,8 @@ def test_a_failed_candidate_is_diagnosed_and_the_repair_passes(cp, llm):
     [d] = cp.get(f"/api/projects/{pid}/evidence", params={"kind": "diagnosis"}).json()
     assert d["id"] == s["diagnosis_id"]
     db = body(cp, pid, d["id"])
-    assert "coefficient max rel diff" in db["failed_checks"] and db["candidate_hash"] != s["candidate_hash"]
+    assert "coefficient estimates" in db["failed_checks"] and db["category"] == "migration_defect"
+    assert db["candidate_hash"] != s["candidate_hash"]
     cands = cp.get(f"/api/projects/{pid}/evidence", params={"kind": "candidate"}).json()
     c = body(cp, pid, cands[-1]["id"])
     assert (c["attempt"], c["diagnosis_id"], c["changes"]) == (1, d["id"], "Removed the offset scaling.")
@@ -112,7 +115,7 @@ def test_a_rejected_candidate_is_diagnosed_with_the_ds_comment(cp, llm):
 def test_a_runtime_error_reaches_the_diagnostician_without_data_and_a_spec_change_goes_back_to_the_analyst(cp, llm):
     pid = start(cp, llm, [
         submit(LEAKY), text("Done."),
-        diagnosis(spec_change_needed=True, proposed_spec_change="Loosen coef_rel to 1e-5.", repair_instructions=[]),
+        diagnosis(spec_change_needed=True, proposed_spec_change="Loosen the coefficient rtol to 1e-5.", repair_instructions=[]),
         text("This needs a spec change.")])
     s = state(cp, pid)
     assert (s["step"], s["status"], s["reason"]) == (5, "awaiting_ds", "spec_change"), s
@@ -120,15 +123,16 @@ def test_a_runtime_error_reaches_the_diagnostician_without_data_and_a_spec_chang
     assert "could not convert string to float: <redacted>" in sent and '"function": "prepare"' in sent
     assert "secret-" not in sent
     note = cp.get(f"/api/projects/{pid}/chat").json()[-1]
-    assert note["author"] == "platform" and "Proposed change: Loosen coef_rel to 1e-5." in note["text"]
+    assert note["author"] == "platform" and "Proposed change: Loosen the coefficient rtol to 1e-5." in note["text"]
+    assert "the spec needs to change before the migration can match R" in note["text"]
 
-    v2 = poisson_spec(tolerances={"coef_rel": 1e-5}).model_dump(mode="json")
-    llm.script = [tool("submit_model_spec", v2), text("Loosened coef_rel.")]
+    v2 = poisson_spec(tolerances={"coefficients": {"atol": 1e-8, "rtol": 1e-5}}).model_dump(mode="json")
+    llm.script = [tool("submit_model_spec", v2), text("Loosened the coefficient rtol.")]
     assert cp.post(f"/api/projects/{pid}/chat", json={"text": "Take the proposal."}).status_code == 202
     s = settle(cp, pid)
     assert (s["step"], s["reason"], s["drafted_version"]) == (2, "spec_drafted", 2)
     analyst = llm.sent(turns(llm, "Analyst")[-2:-1])
-    assert "Proposed change: Loosen coef_rel to 1e-5." in analyst and "Take the proposal." in analyst
+    assert "Proposed change: Loosen the coefficient rtol to 1e-5." in analyst and "Take the proposal." in analyst
 
     baseline_id = s["baseline_id"]
     llm.script = [submit(POISSON_PY), text("Done.")]

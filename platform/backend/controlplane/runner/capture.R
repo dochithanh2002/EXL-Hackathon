@@ -1,7 +1,11 @@
 # R baseline capture harness, evolved from legacy/agent/tools/r_capture.R.
 # Sources baseline.R unmodified in a fresh environment, then exports everything the validator compares against.
 # Usage: Rscript --vanilla capture.R <config.json>
-#   config: script, dataset, response, objects {model, train, test (or null)}, seed (or null), out
+#   config: script, dataset, objects {model, train, test (or null)}, seed (or null), out, and the spec's semantics
+#   (ModelSpec.capture_config): response, response_type, event_coding, grouped, weights, prediction {kind, keys,
+#   r_predict}, period_column
+# lm and glm fits are read through summary(); any other class through coef(), vcov(), logLik() and the spec's
+# r_predict expression, so the extraction follows the spec rather than a list of supported classes.
 # Everything written to `out` is deterministic except timing.json, so a rerun reproduces the same baseline id.
 # Row identity: base R's readers (read.csv, read.table, ...) are masked so that the data frame read from the dataset
 # file gets row names TAG + its 1-based data row. Subsetting, reordering and merge() (masked too) carry row names
@@ -63,7 +67,10 @@ assign("merge", keep_rows, envir = env)
 if (!is.null(cfg$seed)) set.seed(cfg$seed)
 t0 <- Sys.time()
 stage <- "baseline.R"
-sys.source(cfg$script, envir = env, keep.source = FALSE)
+fit_warnings <- character()
+withCallingHandlers(sys.source(cfg$script, envir = env, keep.source = FALSE), warning = function(w) {
+  fit_warnings <<- c(fit_warnings, conditionMessage(w))
+})
 stage <- "the capture harness"
 runtime <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
 
@@ -76,7 +83,6 @@ m <- get_obj("model")
 sets <- list(train = get_obj("train"))
 if (!is.null(cfg$objects$test)) sets$test <- get_obj("test")
 for (s in names(sets)) if (!is.data.frame(sets[[s]])) stop(sprintf("the %s object is not a data frame", s))
-if (!inherits(m, c("glm", "lm"))) stop(sprintf("capture is not implemented for model class '%s'", class(m)[1]))
 
 # ---- row identity
 if (is.na(n_raw)) stop("baseline.R did not read ", cfg$dataset, " with read.csv or read.table, so row identity ",
@@ -94,62 +100,179 @@ rows <- lapply(names(sets), function(s) {
 })
 names(rows) <- names(sets)
 
-y_levels <- if (is.factor(m$model[[1]])) levels(m$model[[1]]) else NULL
-numeric_response <- function(y) {                     # the 0/1 or numeric scale the model fits
-  if (is.logical(y)) return(as.numeric(y))
-  if (is.factor(y) || is.character(y)) {
-    if (is.null(y_levels)) stop(sprintf("the response '%s' is not numeric but the model response is not a factor", cfg$response))
-    return(ifelse(is.na(y), NA_real_, as.numeric(as.character(y) != y_levels[1])))
+is_glm <- inherits(m, "glm")
+is_lm <- inherits(m, "lm")
+family <- if (is_glm) m$family$family else if (is_lm) "gaussian" else NULL
+pred_cfg <- cfg$prediction
+keys <- as.character(unlist(pred_cfg$keys))
+in_frame <- function(expr, df) eval(parse(text = expr), df, env)
+optional <- function(expr) tryCatch(expr, error = function(e) NULL)
+field <- function(name) if (is.list(m)) m[[name]] else NULL      # S4 fits (lme4) have no `$`
+
+# ---- response semantics: the observed value each prediction is compared with
+coding <- cfg$event_coding
+if (!is.null(coding) && cfg$response_type == "binary" && cfg$response %in% names(sets$train)) {
+  y0 <- sets$train[[cfg$response]]
+  if (is_glm && family %in% c("binomial", "quasibinomial")) {
+    if (is.factor(y0) && coding == levels(y0)[1])
+      stop(sprintf("the spec codes the event as '%s', but glm models the probability of the levels after the first ",
+                   coding), sprintf("('%s'); the event coding must name the outcome R predicts", levels(y0)[1]))
+    if ((is.numeric(y0) || is.logical(y0)) && coding != "1")
+      stop("glm models the probability that a 0/1 or logical response is 1, so the event coding must be '1'")
   }
+}
+event_of <- function(y) {
+  if (is.logical(y)) y <- as.integer(y)
+  ifelse(is.na(y), NA_real_, as.numeric(as.character(y) == coding))
+}
+observed <- function(df) {
+  n <- nrow(df)
+  if (cfg$response_type == "grouped_binomial") {
+    g <- cfg$grouped
+    trials <- as.numeric(in_frame(g$trials, df))
+    if (g$form == "successes_and_trials") return(as.numeric(in_frame(g$successes, df)) / trials)
+    return(as.numeric(df[[cfg$response]]))
+  }
+  if (!cfg$response %in% names(df)) return(rep(NA, n))
+  y <- df[[cfg$response]]
+  if (pred_cfg$kind == "class_probability") return(as.character(y))
+  if (cfg$response_type == "binary") return(event_of(y))
   as.numeric(y)
 }
-response_of <- function(df) if (cfg$response %in% names(df)) numeric_response(df[[cfg$response]]) else rep(NA_real_, nrow(df))
+weight_of <- function(df) {                           # the model's prior weight of each row (trials when grouped)
+  if (cfg$response_type == "grouped_binomial") return(as.numeric(in_frame(cfg$grouped$trials, df)))
+  if (!is.null(cfg$weights)) return(as.numeric(in_frame(cfg$weights, df)))
+  rep(1, nrow(df))
+}
 
-# ---- coefficients, design matrix, predictions
-cf <- coef(m)
-sm <- summary(m)$coefficients
-term_stat <- function(j) { v <- rep(NA_real_, length(cf)); v[match(rownames(sm), names(cf))] <- sm[, j]; v }
-write_full(data.frame(term = names(cf), estimate = unname(cf), std_error = term_stat(2), statistic = term_stat(3),
-                      p_value = term_stat(4)), "coefficients.csv")
+# ---- coefficients
+coefficient_table <- function() {
+  if (is_lm) {                                        # glm and lm: summary() keeps aliased terms as NA
+    cf <- coef(m)
+    sm <- summary(m)$coefficients
+    stat <- function(j) { v <- rep(NA_real_, length(cf)); v[match(rownames(sm), names(cf))] <- sm[, j]; v }
+    return(data.frame(term = names(cf), estimate = unname(cf), std_error = stat(2), statistic = stat(3),
+                      p_value = stat(4)))
+  }
+  cf <- optional(coef(m))
+  if (is.null(cf) || !is.numeric(cf)) return(data.frame(term = character(), estimate = numeric(),
+                                                        std_error = numeric(), statistic = numeric(),
+                                                        p_value = numeric()))
+  if (is.matrix(cf)) cf <- setNames(as.vector(t(cf)), paste(rep(rownames(cf), each = ncol(cf)),
+                                                            rep(colnames(cf), times = nrow(cf)), sep = ":"))
+  if (is.numeric(field("zeta"))) cf <- c(cf, field("zeta"))          # MASS::polr cut points
+  v <- optional(suppressWarnings(sqrt(diag(vcov(m)))))
+  se <- rep(NA_real_, length(cf))
+  if (!is.null(v) && !is.null(names(v)) && all(names(cf) %in% names(v))) se <- unname(v[names(cf)])
+  else if (!is.null(v) && length(v) == length(cf)) se <- unname(v)
+  data.frame(term = names(cf), estimate = unname(cf), std_error = se, statistic = NA_real_, p_value = NA_real_)
+}
+coefs <- coefficient_table()
+write_full(coefs, "coefficients.csv")
 
-fit_rows <- setdiff(rows$train, source_rows(names(m$na.action)))
-write_full(do.call(rbind, lapply(names(sets), function(s) data.frame(
-  row = rows[[s]], set = s, in_fit = if (s == "train") rows[[s]] %in% fit_rows else NA))), "split.csv")
+fit_rows <- setdiff(rows$train, source_rows(names(field("na.action"))))
+split <- do.call(rbind, lapply(names(sets), function(s) data.frame(
+  row = rows[[s]], set = s, in_fit = if (s == "train") rows[[s]] %in% fit_rows else NA)))
+if (!is.null(cfg$period_column)) {
+  split$period <- unlist(lapply(names(sets), function(s) {
+    if (!cfg$period_column %in% names(sets[[s]])) stop(sprintf("the %s set has no period column '%s'", s,
+                                                               cfg$period_column))
+    as.character(sets[[s]][[cfg$period_column]])
+  }))
+}
+write_full(split, "split.csv")
 
+# ---- predictions: one row per set, data row and key (class or quantile level; empty for one value per row)
 predictions <- do.call(rbind, lapply(names(sets), function(s) {
   df <- sets[[s]]
-  response <- unname(predict(m, newdata = df, type = "response", na.action = na.pass))
-  link <- if (inherits(m, "glm")) unname(predict(m, newdata = df, type = "link", na.action = na.pass)) else response
-  data.frame(row = rows[[s]], set = s, y = response_of(df), link = link, response = response)
+  p <- eval(parse(text = pred_cfg$r_predict), list(model = m, newdata = df), env)
+  if (pred_cfg$kind %in% c("scalar", "time_indexed")) {
+    p <- as.numeric(p)
+    if (length(p) != nrow(df)) stop(sprintf("r_predict returned %d values for the %d rows of the %s set", length(p),
+                                            nrow(df), s))
+    p <- matrix(p, ncol = 1)
+    k <- ""
+  } else {
+    if (is.null(dim(p)) && pred_cfg$kind == "class_probability" && length(keys) == 2) p <- cbind(1 - p, p)
+    p <- as.matrix(p)
+    if (nrow(p) != nrow(df) || ncol(p) != length(keys))
+      stop(sprintf("r_predict returned a %d x %d result for the %d rows of the %s set and the %d keys", nrow(p),
+                   ncol(p), nrow(df), s, length(keys)))
+    if (pred_cfg$kind == "class_probability" && setequal(colnames(p), keys)) p <- p[, keys, drop = FALSE]
+    k <- keys
+  }
+  y <- observed(df)
+  w <- weight_of(df)
+  do.call(rbind, lapply(seq_along(k), function(j) data.frame(
+    row = rows[[s]], set = s, key = k[j],
+    y = if (pred_cfg$kind == "class_probability") ifelse(is.na(y), NA_real_, as.numeric(y == k[j])) else y,
+    weight = w, prediction = unname(as.numeric(p[, j])))))
 }))
 write_full(predictions, "predictions.csv")
 
 # ---- fit statistics
-is_glm <- inherits(m, "glm")
-s <- summary(m)
-fit <- list(nobs = nobs(m), df_residual = df.residual(m), log_lik = as.numeric(logLik(m)), aic = AIC(m), bic = BIC(m))
+stat_of <- function(expr) { v <- optional(as.numeric(expr)); if (length(v) == 1) v else NULL }
+fit <- list(nobs = stat_of(nobs(m)), df_residual = stat_of(df.residual(m)), log_lik = stat_of(logLik(m)),
+            aic = stat_of(AIC(m)), bic = stat_of(BIC(m)))
 if (is_glm) {
+  s <- summary(m)
   fit <- c(fit, list(deviance = m$deviance, null_deviance = m$null.deviance, df_null = m$df.null,
                      dispersion = s$dispersion, pearson_chi2 = sum(residuals(m, type = "pearson")^2)))
-} else {
+} else if (is_lm) {
+  s <- summary(m)
   fit <- c(fit, list(sigma = s$sigma, r_squared = s$r.squared, adj_r_squared = s$adj.r.squared,
                      rss = sum(residuals(m)^2)))
+} else {
+  fit$deviance <- stat_of(deviance(m))
 }
 write_meta(fit, "fit.json")
 
+# ---- design summary for the Diagnostician: aggregates of what the fit consumed, never a row
+summary_of <- function(x) {
+  if (is.null(x) || !length(x)) return(NULL)
+  x <- as.numeric(x)
+  list(n = length(x), sum = sum(x), mean = mean(x), min = min(x), max = max(x), n_zero = sum(x == 0))
+}
+X <- optional(model.matrix(m))
+mf <- optional(model.frame(m))
+prior <- if (is_glm) m$prior.weights else optional(weights(m))
+write_meta(list(
+  n_fit = length(fit_rows), n_train = length(rows$train),
+  columns = if (is.null(X)) NULL else lapply(seq_len(ncol(X)), function(j) {
+    x <- X[, j]
+    list(name = colnames(X)[j], mean = mean(x), sd = if (length(x) > 1) sd(x) else NA, min = min(x), max = max(x))
+  }),
+  reference_levels = lapply(field("xlevels"), function(l) l[1]), contrasts = field("contrasts"),
+  weights = summary_of(prior), offset = summary_of(if (is.null(mf)) NULL else model.offset(mf))
+), "design.json")
+
 # ---- metadata
+converged <- if (is_glm) isTRUE(m$converged) else if (is_lm) TRUE else {
+  v <- if (!is.null(field("converged"))) field("converged") else if (is.numeric(field("convergence")))
+    field("convergence") == 0 else NA
+  if (length(v) == 1 && !is.na(v)) as.logical(v) else NULL
+}
+if (!is.null(cfg$convergence) && cfg$convergence$mode == "expression") {
+  converged <- eval(parse(text = cfg$convergence$r_check), list(model = m, fit_warnings = fit_warnings), env)
+  if (!is.logical(converged) || length(converged) != 1 || is.na(converged))
+    stop("convergence.r_check must return one non-missing logical value")
+}
+if (!is.null(cfg$convergence) && cfg$convergence$mode == "not_applicable") converged <- NULL
 packages <- sort(setdiff(loadedNamespaces(), c("base", "stats", "utils", "methods", "graphics", "grDevices", "datasets")))
+y_levels <- if (cfg$response %in% names(sets$train) && is.factor(sets$train[[cfg$response]]))
+  levels(sets$train[[cfg$response]]) else NULL
 write_meta(list(
   r_version = R.version.string, seed = cfg$seed,
   packages = setNames(lapply(packages, function(p) as.character(packageVersion(p))), packages),
-  class = I(class(m)), formula = paste(deparse(formula(m)), collapse = " "),
-  family = if (is_glm) m$family$family else "gaussian", link = if (is_glm) m$family$link else "identity",
-  response = cfg$response, response_levels = y_levels,
-  design_columns = colnames(model.matrix(m)), aliased = names(cf)[is.na(cf)],
-  xlevels = m$xlevels, contrasts = m$contrasts,
-  offset = !is.null(model.offset(model.frame(m))), weights = !is.null(weights(m)) && any(weights(m) != 1),
+  class = I(class(m)), formula = optional(paste(deparse(formula(m)), collapse = " ")),
+  family = family, link = if (is_glm) m$family$link else if (is_lm) "identity" else NULL,
+  response = cfg$response, response_type = cfg$response_type, event_coding = coding, response_levels = y_levels,
+  prediction = list(kind = pred_cfg$kind, keys = I(keys)),
+  design_columns = if (is.null(X)) coefs$term else colnames(X), aliased = coefs$term[is.na(coefs$estimate)],
+  xlevels = field("xlevels"), contrasts = field("contrasts"),
+  offset = !is.null(mf) && !is.null(model.offset(mf)), weights = !is.null(prior) && any(prior != 1),
   n = lapply(rows, length), n_fit = length(fit_rows), row_identity_check = "passed",
-  converged = if (is_glm) isTRUE(m$converged) else TRUE, iterations = if (is_glm) m$iter else NULL,
+  converged = converged, closed_form = is_lm && !is_glm, iterations = if (is_glm) m$iter else NULL,
   control = if (is_glm) list(epsilon = m$control$epsilon, maxit = m$control$maxit) else NULL,
   column_classes = lapply(sets$train, function(x) class(x)[1])
 ), "meta.json")

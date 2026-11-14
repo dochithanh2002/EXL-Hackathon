@@ -36,6 +36,7 @@ def poisson_spec(**overrides) -> ModelSpec:
         "family": "poisson", "link": "log", "formula": "claims ~ area + age + offset(log(exposure))",
         "response": "claims", "offset": "log(exposure)", "baseline_r": POISSON_R,
         "split": {"method": "sample", "r_code": "idx <- sample(nrow(df), 140)", "seed": 42},
+        "metrics": ["rmse", "deviance", "actual_expected"],
         "baseline_objects": {"model": "fit", "train": "train", "test": "test"}} | overrides)
 
 
@@ -196,17 +197,20 @@ def test_dataset_read_without_the_tagged_readers_fails(jobs):
 def test_lm_is_captured(jobs):
     lm_r = POISSON_R.replace("fit <- glm(claims ~ area + age + offset(log(exposure)), family = poisson, data = train)",
                              "fit <- lm(claims ~ area + age, data = train)")
-    spec = poisson_spec(r_function="stats::lm", statsmodels_counterpart="statsmodels.api.OLS", family=None,
-                        link=None, offset=None, formula="claims ~ area + age", baseline_r=lm_r)
+    spec = poisson_spec(r_function="stats::lm", python_implementation="statsmodels.api.OLS", family=None,
+                        link=None, offset=None, formula="claims ~ area + age", baseline_r=lm_r,
+                        response_type="continuous", prediction={"kind": "scalar", "quantity": "continuous",
+                                                                "units": "claims", "alignment_keys": ["row"]})
     pid = project_at_baseline(jobs.store, jobs.settings, spec, {"claims.csv": CLAIMS.encode(), "m.R": b""})
     jobs.baseline(pid)
     s = jobs.store.state(pid)
     assert s.step == Step.TRANSLATION, s.detail
     ev = jobs.store.evidence(pid, s.baseline_id)["body"]
     assert ev["meta"]["class"] == ["lm"] and ev["meta"]["link"] == "identity" and not ev["meta"]["offset"]
+    assert ev["meta"]["closed_form"] and ev["meta"]["converged"]
     assert {"r_squared", "sigma", "rss"} <= set(ev["fit"])
     preds = read_csv(jobs.settings.data_dir / ev["dir"] / "predictions.csv")
-    assert len(preds) == 200 and all(p["link"] == p["response"] for p in preds)
+    assert len(preds) == 200 and {p["key"] for p in preds} == {""} and {p["weight"] for p in preds} == {"1"}
 
 
 def test_modified_upload_is_refused(jobs):
@@ -263,3 +267,95 @@ def test_m4_baseline_matches_the_unmodified_notebook(jobs, tmp_path):
     want = {row["t"]: row["v"] for row in read_csv(nb / "code" / "coef.csv")}
     got = {row["term"]: row["estimate"] for row in read_csv(out / "coefficients.csv")}
     assert got == want                                  # identical to the last bit
+
+
+GROUPS = "\n".join(["id,x,defaults,loans,region,band"] + [
+    f"{i},{(i * 37) % 100 / 10},{(i * 3) % 7},{7 + i % 5},{'NS'[i % 2]},{'ABC'[(i * 7 + i // 3) % 3]}"
+    for i in range(1, 121)])
+
+
+def capture(jobs, spec, csv_text: str, name: str = "groups.csv") -> tuple[dict, Path]:
+    pid = project_at_baseline(jobs.store, jobs.settings, spec, {name: csv_text.encode(), "m.R": b""})
+    jobs.baseline(pid)
+    s = jobs.store.state(pid)
+    assert s.step == Step.TRANSLATION, s.detail
+    ev = jobs.store.evidence(pid, s.baseline_id)["body"]
+    return ev, jobs.settings.data_dir / ev["dir"]
+
+
+def test_class_probabilities_are_captured_for_a_model_outside_lm_and_glm(jobs):
+    r = ('df <- read.csv("inputs/groups.csv")\ndf$band <- factor(df$band)\ntrain <- df[df$id <= 90, ]\n'
+         'test <- df[df$id > 90, ]\nfit <- nnet::multinom(band ~ x + region, data = train, trace = FALSE)\n')
+    spec = make_spec(r_function="nnet::multinom", python_implementation="statsmodels.api.MNLogit", family=None,
+                     link=None, formula="band ~ x + region", response="band", response_type="categorical",
+                     metrics=["log_loss"], r_packages=["nnet"], baseline_r=r, split={"method": "id", "r_code": "",
+                                                                                      "seed": None},
+                     prediction={"kind": "class_probability", "quantity": "probability", "units": "band probability",
+                                 "keys": ["A", "B", "C"], "alignment_keys": ["row", "class"],
+                                 "r_predict": 'predict(model, newdata = newdata, type = "probs")'})
+    ev, out = capture(jobs, spec, GROUPS)
+    coefs = read_csv(out / "coefficients.csv")
+    assert [c["term"] for c in coefs][:3] == ["B:(Intercept)", "B:x", "B:regionS"]
+    assert all(float(c["std_error"]) > 0 for c in coefs)                           # from vcov(), matched by name
+    preds = read_csv(out / "predictions.csv")
+    assert len(preds) == 120 * 3 and {p["key"] for p in preds} == {"A", "B", "C"}
+    by_row = {}
+    for p in preds:
+        by_row.setdefault((p["set"], p["row"]), []).append(p)
+    assert all(sum(float(p["y"]) for p in v) == 1 for v in by_row.values())         # one observed class per row
+    assert all(abs(sum(float(p["prediction"]) for p in v) - 1) < 1e-9 for v in by_row.values())
+    meta = ev["meta"]
+    assert meta["class"] == ["multinom", "nnet"] and meta["converged"] is True and not meta["closed_form"]
+    design = json.loads((out / "design.json").read_text())
+    assert [c["name"] for c in design["columns"]] == ["(Intercept)", "x", "regionS"]
+    assert design["reference_levels"] == {"region": "N"}
+
+
+def test_grouped_binomial_trials_become_observed_proportions_and_weights(jobs):
+    r = ('df <- read.csv("inputs/groups.csv")\ntrain <- df\n'
+         'fit <- glm(cbind(defaults, loans - defaults) ~ x, family = binomial, data = train)\n')
+    spec = make_spec(formula="cbind(defaults, loans - defaults) ~ x", response="defaults",
+                     response_type="grouped_binomial", metrics=["auc", "log_loss"], baseline_r=r,
+                     grouped_binomial={"form": "successes_and_trials", "successes": "defaults", "trials": "loans"},
+                     baseline_objects={"model": "fit", "train": "train", "test": None})
+    ev, out = capture(jobs, spec, GROUPS)
+    raw = [line.split(",") for line in GROUPS.splitlines()[1:]]
+    preds = read_csv(out / "predictions.csv")
+    assert all(float(p["y"]) == int(raw[int(p["row"]) - 1][2]) / int(raw[int(p["row"]) - 1][3]) for p in preds)
+    assert all(float(p["weight"]) == int(raw[int(p["row"]) - 1][3]) for p in preds)
+    design = json.loads((out / "design.json").read_text())
+    assert design["weights"]["sum"] == sum(int(x[3]) for x in raw)
+
+
+def test_the_event_coding_must_be_the_outcome_r_predicts(jobs):
+    r = ('df <- read.csv("inputs/groups.csv")\ndf$late <- factor(ifelse(df$defaults > 2, "Yes", "No"))\n'
+         'train <- df\nfit <- glm(late ~ x, family = binomial, data = train)\n')
+    spec = make_spec(formula="late ~ x", response="late", baseline_r=r, metrics=["auc"],
+                     event={"meaning": "late payment", "complement": "on time", "coding": "No"},
+                     baseline_objects={"model": "fit", "train": "train", "test": None})
+    pid = project_at_baseline(jobs.store, jobs.settings, spec, {"groups.csv": GROUPS.encode(), "m.R": b""})
+    jobs.baseline(pid)
+    [note] = jobs.store.chat(pid)
+    assert "the event coding must name the outcome R predicts" in note["text"]
+
+    ev, out = capture(jobs, spec.model_copy(update={"event": spec.event.model_copy(update={"coding": "Yes"})}), GROUPS)
+    raw = [line.split(",") for line in GROUPS.splitlines()[1:]]
+    preds = read_csv(out / "predictions.csv")
+    assert all(float(p["y"]) == (int(raw[int(p["row"]) - 1][2]) > 2) for p in preds)       # 1 is the event "Yes"
+
+
+def test_quantile_predictions_are_keyed_by_level(jobs):
+    r = ('df <- read.csv("inputs/groups.csv")\ntrain <- df\n'
+         'fit <- quantreg::rq(loans ~ x, tau = c(0.5, 0.9), data = train)\n')
+    spec = make_spec(r_function="quantreg::rq", python_implementation="statsmodels.api.QuantReg", family=None,
+                     link=None, formula="loans ~ x", response="loans", response_type="count", event=None,
+                     metrics=["pinball_loss"], baseline_r=r, r_packages=["quantreg"],
+                     baseline_objects={"model": "fit", "train": "train", "test": None},
+                     prediction={"kind": "quantile", "quantity": "count", "units": "loans", "keys": ["0.5", "0.9"],
+                                 "alignment_keys": ["row", "quantile"], "r_predict": "predict(model, newdata = newdata)"})
+    ev, out = capture(jobs, spec, GROUPS)
+    preds = read_csv(out / "predictions.csv")
+    assert len(preds) == 240 and {p["key"] for p in preds} == {"0.5", "0.9"}
+    assert all(float(a["prediction"]) <= float(b["prediction"]) + 1e-9
+               for a, b in zip([p for p in preds if p["key"] == "0.5"], [p for p in preds if p["key"] == "0.9"]))
+    assert len(read_csv(out / "coefficients.csv")) == 4

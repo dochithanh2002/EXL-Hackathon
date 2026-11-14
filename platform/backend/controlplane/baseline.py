@@ -14,7 +14,8 @@ from .schemas import ModelSpec, canonical_hash, sha256_file
 from .workflow.machine import InputFile
 
 CAPTURE_R = Path(__file__).parent / "runner" / "capture.R"
-CAPTURED = ("coefficients.csv", "split.csv", "predictions.csv", "fit.json", "meta.json", "sessionInfo.txt")
+CAPTURED = ("coefficients.csv", "split.csv", "predictions.csv", "fit.json", "design.json", "meta.json",
+            "sessionInfo.txt")
 
 
 class BaselineFailed(Exception):
@@ -65,8 +66,8 @@ def run_baseline(workdir: Path, spec: ModelSpec, files: tuple[InputFile, ...], i
     shutil.copy(CAPTURE_R, workdir / "capture.R")
     dataset = next(f.name for f in files if f.role == "dataset")
     (workdir / "config.json").write_text(json.dumps({
-        "script": "baseline.R", "dataset": f"inputs/{dataset}", "response": spec.response,
-        "objects": spec.baseline_objects.model_dump(), "seed": spec.split.seed, "out": "capture"}))
+        "script": "baseline.R", "dataset": f"inputs/{dataset}", "objects": spec.baseline_objects.model_dump(),
+        "seed": spec.split.seed, "out": "capture", **spec.capture_config()}))
 
     proc = Process([str(envs.r()), "--vanilla", "capture.R", "config.json"], workdir, envs.r_env(), limits)
     on_start(proc)

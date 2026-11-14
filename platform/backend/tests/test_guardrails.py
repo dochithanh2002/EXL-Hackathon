@@ -15,7 +15,8 @@ def test_known_good_candidates_pass():
 @pytest.mark.parametrize("code, message", [
     ("import os", "module 'os' is not available"),
     ("import socket", "module 'socket' is not available"),
-    ("import sklearn.linear_model", "module 'sklearn' is not available"),
+    ("import sklearn.linear_model", "scikit-learn is excluded"),
+    ("from sklearn.linear_model import LogisticRegression", "scikit-learn is excluded"),
     ("from numpy import random", "randomness"),
     ("import numpy.random as r", "randomness"),
     ("x = np.random.normal()", "randomness"),

@@ -8,8 +8,11 @@ export type Reason =
 export type Tier = "exact" | "approximate" | "unsupported";
 
 export const STEPS: Record<Step, string> = {
-  1: "Intake", 2: "Alignment", 3: "R baseline", 4: "Translation", 5: "Repair", 6: "Report", 7: "Deliverables",
+  1: "Data & Code", 2: "Model Specification", 3: "R Reference Results", 4: "Python Migration & Comparison",
+  5: "Discrepancy Analysis", 6: "Migration Validation Report", 7: "Code & Reproducibility Package",
 };
+/** Step 5 runs only when parity checks fail or the DS rejects the migration, then returns to step 4. */
+export const CONDITIONAL_STEP: Step = 5;
 export const RETRYABLE: Reason[] = ["step_failed", "interrupted", "cancelled"];
 export const ROLES = ["analyst", "translator", "diagnostician", "reporter"] as const;
 export type Role = (typeof ROLES)[number];
@@ -37,36 +40,62 @@ export interface Project { id: string; name: string; state: ProjectState; runnin
 
 export interface ChatMessage { seq: number; at: string; author: "ds" | "analyst" | "platform"; text: string; job_id: string | null; spec_version: number | null }
 
+export interface Tolerance { atol: number; rtol: number }
 export interface ModelSpec {
-  target_model: string; r_function: string; statsmodels_counterpart: string; support_tier: Tier;
-  family: string | null; link: string | null; formula: string; response: string; offset: string | null;
-  weights: string | null;
+  target_model: string; r_function: string; python_implementation: string; support_tier: Tier; limitation: string | null;
+  family: string | null; link: string | null; formula: string; response: string;
+  response_type: string;
+  event: { meaning: string; complement: string; coding: string } | null;
+  grouped_binomial: { form: string; successes: string | null; trials: string } | null;
+  offset: string | null;
+  weights: { expression: string; type: string; normalization: string } | null;
+  prediction: { kind: string; quantity: string; units: string; exposure: string | null; keys: string[]; alignment_keys: string[]; r_predict: string };
   preprocessing: { order: number; description: string; r_code: string; columns: string[] }[];
   split: { method: string; r_code: string; seed: number | null };
-  kpis: string[]; tolerances: Record<string, number>; unsupported_items: string[];
+  assessment: {
+    business_use: string; intended_population: string; sample_population: string;
+    evaluation_sets: { set: string; role: string; description: string }[]; period_column: string | null;
+    decision: { threshold: number; action: string } | null; criteria: Record<string, number | null>;
+    missing_information: string[];
+  };
+  metrics: string[];
+  optional_metrics: Record<string, string[]>;
+  convergence: { mode: string; r_check: string | null; rationale: string | null };
+  tolerances: { coefficients: Tolerance; std_errors: Tolerance; predictions: Tolerance; fit_statistics: Tolerance; metrics: Tolerance; per_metric: Record<string, Tolerance> };
+  unsupported_items: string[];
   substitutions: { original: string; proposed: string; rationale: string }[];
   r_packages: string[]; baseline_r: string; baseline_objects: { model: string; train: string; test: string | null };
 }
-export interface SpecVersion { version: number; spec: ModelSpec; support: { tier: Tier; proven: boolean }; baseline_key: string }
+export interface SpecVersion { version: number; spec: ModelSpec; support: { tier: Tier; proven: boolean; known: boolean }; baseline_key: string }
 export interface SpecRow { version: number; hash: string; created_at: string }
 
 export interface Evidence<T = Record<string, any>> { id: string; kind: string; hash: string; created_at: string; body: T }
 export interface EvidenceRow { id: string; kind: string; hash: string; created_at: string }
 
-export interface Check { name: string; value: number | null; tolerance: number; passed: boolean }
+export interface Check {
+  name: string; quantity: string; kind: "tolerance" | "count" | "flag" | "minimum"; value: number | null; tolerance: number;
+  status: "passed" | "failed" | "unavailable"; passed: boolean; required: boolean; reason: string;
+  atol: number | null; rtol: number | null; max_abs_diff: number | null; compared: number | null;
+  missing_both: number | null; missing_one_side: number | null; nonfinite_mismatch: number | null; total: number | null;
+}
+export type AssessmentStatus = "assessed" | "partially assessed" | "not assessed";
+export interface AssessmentAnswer { status: AssessmentStatus; needs: string[]; criterion: string | null; meets: boolean | null; results: Record<string, any> }
 export interface ValidationBody {
   passed: boolean; stage: "runtime" | "parity"; error: Record<string, any> | null; checks: Check[];
-  kpis: Record<string, Record<string, { r: number | null; python: number | null }>>;
+  metrics: Record<string, Record<string, { r: number | null; python: number | null }>>;
   differences: Record<string, any>; notes: string[]; candidate_id: string; candidate_hash: string; job_id: string;
+  assessment: { r?: Record<string, AssessmentAnswer>; python?: Record<string, AssessmentAnswer> };
+  design: Record<string, any>;
   spec_version: number; baseline_id: string; mlflow_run_id: string;
 }
 export interface CandidateBody {
-  attempt: number; diagnosis_id: string | null; hash: string; module: string; notes: string[]; changes: string;
+  attempt: number; diagnosis_id: string | null; hash: string; module: string; notes: string[]; limitations?: string[]; changes: string;
   reply: string; model: string; mlflow_run_id: string; spec_version: number; baseline_id: string; job_id: string;
 }
 export interface DiagnosisBody {
+  category?: "migration_defect" | "specification" | "not_reproducible" | "model_fitness";
   root_cause: string; evidence: string[]; repair_instructions: string[]; spec_change_needed: boolean;
-  proposed_spec_change: string | null; ds_comment: string | null; failed_checks: string[]; reply: string;
+  assessment_findings?: string[]; limitation?: string | null; proposed_spec_change: string | null; ds_comment: string | null; failed_checks: string[]; reply: string;
   candidate_id: string; validation_id: string; spec_version: number; baseline_id: string; mlflow_run_id: string;
 }
 export interface BaselineBody {
@@ -75,7 +104,7 @@ export interface BaselineBody {
 }
 export interface CoefficientRow {
   term: string; r_estimate?: number | null; r_std_error?: number | null; python_estimate?: number | null;
-  python_std_error?: number | null; estimate_rel?: number | null; std_error_rel?: number | null;
+  python_std_error?: number | null; estimate_ratio?: number | null; std_error_ratio?: number | null;
 }
 export interface Bundle {
   dir: string; archive: string; archive_sha256: string; report_id: string; job_id: string; mlflow_run_id: string;

@@ -9,6 +9,11 @@ import { p, post } from "@/lib/api";
 import { useAttempts } from "@/lib/attempts";
 import type { StepProps } from "@/pages/Project";
 
+const CATEGORY = {
+  migration_defect: "migration defect", specification: "specification mismatch",
+  not_reproducible: "not reproducible in Python", model_fitness: "model fitness concern",
+};
+
 export function Repair({ project, rev }: StepProps) {
   const s = project.state;
   const { attempts } = useAttempts(project, rev);
@@ -17,11 +22,11 @@ export function Repair({ project, rev }: StepProps) {
   return (
     <>
       {s.step === 5 && s.status === "awaiting_ds" && <Resume project={project} rev={rev} />}
-      <Panel title={`Attempts · ${s.repairs} of ${s.retry_limit} repairs used`}>
+      <Panel title={`Discrepancy analysis · ${s.repairs} of ${s.retry_limit} repair attempts used`}>
         {attempts.length ? (
           <Table>
             <THead>
-              <TR><TH>Attempt</TH><TH>Validation</TH><TH>Failed checks</TH><TH>DS</TH><TH>Root cause</TH></TR>
+              <TR><TH>Attempt</TH><TH>Parity</TH><TH>Failed checks</TH><TH>DS</TH><TH>Root cause</TH></TR>
             </THead>
             <TBody>
               {attempts.map((a) => {
@@ -32,21 +37,23 @@ export function Repair({ project, rev }: StepProps) {
                     <TD>{a.candidate.body.attempt}</TD>
                     <TD>{v ? <Badge variant={v.body.passed ? "pass" : "fail"}>{v.body.passed ? "passed" : "failed"}</Badge> : <Badge variant="secondary">did not run</Badge>}</TD>
                     <TD className="max-w-64 text-xs">{a.diagnosis?.body.failed_checks.join("; ")}</TD>
-                    <TD className="max-w-48 text-xs">{d ? <><Badge variant={d.decision === "approved" ? "pass" : "warn"}>{d.decision}</Badge> {d.comment}</> : null}</TD>
+                    <TD className="max-w-48 text-xs">{d ? <><Badge variant={d.decision === "approved" ? "pass" : "warn"}>{d.decision === "approved" ? "accepted" : d.decision}</Badge> {d.comment}</> : null}</TD>
                     <TD className="max-w-96 text-xs">{a.diagnosis?.body.root_cause}</TD>
                   </TR>
                 );
               })}
             </TBody>
           </Table>
-        ) : <Muted>No attempts under the current spec.</Muted>}
+        ) : <Muted>No attempts under the current model specification.</Muted>}
       </Panel>
       {latest && (
         <Panel title="Latest diagnosis" actions={<RunLink pid={project.id} runId={latest.body.mlflow_run_id} />}>
           <div className="flex flex-col gap-4 text-sm">
             <Fields rows={[
+              ["Finding", latest.body.category ? <Badge variant={latest.body.category === "migration_defect" ? "secondary" : "warn"}>{CATEGORY[latest.body.category]}</Badge> : null],
               ["Root cause", latest.body.root_cause],
-              ["Spec change", latest.body.spec_change_needed ? <Badge variant="warn">needed</Badge> : "no"],
+              ["Limitation", latest.body.limitation],
+              ["Specification change", latest.body.spec_change_needed ? <Badge variant="warn">needed</Badge> : "no"],
               ["Proposed change", latest.body.proposed_spec_change],
               ["DS comment", latest.body.ds_comment],
             ]} />
@@ -54,6 +61,12 @@ export function Repair({ project, rev }: StepProps) {
               <h4 className="mb-1 font-medium">Evidence</h4>
               <ul className="list-disc pl-5">{latest.body.evidence.map((x) => <li key={x}>{x}</li>)}</ul>
             </div>
+            {(latest.body.assessment_findings ?? []).length > 0 && (
+              <div>
+                <h4 className="mb-1 font-medium">Financial model assessment</h4>
+                <ul className="list-disc pl-5">{latest.body.assessment_findings!.map((x) => <li key={x}>{x}</li>)}</ul>
+              </div>
+            )}
             {latest.body.repair_instructions.length > 0 && (
               <div>
                 <h4 className="mb-1 font-medium">Repair instructions</h4>
@@ -78,8 +91,8 @@ function Resume({ project }: StepProps) {
   if (s.reason !== "retry_limit" && s.reason !== "spec_change") return null;
   return (
     <div className="flex items-center gap-3 rounded-md border border-warn/50 bg-warn/5 px-4 py-3 text-sm">
-      <span className="font-medium">{s.reason === "retry_limit" ? "Retry limit reached" : "The Diagnostician proposes a spec change"}</span>
-      <span className="text-muted-foreground">Write to the Analyst for a new spec, or</span>
+      <span className="font-medium">{s.reason === "retry_limit" ? "Repair limit reached" : "The Diagnostician proposes a specification change"}</span>
+      <span className="text-muted-foreground">Write to the Analyst for a new model specification, or</span>
       <div className="ml-auto flex items-center gap-2">
         {s.reason === "retry_limit" ? (
           <>
@@ -87,7 +100,7 @@ function Resume({ project }: StepProps) {
             <Button size="sm" disabled={resume.isPending || more < 1} onClick={() => resume.mutate(more)}>Allow more attempts</Button>
           </>
         ) : (
-          <Button size="sm" disabled={resume.isPending} onClick={() => resume.mutate(0)}>Repair under the current spec</Button>
+          <Button size="sm" disabled={resume.isPending} onClick={() => resume.mutate(0)}>Repair under the current specification</Button>
         )}
       </div>
       <ErrorText error={resume.error} />

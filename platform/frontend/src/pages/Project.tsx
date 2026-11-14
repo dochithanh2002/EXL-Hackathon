@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Circle, CircleDot, LoaderCircle, Wrench } from "lucide-react";
+import { Check, Circle, CircleDot, LoaderCircle, Minus, Repeat, Wrench } from "lucide-react";
 import type * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import { ErrorText, RunLink } from "@/components/common";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
-import { type ChatMessage, get, p, post, type Project, RETRYABLE, type Step, STEPS } from "@/lib/api";
+import { type ChatMessage, CONDITIONAL_STEP, get, p, post, type Project, RETRYABLE, type Step, STEPS } from "@/lib/api";
 import { statusText, statusVariant } from "@/lib/format";
 import { rev, useJobEvents, useProject } from "@/lib/hooks";
 import { href } from "@/lib/route";
@@ -20,7 +20,7 @@ import { Report } from "@/steps/Report";
 import { Translation } from "@/steps/Translation";
 
 const AGENT_JOBS: Record<string, string> = { analyst: "Analyst", translation: "Translator", diagnosis: "Diagnostician", report: "Reporter" };
-const JOB_LABELS: Record<string, string> = { r_baseline: "Running the R baseline", deliverables: "Building the deliverables" };
+const JOB_LABELS: Record<string, string> = { r_baseline: "Computing the R reference results", deliverables: "Building the code & reproducibility package" };
 
 export interface StepProps {
   project: Project;
@@ -66,17 +66,24 @@ export function ProjectPage({ pid, step }: { pid: string; step?: number }) {
 
 function Stepper({ project, shown }: { project: Project; shown: Step }) {
   const s = project.state;
+  // Discrepancy Analysis is a loop off step 4: entered only when parity checks fail or the DS rejects the migration
+  const looped = s.step === CONDITIONAL_STEP || s.repairs > 0 || s.diagnosis_id !== null;
   return (
-    <nav className="w-52 shrink-0 border-r p-3">
+    <nav className="w-60 shrink-0 border-r p-3">
       <ol className="flex flex-col gap-0.5">
         {(Object.keys(STEPS).map(Number) as Step[]).map((n) => {
-          const reached = n <= s.step;
-          const done = n < s.step || (n === s.step && s.status === "done");
-          const Icon = done ? Check : n === s.step ? (s.status === "working" ? LoaderCircle : CircleDot) : Circle;
+          const loop = n === CONDITIONAL_STEP;
+          const skipped = loop && !looped && s.step > n;
+          const reached = n <= s.step && !skipped;
+          const done = !skipped && (n < s.step || (n === s.step && s.status === "done"));
+          const Icon = skipped ? Minus : done ? Check : n === s.step ? (s.status === "working" ? LoaderCircle : CircleDot) : loop ? Repeat : Circle;
           const item = (
-            <span className={cn("flex items-center gap-2 rounded-md px-2 py-1.5 text-sm", shown === n && "bg-muted font-medium", !reached && "text-muted-foreground/60")}>
-              <Icon className={cn("size-4", n === s.step && s.status === "working" && "animate-spin", done && "text-pass")} />
-              {n}. {STEPS[n]}
+            <span
+              className={cn("flex items-center gap-2 rounded-md px-2 py-1.5 text-sm", loop && "ml-4 border-l border-dashed pl-3", shown === n && "bg-muted font-medium", (!reached || skipped) && "text-muted-foreground/60")}
+              title={loop ? "Runs only when parity checks fail or the migration is rejected, then returns to step 4" : undefined}
+            >
+              <Icon className={cn("size-4 shrink-0", n === s.step && s.status === "working" && "animate-spin", done && "text-pass")} />
+              {loop ? STEPS[n] : `${n < CONDITIONAL_STEP ? n : n - 1}. ${STEPS[n]}`}
             </span>
           );
           return <li key={n}>{reached ? <a href={href.project(project.id, n)}>{item}</a> : item}</li>;
@@ -93,8 +100,8 @@ function Header({ project }: { project: Project }) {
   return (
     <div className="flex h-14 shrink-0 items-center gap-3 border-b px-6">
       <h1 className="font-semibold">{project.name}</h1>
-      <Badge variant={statusVariant(s)}>{s.step}. {STEPS[s.step]} · {statusText(s)}</Badge>
-      {s.spec_version && <Badge variant="outline">spec v{s.spec_version}{s.spec_tier ? ` · ${s.spec_tier}` : ""}</Badge>}
+      <Badge variant={statusVariant(s)}>{STEPS[s.step]} · {statusText(s)}</Badge>
+      {s.spec_version && <Badge variant="outline">Model Specification v{s.spec_version}{s.spec_tier ? ` · ${s.spec_tier} parity` : ""}</Badge>}
       <div className="ml-auto flex items-center gap-3">
         <RunLink pid={project.id}>MLflow experiment</RunLink>
         {s.status === "awaiting_ds" && s.reason && RETRYABLE.includes(s.reason) && (

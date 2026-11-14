@@ -137,7 +137,7 @@ def test_cancelling_a_running_candidate_kills_it_and_the_retry_passes(cp, llm):
     assert (s["step"], s["reason"]) == (4, "candidate_passed"), s
     coefs = cp.get(f"/api/projects/{pid}/evidence/{s['validation_id']}/coefficients").json()
     assert coefs["python"] and len(coefs["terms"]) == 4
-    assert all(t["estimate_rel"] is not None and t["estimate_rel"] < 1e-6 for t in coefs["terms"])
+    assert all(t["estimate_ratio"] is not None and t["estimate_ratio"] <= 1 for t in coefs["terms"])
     assert [j["status"] for j in cp.get(f"/api/projects/{pid}/jobs").json()] == [
         "succeeded", "succeeded", "cancelled", "succeeded"]
 
@@ -162,8 +162,7 @@ def test_after_approval_the_spec_cannot_change_and_a_cancelled_report_reruns(cp,
 
     [decision] = [f"decision-{t['seq']}" for t in cp.get(f"/api/projects/{pid}/transitions").json()
                   if t["event"]["type"] == "candidate_approved"]
-    llm.script = [report(("Result", [("The validation passed and the DS approved it.",
-                                      [s["validation_id"], decision])])), text("Reported.")]
+    llm.script = [report(s["validation_id"], decision), text("Reported.")]
     assert cp.post(f"/api/projects/{pid}/retry").status_code == 200
     s = settle(cp, pid, timeout=120)
     assert (s["step"], s["status"]) == (7, "done"), s

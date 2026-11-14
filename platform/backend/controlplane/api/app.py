@@ -21,7 +21,7 @@ from ..analyst import Analyst, ToolError
 from ..endpoints import EndpointIn, Endpoints, InvalidSetting, RoleModel, load_cipher
 from ..environments import EnvironmentNotReady, Environments
 from ..jobs import Jobs
-from ..runner.parity import _coefs, _rel
+from ..runner.parity import _coefs, score
 from ..schemas import ROLES, canonical_hash, sha256_file
 from ..settings import Settings
 from ..tracking import Tracker
@@ -276,7 +276,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         else:
             raise HTTPException(404, f"{eid} has no coefficients")
         rc = _coefs(r_dir / "coefficients.csv")
-        pc = _coefs(py_dir / "coefficients.csv") if py_dir and (py_dir / "coefficients.csv").is_file() else {}
+        pc = _coefs(py_dir / "coefficients.csv") if py_dir else {}
+        tol = store(request).spec(pid, e["body"]["spec_version"]).tolerances if py_dir else None
         rows = []
         for term in list(rc) + [t for t in pc if t not in rc]:
             row = {"term": term}
@@ -285,8 +286,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if term in pc:
                 row |= {"python_estimate": _finite(pc[term][0]), "python_std_error": _finite(pc[term][1])}
             if term in rc and term in pc:
-                row |= {"estimate_rel": _finite(_rel(rc[term][0], pc[term][0])),
-                        "std_error_rel": _finite(_rel(rc[term][1], pc[term][1]))}
+                # |python - r| / (atol + rtol |r|): at most 1 is within tolerance; null when infinite
+                row |= {"estimate_ratio": _finite(score(rc[term][0], pc[term][0], tol.coefficients.atol,
+                                                        tol.coefficients.rtol)),
+                        "std_error_ratio": _finite(score(rc[term][1], pc[term][1], tol.std_errors.atol,
+                                                         tol.std_errors.rtol))}
             rows.append(row)
         return {"python": bool(pc), "terms": rows}
 

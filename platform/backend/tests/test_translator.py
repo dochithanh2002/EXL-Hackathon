@@ -61,7 +61,7 @@ def test_translator_candidate_passes_validation_and_the_ds_approves_it(cp, llm):
     [v_run] = tracker.client.search_runs([exp], "tags.kind = 'validation'")
     assert t_run.info.status == v_run.info.status == "FINISHED"
     assert t_run.data.metrics == {"tool_calls": 4.0, "invalid_submissions": 1.0}
-    assert v_run.data.tags["passed"] == "True" and v_run.data.metrics["coefficient_max_rel_diff"] < 1e-12
+    assert v_run.data.tags["passed"] == "True" and v_run.data.metrics["coefficient_estimates"] < 1e-3
     assert {a.path for a in tracker.client.list_artifacts(v_run.info.run_id)} >= {"code", "output", "step.log",
                                                                                      "validation.json"}
 
@@ -83,7 +83,7 @@ def test_a_failing_candidate_goes_to_repair_and_a_rejected_one_carries_the_comme
     assert (s["step"], s["status"], s["validation_passed"]) == (5, "awaiting_ds", False), s
     assert s["detail"] == "no model is assigned to the diagnostician role; assign one in settings"
     v = cp.get(f"/api/projects/{pid}/evidence/{s['validation_id']}").json()["body"]
-    assert not v["passed"] and "coefficient max rel diff" in {c["name"] for c in v["checks"] if not c["passed"]}
+    assert not v["passed"] and "coefficient estimates" in {c["name"] for c in v["checks"] if not c["passed"]}
     bindings = {k: s[k] for k in ("spec_version", "baseline_id", "candidate_hash", "validation_id")}
     assert cp.post(f"/api/projects/{pid}/approve", json=bindings).status_code == 409
 

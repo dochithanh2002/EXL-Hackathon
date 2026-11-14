@@ -14,6 +14,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from .candidate import ENV_PACKAGES
 from .environments import R_BASE, Environments
 from .profile import ProfileFailed, profile
 from .runner import Limits
@@ -123,11 +124,14 @@ class Analyst:
         lines += ["", f"baseline.R runs in a fresh directory and reads the dataset as inputs/{self.dataset.name}"
                   + "".join(f", and {d.name} as inputs/{d.name}" for d in self.data) + ". The model's rows come from "
                   "the dataset; the other data files may only be joined or aggregated into it.", "",
-                  "Support matrix (R function [families]: statsmodels counterparts, tier). Anything else is "
-                  "unsupported:"]
+                  "Python packages a candidate can use: " + ", ".join(sorted(ENV_PACKAGES)) + ". scikit-learn is "
+                  "excluded.", "",
+                  "Known R -> Python pairs (R function [families]: Python implementations, tier). A model not listed "
+                  "is still attempted: propose an implementation from the packages above and the tier you expect, "
+                  "or set support_tier to unsupported and explain the limitation:"]
         for pair in self.matrix.pairs:
             fam = f" [{', '.join(pair.families)}]" if pair.families else ""
-            lines.append(f"- {pair.r}{fam}: {', '.join(pair.statsmodels)} ({pair.tier})")
+            lines.append(f"- {pair.r}{fam}: {', '.join(pair.python)} ({pair.tier})")
         lines += ["", "R packages baseline.R can load: " + ", ".join(sorted(self.r_packages, key=str.lower)), "",
                   "Read the files and the data profiles (dataset_profile, with a data file's name for the others), "
                   "then submit the ModelSpec."]
@@ -148,8 +152,8 @@ class Analyst:
             errors.append(f"baseline_r loads {missing}, which r_packages does not list")
         if spec.support_tier != "unsupported" and (outside := sorted(set(spec.r_packages) - self.r_packages)):
             errors.append(f"the stable R environment has no {outside}: drop them from baseline_r if the target model "
-                          f"does not need them; otherwise set support_tier to unsupported and list them in "
-                          f"unsupported_items")
+                          f"does not need them; otherwise set support_tier to unsupported, list them in "
+                          f"unsupported_items and explain the limitation")
         objects = spec.baseline_objects.model_dump()
         for field, name in objects.items():
             if name is not None and not re.search(rf"(?<![\w.]){re.escape(name)}(?![\w.])", spec.baseline_r):

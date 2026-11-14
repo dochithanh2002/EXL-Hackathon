@@ -16,12 +16,12 @@ export function when(iso: string | null | undefined): string {
 }
 
 const REASONS: Record<string, string> = {
-  spec_drafted: "spec drafted",
+  spec_drafted: "specification drafted",
   analyst_replied: "Analyst replied",
-  unsupported: "unsupported model",
-  candidate_passed: "awaiting approval",
-  retry_limit: "retry limit reached",
-  spec_change: "spec change proposed",
+  unsupported: "no faithful Python implementation",
+  candidate_passed: "awaiting acceptance",
+  retry_limit: "repair limit reached",
+  spec_change: "specification change proposed",
   step_failed: "failed",
   interrupted: "interrupted",
   cancelled: "cancelled",

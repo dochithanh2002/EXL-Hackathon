@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
+import type * as React from "react";
 import { useState } from "react";
-import { ErrorText, Mono, Panel } from "@/components/common";
+import { Details, ErrorText, Mono, Panel } from "@/components/common";
 import { Badge } from "@/components/ui/badge";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { get, p, type Profile } from "@/lib/api";
@@ -8,7 +9,7 @@ import { num } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { StepProps } from "@/pages/Project";
 
-const ROLE = { dataset: "dataset", data: "other data", r_code: "R code", document: "document" };
+const ROLE = { dataset: "model dataset", data: "other data", r_code: "R code", document: "document" };
 
 export function Intake({ project }: StepProps) {
   const csvs = project.state.files.filter((f) => f.role === "dataset" || f.role === "data");
@@ -21,21 +22,23 @@ export function Intake({ project }: StepProps) {
   });
   return (
     <>
-      <Panel title="Files">
-        <Table>
-          <THead>
-            <TR><TH>Name</TH><TH>Role</TH><TH>SHA-256</TH></TR>
-          </THead>
-          <TBody>
-            {project.state.files.map((f) => (
-              <TR key={f.name}>
-                <TD className="font-medium">{f.name}</TD>
-                <TD>{ROLE[f.role]}</TD>
-                <TD><Mono>{f.sha256}</Mono></TD>
-              </TR>
-            ))}
-          </TBody>
-        </Table>
+      <Panel title="Data & code">
+        <div className="flex flex-col gap-4">
+          <Table>
+            <THead>
+              <TR><TH>File</TH><TH>Used as</TH></TR>
+            </THead>
+            <TBody>
+              {project.state.files.map((f) => (
+                <TR key={f.name}>
+                  <TD className="font-medium">{f.name}</TD>
+                  <TD>{ROLE[f.role]}</TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+          <Details rows={project.state.files.map((f): [string, React.ReactNode] => [f.name, <Mono>{f.sha256}</Mono>])} />
+        </div>
       </Panel>
       <Panel
         title={profile.data ? `${profile.data.file} · ${num(profile.data.rows)} rows` : name}

@@ -1,4 +1,6 @@
-"""The R -> statsmodels support matrix (`platform/envs/support_matrix.yaml`)."""
+"""Known R -> Python pairs (`platform/envs/support_matrix.yaml`). The matrix is a reference, not an allowlist: a
+model outside it is still attempted, at the tier the Analyst proposes, and the DS must accept the parity risk. A
+known pair fixes the tier and, once it has a passing fixture, counts as proven. scikit-learn is never used."""
 from __future__ import annotations
 
 from functools import lru_cache
@@ -19,7 +21,7 @@ class Pair(BaseModel):
     fixture that passes; until then the DS has to accept the parity risk, even for an exact pair."""
     model_config = ConfigDict(extra="forbid")
     r: str
-    statsmodels: list[str]
+    python: list[str]
     tier: Literal["exact", "approximate"]
     families: list[str] | None = None
     fixture: str | None = None
@@ -32,6 +34,7 @@ class Pair(BaseModel):
 class Support(BaseModel):
     tier: Tier
     proven: bool
+    known: bool
 
 
 class SupportMatrix(BaseModel):
@@ -45,25 +48,21 @@ class SupportMatrix(BaseModel):
                 return p
         return None
 
-    def tier(self, r_function: str, family: str | None = None) -> Tier:
-        p = self.lookup(r_function, family)
-        return p.tier if p else "unsupported"
-
     def support(self, spec: ModelSpec) -> Support:
+        """A known pair with its listed implementation sets the tier; anything else keeps the Analyst's tier and is
+        unproven."""
         p = self.lookup(spec.r_function, spec.family)
-        return Support(tier=p.tier, proven=p.proven) if p else Support(tier="unsupported", proven=False)
+        if p and spec.support_tier != "unsupported" and spec.python_implementation in p.python:
+            return Support(tier=p.tier, proven=p.proven, known=True)
+        return Support(tier=spec.support_tier, proven=False, known=False)
 
     def check(self, spec: ModelSpec) -> list[str]:
-        """Disagreements between the Analyst's spec and the matrix; returned to the Analyst as validation errors."""
-        expected = self.tier(spec.r_function, spec.family)
-        errors = []
-        if spec.support_tier != expected:
-            what = spec.r_function + (f" (family {spec.family})" if spec.family else "")
-            errors.append(f"support_tier is '{spec.support_tier}' but the support matrix lists {what} as '{expected}'")
-        pair = self.lookup(spec.r_function, spec.family)
-        if pair and spec.statsmodels_counterpart not in pair.statsmodels:
-            errors.append(f"statsmodels_counterpart must be one of {pair.statsmodels}")
-        return errors
+        """Disagreements with a known pair; returned to the Analyst as validation errors."""
+        p = self.lookup(spec.r_function, spec.family)
+        if p and spec.python_implementation in p.python and spec.support_tier not in (p.tier, "unsupported"):
+            return [f"support_tier is '{spec.support_tier}' but {spec.r_function} with {spec.python_implementation} "
+                    f"is a known '{p.tier}' pair"]
+        return []
 
 
 @lru_cache

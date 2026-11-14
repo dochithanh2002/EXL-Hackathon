@@ -324,7 +324,8 @@ class Jobs:
                 run.params(candidate_hash=h)
                 run.artifact_text(cand.module, "candidate.py")
                 cid, _ = self.store.record(pid, "candidate", {
-                    **common, **attempt, "hash": h, "module": cand.module, "notes": cand.notes, "changes": cand.changes,
+                    **common, **attempt, "hash": h, "module": cand.module, "notes": cand.notes,
+                    "limitations": cand.limitations, "changes": cand.changes,
                     "reply": result["text"], "model": model_label, "mlflow_run_id": run.run_id})
 
             with self.tracker.step(pid, "validation", f"validation v{s.spec_version}", workdir / "step.log") as run:
@@ -333,7 +334,7 @@ class Jobs:
                                   self.settings.project_dir(pid) / "inputs", self.envs, self.settings.limits,
                                   lambda p: self._started(jid, p.cancel))
                 body = json.loads(v.model_dump_json())
-                run.metrics(**v.metrics())
+                run.metrics(**v.metrics_for_mlflow())
                 run.tags(passed=v.passed, stage=v.stage)
                 run.artifact_text(json.dumps(body, indent=1), "validation.json")
                 run.artifact(workdir / "candidate.py", "code")
@@ -408,11 +409,14 @@ class Jobs:
 
             def commit(db):
                 if d.spec_change_needed:
+                    finding = {"specification": "the spec needs to change before the migration can match R",
+                               "not_reproducible": "no faithful Python implementation can reproduce R",
+                               "model_fitness": "the migration is faithful; the concern is the model itself"}[d.category]
                     self.store.add_chat(db, pid, "platform", (
-                        f"The Diagnostician found that the candidate cannot reproduce R under spec v{s.spec_version} "
-                        f"without a spec change.\nRoot cause: {d.root_cause}\nProposed change: "
-                        f"{d.proposed_spec_change}\nWrite to the Analyst to draft a new spec version, or resume the "
-                        "repair to keep the current spec."), jid, s.spec_version)
+                        f"The Diagnostician found that {finding} (spec v{s.spec_version}).\nRoot cause: "
+                        f"{d.root_cause}\n" + (f"Limitation: {d.limitation}\n" if d.limitation else "")
+                        + f"Proposed change: {d.proposed_spec_change}\nWrite to the Analyst to draft a new spec "
+                        "version, or resume the repair to keep the current spec."), jid, s.spec_version)
                 return event
             self.store.finish_job(jid, commit)
         except StepCancelled:

@@ -2,8 +2,9 @@
 
 The Diagnostician sees what the Translator saw (spec, baseline.R, baseline metadata, R's coefficient names), the
 candidate under diagnosis, the DS's comment if they rejected it, earlier attempts for the same spec, and a filtered
-view of the validation. The view keeps every check, per-term relative differences, row ids and KPIs, and withholds
-three things:
+view of the validation. The view keeps every check, per-term differences in tolerance units, row ids, evaluation
+metrics, the design comparison (fitted rows, design-matrix column statistics, reference levels, offsets and
+weights in R and Python) and the financial assessment summaries, and withholds three things:
 - R's estimates and fit statistics, and the candidate's: its repair instructions go to the Translator, which must
   never be able to copy R's numbers into a candidate;
 - row-level predictions and responses;
@@ -32,6 +33,8 @@ TYPE_NAMES = {"str", "int", "float", "bool", "object", "list", "dict", "tuple", 
 # validation `differences` keys that hold only names and row ids, passed on as they are
 NAMES_AND_ROWS = ("missing_terms", "extra_terms", "rows_only_in_r", "rows_only_in_python", "response_differs_rows",
                   "prediction_na_differs_rows")
+CHECK_FIELDS = ("name", "quantity", "kind", "status", "required", "reason", "value", "tolerance", "atol", "rtol",
+                "max_abs_diff", "compared", "missing_both", "missing_one_side", "nonfinite_mismatch", "total")
 
 
 def _sig(x: float | None) -> float | None:
@@ -88,8 +91,9 @@ def vocabulary(profile: dict, terms: list[str], spec: ModelSpec) -> set[str]:
 
 def validation_view(v: dict, words: set[str], source: str) -> dict:
     """The validation as the Diagnostician sees it (module docstring)."""
-    view = {"passed": v["passed"], "stage": v["stage"], "checks": v["checks"], "kpis": v["kpis"],
-            "notes": v["notes"]}
+    view = {"passed": v["passed"], "stage": v["stage"],
+            "checks": [{k: c[k] for k in CHECK_FIELDS if c.get(k) not in (None, "")} for c in v["checks"]],
+            "metrics": v.get("metrics", {}), "notes": v["notes"]}
     if v.get("error"):
         e = v["error"]
         view["error"] = {"stage": e["stage"], "type": e["type"], "message": redact(e["message"], words, source),
@@ -100,22 +104,31 @@ def validation_view(v: dict, words: set[str], source: str) -> dict:
         diffs["worst_terms"] = [
             {"term": t["term"],
              "estimate_rel_diff": _sig(t["estimate_rel"]),
+             "estimate_tolerance_units": _sig(t["estimate_score"]),
              "estimate": _direction(t["estimate_r"], t["estimate_python"]),
              "std_error_rel_diff": _sig(t["std_error_rel"]),
+             "std_error_tolerance_units": _sig(t["std_error_score"]),
              "std_error": _direction(t["std_error_r"], t["std_error_python"])} for t in d["worst_terms"]]
     if "worst_predictions" in d:
-        diffs["worst_predictions"] = [{"set": p["set"], "row": p["row"], "abs_diff": _sig(p["abs_diff"])}
+        diffs["worst_predictions"] = [{"set": p["set"], "row": p["row"], "key": p["key"],
+                                       "abs_diff": _sig(p["abs_diff"]), "tolerance_units": _sig(p["score"])}
                                       for p in d["worst_predictions"]]
     if "fit_statistics" in d:
         diffs["fit_statistics"] = {k: _direction(s["r"], s["python"]) for k, s in d["fit_statistics"].items()}
     view["differences"] = diffs
+    if v.get("design"):
+        view["design"] = v["design"]
+    if v.get("assessment"):
+        view["assessment"] = v["assessment"]
     return view
 
 
 def failed_checks(v: dict) -> list[str]:
+    """Required checks that did not pass; an unavailable one is named as such."""
     if v.get("error"):
         return [f"runtime error in {v['error']['stage']}"]
-    return [c["name"] for c in v["checks"] if not c["passed"]]
+    return [c["name"] + (" (unavailable)" if c.get("status") == "unavailable" else "")
+            for c in v["checks"] if not c["passed"] and c.get("required", True)]
 
 
 class Diagnostician:
@@ -146,15 +159,20 @@ class Diagnostician:
             "The Translator's notes: " + json.dumps(c["notes"])]
         if c.get("changes"):
             lines.append("What it changed from the attempt before: " + c["changes"])
+        if c.get("limitations"):
+            lines.append("Limitations the Translator reported: " + json.dumps(c["limitations"]))
         lines += ["", "Its validation against the R baseline (R's estimates, row-level values and data values are "
-                      "withheld):", json.dumps(self.view(), indent=1), ""]
+                      "withheld). A tolerance check's value is the worst |python - r| / (atol + rtol * |r|); above 1 "
+                      "fails. `design` compares what each side fitted; `assessment` summarises sample "
+                      "suitability, stability, calibration and decision performance for R's reference and the "
+                      "candidate:", json.dumps(self.view(), indent=1), ""]
         if self.ds_comment:
             lines += ["The validation passed, but the DS rejected the candidate with this comment:", self.ds_comment,
                       ""]
         if self.earlier:
             lines += ["Earlier attempts for this spec, oldest first:", json.dumps(
-                [{k: e[k] for k in ("failed_checks", "root_cause", "repair_instructions")} for e in self.earlier],
-                indent=1), ""]
+                [{k: e.get(k) for k in ("category", "failed_checks", "root_cause", "repair_instructions")}
+                 for e in self.earlier], indent=1), ""]
         lines += [f"Repairs used: {self.repairs} of {self.retry_limit}.", "",
                   "Read the dataset profile and, where useful, the rulebook, then submit the diagnosis."]
         return "\n".join(lines)

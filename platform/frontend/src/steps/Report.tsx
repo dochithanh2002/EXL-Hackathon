@@ -13,7 +13,7 @@ export function Report({ project }: StepProps) {
     enabled: !!s.report_id,
     staleTime: Infinity,
   });
-  if (!s.report_id) return s.status === "working" ? null : <Muted>The report is written after the DS approves a candidate.</Muted>;
+  if (!s.report_id) return s.status === "working" ? null : <Muted>The report is written after the migration is accepted.</Muted>;
   if (!report.data) return <ErrorText error={report.error} />;
   const md = report.data.body.markdown;
   const download = `data:text/markdown;charset=utf-8,${encodeURIComponent(md)}`;

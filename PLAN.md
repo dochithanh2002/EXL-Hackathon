@@ -1,6 +1,6 @@
 # Plan: agentic R → Python ML transformation platform
 
-Status: build steps 1–7 built; step 7's Docker image is written but not yet built on a Linux host (sections 12, 13). Date: 2026-11-14.
+Status: build steps 1–7 built, plus the semantics and assessment revision (section 7); step 7's Docker image is written but not yet built on a Linux host (sections 12, 13). Date: 2026-11-14.
 
 A Python control plane owns all workflow, execution and approval logic. A small Node service hosts Pi for the
 four agents. A React UI is the data scientist's (DS) workspace. Everything runs locally as plain processes; a
@@ -13,7 +13,7 @@ Dockerfile is provided for Linux server deployment.
 | Agent framework | Pi SDK, `@earendil-works/pi-coding-agent` pinned to 1.5.2 (MIT, Node ≥ 22.19), embedded in-process in a Node service |
 | Backend | Two processes: Python control plane (FastAPI) + Node agent service. MLflow server is a third process |
 | Environments | One stable, pinned R environment and one stable, pinned Python environment, built once and shared by all projects (section 6) |
-| Supported scope | Any R model with a statsmodels counterpart; scikit-learn is not included (section 7) |
+| Supported scope | Any R model the agents can implement faithfully with statsmodels, scipy or numpy; scikit-learn is excluded; known pairs are a reference, not an allowlist (section 7) |
 | Where it runs | Local processes on macOS/Linux, no Docker needed. One Dockerfile + compose file for Linux deployment |
 | Web UI libraries | No Pi web UI package: `@earendil-works/pi-web-ui` is stale (0.75.3, May 2026, pinned to pi-ai 0.75) and community ones are full coding cockpits. The chat panel is a plain component: the Analyst chat is request/reply over the control plane, which `@assistant-ui/react` would only wrap. shadcn/ui components are vendored in `frontend/src/components/ui` without Radix, as the UI needs no menus or dialogs |
 | Network | Treated as working. Python dependency versions are pinned when the lockfile is first generated |
@@ -62,12 +62,12 @@ React UI ──HTTP/SSE──> Control plane (Python, FastAPI)
 | # | State | Who acts | Gate to leave |
 |---|---|---|---|
 | 1 | Project created, dataset, other data files and R code uploaded | DS | files hashed (SHA-256) |
-| 2 | Understanding and alignment | Analyst agent + DS chat | DS confirms `ModelSpec` vN |
-| 3 | R baseline | static code | run succeeds; baseline frozen |
-| 4 | Python translation and validation | Translator agent + static runner and validator | DS approves or rejects |
-| 5 | Diagnosis and repair | Diagnostician agent, then back to 4 | retry limit (default 3), then escalate to DS |
-| 6 | Final report | Reporter agent | report built from recorded evidence |
-| 7 | Deliverables | static | download bundle |
+| 2 | Model Specification | Analyst agent + DS chat | DS confirms `ModelSpec` vN |
+| 3 | R Reference Results | static code | run succeeds; baseline frozen |
+| 4 | Python Migration & Comparison | Translator agent + static runner and validator | DS accepts or rejects the migration |
+| 5 | Discrepancy Analysis (only after a failure or rejection) | Diagnostician agent, then back to 4 | retry limit (default 3), then escalate to DS |
+| 6 | Migration Validation Report | Reporter agent | report built from recorded evidence |
+| 7 | Code & Reproducibility Package | static | download bundle |
 
 - Approvals are bound to hashes: spec version, baseline id, candidate code hash, validation result id. If any
   changes, the approval is void.
@@ -87,10 +87,10 @@ is returned to the agent with the validation error, for a bounded number of retr
 
 | Role | Sees | Submits |
 |---|---|---|
-| Analyst | R code, column names, dtypes, level sets, summary statistics (no data rows) | `ModelSpec`: target model, R function, statsmodels counterpart and support tier, family, link, formula, offset, weights, preprocessing steps, split definition, KPIs, tolerances, unsupported items, proposed substitutions, and a minimal `baseline.R` slice |
-| Translator | `ModelSpec`, `baseline.R`, baseline metadata, repair instructions if any | `Candidate`: one Python module against a fixed interface, plus notes |
-| Diagnostician | filtered validation (checks, relative differences, row ids, KPIs, redacted errors), candidate, spec, DS comment, earlier attempts | `Diagnosis`: root cause, evidence, repair instructions, and whether a spec change is needed (routes to the DS) |
-| Reporter | an evidence catalogue built by code from recorded runs, validation results and approvals; the approved candidate and `baseline.R` | `ReportNarrative`: every claim cites catalogue ids; numbers are `{{id.field}}` placeholders filled in by code, and names with digits must be in backticks and known to the project |
+| Analyst | R code, column names, dtypes, level sets, summary statistics (no data rows) | `ModelSpec` v2: target model, R function, Python implementation and parity tier (or the limitation when none is faithful), family, link, formula, explicit semantics (response type, event meaning and coding, grouped-binomial trials, weight type and normalization, offset, prediction kind, quantity, units, keys, alignment keys and the R prediction expression), the financial assessment definition (business use, intended and sample population, evaluation-set roles, period column, decision threshold, criteria, missing information), preprocessing, split, evaluation metrics, `atol`/`rtol` per quantity, unsupported items, substitutions, and a minimal `baseline.R` slice |
+| Translator | `ModelSpec`, `baseline.R`, baseline metadata, repair instructions if any | `Candidate`: one Python module against a fixed interface, notes, and limitations it cannot reproduce |
+| Diagnostician | filtered validation (check statuses, differences in tolerance units, row ids, metrics, design comparison, assessment summaries, redacted errors), candidate, spec, DS comment, earlier attempts | `Diagnosis`: category (migration defect, specification, not reproducible, model fitness), root cause, evidence, repair instructions, assessment findings; all but a migration defect route to the DS |
+| Reporter | an evidence catalogue built by code from recorded runs, validation results and approvals; the approved candidate and `baseline.R` | `ReportNarrative` v2: claims for fixed sections (scope, semantics, parity, the four assessment questions, skipped checks, limitations, acceptance); every claim cites catalogue ids; numbers are `{{id.field}}` placeholders filled in by code, and names with digits must be in backticks and known to the project |
 
 The `baseline.R` slice is the minimal part of the uploaded code that produces the target model. The DS sees it
 as a diff against the original before confirming. It is what keeps unrelated code (keras, xgboost, plotting)
@@ -149,25 +149,51 @@ errors, fit statistics, predictions, the row ids of the train and test sets, des
 `sessionInfo()`. Python never re-splits or re-seeds: it consumes R's exported row ids, which guarantees the same
 observations and evaluation splits.
 
-## 7. Supported scope: everything statsmodels covers
+## 7. Supported scope, semantics and validation
 
-A model is supported when statsmodels has a counterpart. Having a counterpart does not always mean the numbers
-can match to tight tolerance, because some pairs use different algorithms. So there are three tiers, assigned by
-the Analyst at step 2 and shown to the DS.
+The support matrix (`support_matrix.yaml`) lists known R -> Python pairs. It is a reference, not an allowlist: a
+known pair with its listed implementation fixes the tier; any other model is attempted at the tier the Analyst
+proposes (exact or approximate) and is unproven, so the DS must accept the parity risk. When no faithful
+implementation exists the Analyst sets the tier to unsupported and explains the limitation, which stops at step 2.
+scikit-learn is excluded by the spec validator and the candidate guardrails. No model is silently substituted.
 
-| Tier | R → statsmodels | Expectation |
-|---|---|---|
-| Exact | `lm` → OLS/WLS; `glm` (gaussian, binomial, poisson, Gamma, inverse.gaussian, quasi families) → GLM, with offsets and weights; `MASS::glm.nb` → NegativeBinomial; `nnet::multinom` → MNLogit; `MASS::polr` → OrderedModel; `quantreg::rq` → QuantReg; `nlme::gls` → GLS/GLSAR | Tight tolerances on coefficients, standard errors and predictions |
-| Approximate (needs DS approval) | `glmnet` → `fit_regularized`; `mgcv::gam` → GLMGam; `lme4`/`nlme` mixed models → MixedLM; `MASS::rlm` → RLM; `survival::coxph` → PHReg; `arima`/`forecast` → ARIMA/SARIMAX | Different optimisers or penalties; tolerances agreed per case and the report labels the result approximate |
-| Unsupported | `randomForest`, `rpart`, `xgboost`, `lightgbm`, `catboost`, `keras`, `e1071` and anything else without a statsmodels counterpart | Stops at step 2 with a clear message |
+The spec states the statistical semantics explicitly, and code carries them through every step:
+- event meaning and coding (`capture.R` refuses a coding that is not the outcome R predicts);
+- grouped binomial data as successes and trials or a proportion with trials (observed proportion, trials as weight);
+- weight type (frequency, sampling, precision) and normalization: frequency and sampling weights and trials
+  weight the metrics, precision weights do not (deviance always uses prior weights, as R does);
+- prediction kind (scalar, class probabilities, quantiles, time-indexed), quantity and units, keys and alignment
+  keys. `capture.R` evaluates the spec's `r_predict` for any model class and exports predictions keyed by
+  (set, row, key); lm and glm are read through `summary()`, other classes through `coef()`, `vcov()` and `logLik()`.
+  A candidate may return any results object, defining `coefficients()` when it is not statsmodels.
+  Time-indexed output currently means one value per existing data row; multiple horizons or a survival curve per
+  subject are not represented by this demo contract.
 
-The tier table lives in one versioned file (`support_matrix.yaml`), is checked by code, and is extended as pairs
-are proven. Tier assignments above are the starting point and each "Exact" pair needs a passing fixture before it
-is advertised as such.
+Parity checks (`runner/parity.py`, shipped in bundles): convergence on both sides, coefficient names, estimates and
+standard errors, alignment keys, observed values, prediction missingness and values, valid predictions per set, fit
+statistics and the requested metrics. Each numeric comparison is `abs(python - r) <= atol + rtol * abs(r)` with
+tolerances per quantity (and per metric). Missing on both sides and equal infinities match; one-sided missing or
+non-finite values fail. A check is passed, failed or unavailable; an unavailable required check fails the
+validation. Requested metrics are required by default; only `optional_metrics` exceptions declared per set in the
+confirmed spec can leave an unavailable metric non-blocking. Finite mismatches still fail. R convergence uses
+the estimator's status, or a confirmed `convergence.r_check` expression with a rationale and access to the fitted
+model and fit warnings. A justified non-iterative exemption is recorded as unavailable, not passed. Generic
+models use their Python estimator's AIC/BIC rather than inheriting the lm scale-parameter convention.
 
-Validation checks, all deterministic: coefficient names match; coefficients, standard errors, predictions, fit
-statistics and the agreed KPIs (AUC, Gini, actual/expected, RMSE and so on) are within the tolerances agreed at
-step 2. Candidate code also passes the static guardrails reused from `legacy/agent/tools/guardrails.py`.
+Financial model assessment (`assessment.py`), computed by code on R's and the candidate's predictions and recorded
+with the validation without deciding it: sample suitability (rows, events, event rate, events per parameter),
+stability (PSI against the development set and by period), calibration (observed/expected by decile, quantile
+coverage) and decision performance (AUC, Gini, KS, and outcomes at the decision threshold). Each question is
+assessed, partially assessed or not assessed, with what it needs. The design comparison (fitted rows,
+design-matrix column statistics, reference levels, offset and weight summaries in R and Python) goes to the
+Diagnostician. The report keeps migration parity and fitness for business use in separate sections.
+Decision assessment stays partial without independent evaluation, computable discrimination and recall, and
+agreed minimum AUC and event recall at the stated threshold. Missing output groups are listed as unassessed
+calibration evidence rather than raising an exception. Grouped-binomial Brier scores are trial-weighted
+individual-event scores, not squared errors against group proportions. These are screening summaries, not a
+complete judgment of sample representativeness or business fitness.
+
+Spec v1 records from earlier projects do not load under v2; those projects must be recreated.
 
 ## 8. MLflow
 
@@ -250,6 +276,22 @@ M1 and M4 are from the rerun after the fixes, M2 and M3 from the first run. Foll
 prints a harmless pandas `DtypeWarning` reading `split.csv` (`in_fit` mixes booleans and blanks), and M1's repair
 loop is slow (about 45 minutes of model time). Evidence: `platform/var/live-smoke/e2e-20261114-024946/` and
 `e2e-20261114-032333/` (ignored).
+
+Semantics and assessment revision on 2026-11-14: 210 backend tests passed, two skipped; both TypeScript projects
+typecheck and the UI builds. New tests cover the v2 spec validators, atol/rtol parity with missing and non-finite
+values, unavailable checks, convergence and valid-prediction checks, weighted and grouped metrics, the assessment
+statuses, the design comparison, R capture of `nnet::multinom` class probabilities, `quantreg::rq` quantiles,
+grouped binomial trials and event coding, and a multinomial candidate end to end. The scripted end-to-end report was
+rendered in the browser. Not yet run against a live LLM.
+
+Review fixes on 2026-11-14: 223 backend tests passed, two skipped (the existing macOS/root exclusions), and both
+TypeScript projects typecheck. Regressions cover required versus explicitly optional unavailable metrics in both
+the control plane and standalone bundle, missing class calibration groups, independent decision assessment and
+threshold recall criteria, grouped-binomial event-level Brier scores, and estimator-native multinomial AIC. A full
+R quantreg::rq to scipy.optimize.linprog migration passes coefficient, prediction and pinball-loss checks using
+a confirmed solver-specific convergence expression; an injected solver warning fails convergence. A justified
+R convergence exemption remains visibly unavailable rather than passing. No live LLM run was performed for these
+fixes; that smoke test remains pending. Existing v1 projects remain incompatible as noted above.
 
 Step 7 built on 2026-11-14: 165 tests passed, two skipped (macOS address-space limits; the step-user test, which
 needs root), and both TypeScript projects typecheck.

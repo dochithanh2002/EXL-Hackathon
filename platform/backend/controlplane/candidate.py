@@ -15,17 +15,24 @@ prepare(path: str, sets: dict[str, pandas.Index]) -> dict[str, pandas.DataFrame]
     data preparation. `sets` maps
     each set R formed ("train", and "test" if R has one) to the rows R put in it, as 1-based data-row numbers of the
     dataset file (pandas.read_csv's default index + 1). Return one frame per set, indexed by exactly those row
-    numbers. Each frame holds the columns the model uses and the response column RESPONSE, encoded as the number the
-    model fits (for a factor response in a binomial model: 0 for the first level, 1 otherwise). Never sample,
-    shuffle or re-split: the sets come from R.
+    numbers. Each frame holds the columns the model uses and the response column RESPONSE, encoded as the spec's
+    semantics say: for a binary response 1 for the event (the spec's event coding) and 0 otherwise; for a grouped
+    binomial response the proportion of successes; for class probabilities the class label as a string; otherwise
+    the numeric value. Never sample, shuffle or re-split: the sets come from R.
 
-fit(train: pandas.DataFrame) -> statsmodels results
-    Fit the model on the train frame exactly as R does. The results' `params` and `bse`, indexed by R's coefficient
-    names in R's order, are the coefficients that are compared with R.
+fit(train: pandas.DataFrame) -> fitted results
+    Fit the model on the train frame exactly as R does, applying the spec's weights (by type: frequency, sampling
+    or precision), offset and grouped-binomial trials as R does. statsmodels results work as they are: their `params`
+    and `bse`, indexed by R's coefficient names in R's order, are the coefficients compared with R, and `converged`
+    reports convergence. For any other results object, also define coefficients(result) -> pandas.DataFrame with
+    columns estimate and std_error indexed by R's coefficient names, and give the object a boolean `converged`
+    unless the estimator is closed form. Never use scikit-learn.
 
-predict(result, frame: pandas.DataFrame) -> pandas.Series
-    Predictions on the response scale (R's predict(type = "response")), indexed like `frame`; NaN wherever R's
-    prediction is NA. Never impute or drop rows to obtain a prediction."""
+predict(result, frame: pandas.DataFrame) -> pandas.Series | pandas.DataFrame
+    Predictions in the spec's prediction units, matching R's r_predict expression, indexed like `frame`: a Series for
+    scalar and time_indexed outputs, a DataFrame with one column per prediction key (named exactly as the spec's
+    keys) for class probabilities and quantiles. NaN wherever R's prediction is NA. Never impute or drop rows to
+    obtain a prediction."""
 
 DATA_INTERFACE = """This project has other data files, which baseline.R reads next to the dataset. prepare therefore
 takes a third argument, data: dict[str, str], mapping each of their file names to its path:
@@ -92,6 +99,8 @@ def check(module: str, packages: frozenset[str] = ENV_PACKAGES, data: bool = Fal
             paths = []
         for path in paths:
             parts = path.split(".")
+            if parts[0] == "sklearn":
+                continue                                   # reported once below, with the reason
             if parts[0] not in allowed:
                 add(node, f"module '{parts[0]}' is not available; allowed: {sorted(allowed)}")
             elif "random" in parts:
@@ -135,6 +144,11 @@ def check(module: str, packages: frozenset[str] = ENV_PACKAGES, data: bool = Fal
         elif isinstance(node, ast.Constant) and isinstance(node.value, str) and URL.match(node.value):
             add(node, "URLs are not allowed")
 
+    for node in ast.walk(tree):
+        names = ([a.name for a in node.names] if isinstance(node, ast.Import)
+                 else [node.module or ""] if isinstance(node, ast.ImportFrom) else [])
+        if any(n.split(".")[0] == "sklearn" for n in names):
+            add(node, "scikit-learn is excluded: implement the estimator with statsmodels, scipy or numpy")
     for name, nargs in (CONTRACT | {"prepare": 3} if data else CONTRACT).items():
         f = functions.get(name)
         if f is None:

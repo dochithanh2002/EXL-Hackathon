@@ -99,6 +99,16 @@ export function RunLink({ pid, runId, children = "MLflow" }: { pid: string; runI
   );
 }
 
+/** Technical ids and hashes, folded away under the content they identify. */
+export function Details({ rows }: { rows: [string, React.ReactNode][] }) {
+  return (
+    <details className="text-sm">
+      <summary className="cursor-pointer text-xs text-muted-foreground select-none hover:text-foreground">Details</summary>
+      <div className="mt-2"><Fields rows={rows} /></div>
+    </details>
+  );
+}
+
 export function ErrorText({ error }: { error: unknown }) {
   if (!error) return null;
   return <p className="text-sm text-destructive">{error instanceof Error ? error.message : String(error)}</p>;

@@ -34,7 +34,7 @@ export function Projects() {
             {projects.data.map((p) => (
               <TR key={p.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(href.project(p.id))}>
                 <TD className="font-medium">{p.name}</TD>
-                <TD>{p.state.step}. {STEPS[p.state.step]}</TD>
+                <TD>{STEPS[p.state.step]}</TD>
                 <TD><Badge variant={statusVariant(p.state)}>{statusText(p.state)}</Badge></TD>
                 <TD className="text-muted-foreground">{when(p.created_at)}</TD>
               </TR>

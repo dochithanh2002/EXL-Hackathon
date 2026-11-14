@@ -1,7 +1,8 @@
 """Step 4: what the Translator sees, the checks on its submissions, and the candidate run.
 
-The Translator sees the confirmed spec, baseline.R, the baseline's metadata and R's coefficient names (never R's
-estimates, which a candidate could otherwise copy), the dataset profile and the rulebook. A submission is a
+The Translator sees the confirmed spec with its statistical semantics, baseline.R, the baseline's metadata and R's
+coefficient names (never R's estimates, which a candidate could otherwise copy), the dataset profile and the
+rulebook. A submission is a
 Candidate only if it validates and passes the static guardrails. The candidate then runs in the stable Python
 environment against R's sets, and the validator compares its output with the frozen baseline."""
 from __future__ import annotations
@@ -25,9 +26,9 @@ from .workflow.machine import InputFile
 
 HARNESS = Path(__file__).parent / "runner" / "candidate_harness.py"
 RULEBOOK = Path(__file__).parent / "rulebook.yaml"
-META_KEYS = ("r_version", "class", "formula", "family", "link", "response", "response_levels", "design_columns",
-             "aliased", "xlevels", "contrasts", "offset", "weights", "n", "n_fit", "converged", "iterations", "control",
-             "column_classes")
+META_KEYS = ("r_version", "class", "formula", "family", "link", "response", "response_type", "event_coding",
+             "response_levels", "prediction", "design_columns", "aliased", "xlevels", "contrasts", "offset", "weights",
+             "n", "n_fit", "converged", "closed_form", "iterations", "control", "column_classes")
 
 
 def environment_packages(envs: Environments) -> dict[str, str]:
@@ -45,6 +46,29 @@ def baseline_context(spec: ModelSpec, baseline_dir: Path) -> list[str]:
         "baseline.R, the R code the baseline ran:", "```r", spec.baseline_r.rstrip(), "```", "",
         "R baseline metadata:", json.dumps({k: meta.get(k) for k in META_KEYS}, indent=1), "",
         "R's coefficient names, in order: " + json.dumps(coefficient_names(baseline_dir))]
+
+
+def semantics(spec: ModelSpec) -> list[str]:
+    """The statistical semantics the candidate must carry through fitting and prediction, in plain sentences."""
+    p = spec.prediction
+    lines = [f"Response '{spec.response}' ({spec.response_type})."]
+    if spec.event:
+        lines.append(f"Event: {spec.event.meaning}, coded '{spec.event.coding}' (1 in RESPONSE); otherwise "
+                     f"{spec.event.complement} (0).")
+    if g := spec.grouped_binomial:
+        lines.append(f"Grouped binomial ({g.form}): trials = {g.trials}" + (f", successes = {g.successes}" if
+                                                                             g.successes else "")
+                     + "; RESPONSE holds the proportion of successes and the trials enter the fit as R's weights.")
+    if w := spec.weights:
+        lines.append(f"Weights {w.expression}: {w.type} weights, normalization {w.normalization}. In statsmodels "
+                     "GLM, frequency weights are freq_weights and precision weights are var_weights; sampling "
+                     "weights reproduce R's point estimates as R's prior weights do.")
+    if spec.offset:
+        lines.append(f"Offset: {spec.offset}.")
+    keys = f" Keys, in order: {json.dumps(p.keys)}." if p.keys else ""
+    lines.append(f"Prediction: {p.kind}, {p.quantity} in {p.units}" + (f", per {p.exposure}" if p.exposure else "")
+                 + f". R computes it as {p.r_predict}.{keys} Alignment keys: {p.alignment_keys}.")
+    return ["Statistical semantics:", *(f"- {x}" for x in lines)]
 
 
 def coefficient_names(baseline_dir: Path) -> list[str]:
@@ -84,6 +108,7 @@ class Translator:
         lines = baseline_context(self.spec, self.baseline_dir) + [
             "",
             f"prepare() is called with the path of {self.dataset}. RESPONSE is '{self.spec.response}'.", "",
+            *semantics(self.spec), "",
             contract.INTERFACE, "",
             *([contract.DATA_INTERFACE + " The data files: " + ", ".join(self.data) + ". dataset_profile with a "
                "file's name gives its profile.", ""] if self.data else []),
@@ -128,8 +153,8 @@ def run_candidate(workdir: Path, module: str, spec: ModelSpec, baseline_dir: Pat
     shutil.copy(HARNESS, workdir / "harness.py")
     (workdir / "config.json").write_text(json.dumps({
         "candidate": "candidate.py", "dataset": f"inputs/{dataset.name}",
-        "data": {f.name: f"inputs/{f.name}" for f in data}, "split": "inputs/split.csv",
-        "response": spec.response, "out": "output"}))
+        "data": {f.name: f"inputs/{f.name}" for f in data}, "split": "inputs/split.csv", "out": "output",
+        **spec.capture_config()}))
 
     proc = Process([str(envs.py()), "-I", "harness.py", "config.json"], workdir, {"PYTHONDONTWRITEBYTECODE": "1"},
                    limits)

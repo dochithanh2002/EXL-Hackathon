@@ -42,10 +42,11 @@ def main(dataset: Path) -> int:
     shutil.rmtree(out, ignore_errors=True)
     with tempfile.TemporaryDirectory() as tmp:
         config = Path(tmp) / "config.json"
+        semantics = {"response": spec["response"], "response_type": spec["response_type"],
+                     "prediction": spec["prediction"]}
         config.write_text(json.dumps({"candidate": str(HERE / "model.py"), "dataset": str(dataset.resolve()),
                                       "data": {n: str(p) for n, p in data.items()},
-                                      "split": str(HERE / "reference" / "split.csv"), "response": spec["response"],
-                                      "out": str(out)}))
+                                      "split": str(HERE / "reference" / "split.csv"), "out": str(out), **semantics}))
         if subprocess.run([sys.executable, "-I", str(HERE / "harness.py"), str(config)], cwd=HERE).returncode:
             print("the model failed to run; see output/error.json")
             return 1
@@ -53,8 +54,15 @@ def main(dataset: Path) -> int:
     validation = compare(HERE / "reference", out, spec)
     for check in validation["checks"]:
         value = check["value"]
-        detail = "unavailable" if value is None else f"{value:.3e} <= {check['tolerance']:.0e}"
-        print(f"{'pass' if check['passed'] else 'FAIL'}  {check['name']}  {detail}")
+        if check["status"] == "unavailable":
+            detail = check["reason"] or "could not be computed"
+        elif check["kind"] == "tolerance":
+            detail = (f"max |diff| {check['max_abs_diff']:.3e}, {value:.3g} of atol {check['atol']:.0e} + rtol "
+                      f"{check['rtol']:.0e} * |R|" if check["max_abs_diff"] is not None else f"{value:.3g}")
+        else:
+            detail = f"{value:g}"
+        label = {"passed": "pass", "failed": "FAIL", "unavailable": "N/A"}[check["status"]]
+        print(f"{label}  {check['name']}{'' if check['required'] else ' (optional)'}  {detail}")
     for note in validation["notes"]:
         print(f"note  {note}")
     return 0 if validation["passed"] else 1

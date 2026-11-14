@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 Tier = Literal["exact", "approximate", "unsupported"]
 QualifiedName = Field(pattern=r"^[A-Za-z][A-Za-z0-9.]*::[A-Za-z.][A-Za-z0-9._]*$",
                       description="Package-qualified R function, e.g. stats::glm")
+SKLEARN = re.compile(r"sklearn|scikit", re.IGNORECASE)
 
 
 class Contract(BaseModel):
@@ -37,15 +38,125 @@ class BaselineObjects(Contract):
                                          "dataset; null if R has no such set (a frame read from another file is not one)")
 
 
-Kpi = Literal["auc", "gini", "actual_expected", "rmse", "mae", "deviance", "aic", "log_loss"]
+ResponseType = Literal["binary", "grouped_binomial", "count", "continuous", "monetary_amount", "categorical",
+                       "ordinal"]
+BINARY = ("binary", "grouped_binomial")
+
+
+class Event(Contract):
+    meaning: str = Field(description="What the modelled event is, e.g. 'default: 90+ days past due within 24 months'")
+    complement: str = Field(description="What its absence means, e.g. 'non-default'")
+    coding: str = Field(description="The response value that codes the event, as R reads it: '1' for a 0/1 or "
+                                    "logical column, else the level, e.g. 'Yes'. It must be the outcome whose "
+                                    "probability the R model predicts")
+
+
+class GroupedBinomial(Contract):
+    form: Literal["successes_and_trials", "proportion_and_trials"] = Field(
+        description="cbind(successes, trials - successes) ~ ..., or a proportion response with weights = trials")
+    successes: str | None = Field(default=None, description="R expression for the successes, evaluated in the set "
+                                                            "frame; required for successes_and_trials")
+    trials: str = Field(description="R expression for the number of trials, evaluated in the set frame")
+
+
+class Weights(Contract):
+    expression: str = Field(description="The weights argument exactly as R passes it, evaluated in the set frame")
+    type: Literal["frequency", "sampling", "precision"] = Field(
+        description="frequency: each row stands for that many identical observations; sampling: inverse selection "
+                    "probabilities; precision: variance weights (inverse of each observation's variance)")
+    normalization: Literal["none", "mean_one", "sum_one", "sum_n"] = Field(
+        description="How baseline.R rescales the weights before fitting, if at all")
+
+
+OutputKind = Literal["scalar", "class_probability", "quantile", "time_indexed"]
+EXPECTED_KEYS = {"scalar": ["row"], "class_probability": ["row", "class"], "quantile": ["row", "quantile"]}
+
+
+class Prediction(Contract):
+    kind: OutputKind = Field(description="scalar: one value per row; class_probability: one probability per row "
+                                         "and class; quantile: one value per row and quantile level; time_indexed: "
+                                         "one value per row, each row a time point named by assessment.period_column")
+    quantity: Literal["probability", "count", "frequency", "monetary_amount", "continuous"]
+    units: str = Field(min_length=1, description="What one predicted value means, e.g. 'probability of default "
+                                                 "within 24 months', 'claims per policy-year', 'EUR per claim'")
+    exposure: str | None = Field(default=None, description="For a frequency: the exposure the rate is per, "
+                                                           "e.g. Exposure in policy-years")
+    keys: list[str] = Field(default=[], description="Class labels or quantile levels, in the column order of R's "
+                                                    "prediction; empty for scalar and time_indexed outputs")
+    alignment_keys: list[str] = Field(description="What identifies one predicted value besides the set: ['row'] "
+                                                  "(scalar), ['row', 'class'], ['row', 'quantile'], or ['row', "
+                                                  "<period column>] (time_indexed)")
+    r_predict: str = Field(default='predict(model, newdata = newdata, type = "response", na.action = na.pass)',
+                           description="R expression giving the predictions, with `model` and `newdata` bound: a "
+                                       "numeric vector for scalar and time_indexed outputs, otherwise a matrix with "
+                                       "one column per key")
+
+
+class EvaluationSet(Contract):
+    set: Literal["train", "test"]
+    role: Literal["development", "holdout", "out_of_time"]
+    description: str = Field(description="Which rows, periods or segments the set holds")
+
+
+class Decision(Contract):
+    threshold: float = Field(description="Cut-off on the prediction scale, as the business applies it")
+    action: str = Field(description="What a prediction at or above the threshold triggers, e.g. 'decline'")
+
+
+class Criteria(Contract):
+    """Acceptance thresholds for the financial assessment. Only thresholds the code, the documents or the DS state."""
+    min_events_per_parameter: float | None = Field(default=None, gt=0)
+    max_psi: float | None = Field(default=None, gt=0)
+    max_calibration_deviation: float | None = Field(default=None, gt=0, description="Largest |observed / expected "
+                                                                                    "- 1| on an evaluation set")
+    min_auc: float | None = Field(default=None, gt=0, le=1)
+    min_events_captured: float | None = Field(default=None, ge=0, le=1,
+        description="Minimum event recall at the stated decision threshold on independent data")
+
+
+class Assessment(Contract):
+    business_use: str = Field(description="The decision or process the model supports")
+    intended_population: str = Field(description="Who the model is meant to score")
+    sample_population: str = Field(description="What the data covers (product, channel, period, exclusions) as far "
+                                               "as the code and documents say")
+    evaluation_sets: list[EvaluationSet] = Field(min_length=1)
+    period_column: str | None = Field(default=None, description="Column of the set frames that dates each row, for "
+                                                                "stability by period")
+    decision: Decision | None = None
+    criteria: Criteria = Field(default_factory=Criteria)
+    missing_information: list[str] = Field(description="What the DS must still provide (data, periods, thresholds, "
+                                                       "business assumptions); never invent it")
+
+
+Metric = Literal["auc", "gini", "ks", "actual_expected", "rmse", "mae", "deviance", "aic", "log_loss", "brier",
+                 "pinball_loss"]
+BINARY_METRICS = {"auc", "gini", "ks"}
+
+
+class Tolerance(Contract):
+    """|python - r| <= atol + rtol * |r|. atol is in the quantity's own units."""
+    atol: float = Field(ge=0)
+    rtol: float = Field(ge=0)
+
+    @model_validator(mode="after")
+    def _positive(self) -> Tolerance:
+        if self.atol == 0 and self.rtol == 0:
+            raise ValueError("atol and rtol cannot both be 0")
+        return self
+
+
+def _tol(atol: float, rtol: float):
+    return Field(default_factory=lambda: Tolerance(atol=atol, rtol=rtol))
 
 
 class Tolerances(Contract):
-    coef_rel: float = Field(default=1e-6, gt=0)
-    se_rel: float = Field(default=1e-6, gt=0)
-    pred_abs: float = Field(default=1e-8, gt=0)
-    fit_stat_rel: float = Field(default=1e-6, gt=0)
-    kpi_abs: float = Field(default=1e-6, gt=0)
+    coefficients: Tolerance = _tol(1e-8, 1e-6)
+    std_errors: Tolerance = _tol(1e-8, 1e-6)
+    predictions: Tolerance = Field(default_factory=lambda: Tolerance(atol=1e-8, rtol=1e-6),
+                                   description="atol in the prediction's units, e.g. currency for amounts")
+    fit_statistics: Tolerance = _tol(1e-8, 1e-6)
+    metrics: Tolerance = _tol(1e-8, 1e-6)
+    per_metric: dict[Metric, Tolerance] = Field(default={}, description="Overrides of `metrics` by metric name")
 
 
 class Substitution(Contract):
@@ -54,21 +165,48 @@ class Substitution(Contract):
     rationale: str
 
 
+class Convergence(Contract):
+    mode: Literal["auto", "expression", "not_applicable"] = "auto"
+    r_check: str | None = Field(default=None, description="R expression returning one logical solver-success value; "
+        "model and fit_warnings are bound. Inspect actual solver evidence, never return a constant true")
+    rationale: str | None = Field(default=None, description="Required for a custom check or an explicit exemption")
+
+    @model_validator(mode="after")
+    def _contract(self) -> Convergence:
+        if self.mode != "auto" and not (self.rationale or "").strip():
+            raise ValueError("custom convergence handling requires a rationale")
+        if (self.mode == "expression") != bool((self.r_check or "").strip()):
+            raise ValueError("r_check is required exactly for expression mode")
+        return self
+
+
 class ModelSpec(Contract):
-    schema_version: Literal["1"] = "1"
+    schema_version: Literal["2"] = "2"
     target_model: str = Field(description="What the model predicts and for whom, in one sentence")
     r_function: str = QualifiedName
-    statsmodels_counterpart: str = Field(description="e.g. statsmodels.api.GLM")
+    python_implementation: str = Field(description="The Python estimator that reproduces it, e.g. "
+                                                   "statsmodels.api.GLM; scikit-learn is excluded")
     support_tier: Tier
+    limitation: str | None = Field(default=None, description="Why no faithful Python implementation is possible; "
+                                                             "required when support_tier is unsupported")
     family: str | None = Field(default=None, description="R family name, e.g. poisson")
     link: str | None = None
     formula: str = Field(description="Model formula exactly as R fits it")
-    response: str
+    response: str = Field(description="Response column of the set frames")
+    response_type: ResponseType
+    event: Event | None = Field(default=None, description="Required for binary and grouped_binomial responses")
+    grouped_binomial: GroupedBinomial | None = Field(default=None, description="Required for grouped_binomial")
     offset: str | None = Field(default=None, description="Offset expression, e.g. log(Exposure)")
-    weights: str | None = None
+    weights: Weights | None = None
+    prediction: Prediction
+    convergence: Convergence = Field(default_factory=Convergence)
     preprocessing: list[PreprocessingStep]
     split: SplitDefinition
-    kpis: list[Kpi]
+    assessment: Assessment
+    metrics: list[Metric] = Field(description="Evaluation metrics compared between R and Python on every set")
+    optional_metrics: dict[Literal["train", "test"], list[Metric]] = Field(default={},
+        description="Explicit per-set exceptions: unavailable metrics do not block acceptance. All requested "
+                    "metrics are required unless listed here before spec confirmation")
     tolerances: Tolerances = Field(default_factory=Tolerances)
     unsupported_items: list[str] = Field(description="Constructs in the uploaded code that cannot be translated")
     substitutions: list[Substitution]
@@ -78,40 +216,120 @@ class ModelSpec(Contract):
                                         "row names, which trace every row back to the dataset file")
     baseline_objects: BaselineObjects
 
+    @model_validator(mode="after")
+    def _semantics(self) -> ModelSpec:
+        errors = []
+        if SKLEARN.search(self.python_implementation):
+            errors.append("python_implementation: scikit-learn implementations are excluded")
+        if self.support_tier == "unsupported" and not (self.limitation or "").strip():
+            errors.append("limitation: explain why no faithful Python implementation is possible")
+        if self.response_type in BINARY and self.event is None:
+            errors.append(f"event: required for a {self.response_type} response")
+        if (self.response_type == "grouped_binomial") != (self.grouped_binomial is not None):
+            errors.append("grouped_binomial: required exactly when response_type is grouped_binomial")
+        g = self.grouped_binomial
+        if g and g.form == "successes_and_trials" and not (g.successes or "").strip():
+            errors.append("grouped_binomial.successes: required for the successes_and_trials form")
+        p, a = self.prediction, self.assessment
+        if p.kind in ("class_probability", "quantile") and not p.keys:
+            errors.append(f"prediction.keys: list the {'classes' if p.kind == 'class_probability' else 'quantiles'}")
+        if p.kind in ("scalar", "time_indexed") and p.keys:
+            errors.append(f"prediction.keys: must be empty for a {p.kind} output")
+        if p.kind == "quantile":
+            try:
+                if not all(0 < float(k) < 1 for k in p.keys):
+                    raise ValueError
+            except ValueError:
+                errors.append("prediction.keys: quantile levels must be numbers strictly between 0 and 1")
+        if p.kind == "class_probability" and self.response_type not in ("categorical", "ordinal", "binary"):
+            errors.append("prediction.kind: class probabilities need a categorical, ordinal or binary response")
+        if p.kind in ("scalar", "time_indexed") and self.response_type in BINARY and p.quantity != "probability":
+            errors.append(f"prediction.quantity: a {self.response_type} model predicts a probability")
+        if p.kind == "time_indexed" and not a.period_column:
+            errors.append("assessment.period_column: required for a time_indexed output")
+        expected = EXPECTED_KEYS.get(p.kind, ["row", a.period_column or "<period column>"])
+        if p.alignment_keys != expected:
+            errors.append(f"prediction.alignment_keys: must be {expected} for a {p.kind} output")
+        sets = [e.set for e in a.evaluation_sets]
+        if len(sets) != len(set(sets)) or "train" not in sets:
+            errors.append("assessment.evaluation_sets: list train once, and test once if R has a test set")
+        if ("test" in sets) != (self.baseline_objects.test is not None):
+            errors.append("assessment.evaluation_sets: must list test exactly when baseline_objects.test is set")
+        if bad := sorted(BINARY_METRICS & set(self.metrics)) if self.response_type not in BINARY else []:
+            errors.append(f"metrics: {bad} need a binary or grouped_binomial response")
+        if "pinball_loss" in self.metrics and p.kind != "quantile":
+            errors.append("metrics: pinball_loss needs a quantile output")
+        if extra := sorted(set(self.tolerances.per_metric) - set(self.metrics)):
+            errors.append(f"tolerances.per_metric: {extra} are not in metrics")
+        for name, metrics in self.optional_metrics.items():
+            if name not in sets or not set(metrics) <= set(self.metrics):
+                errors.append("optional_metrics must name an evaluation set and requested metrics")
+        if errors:
+            raise ValueError("; ".join(errors))
+        return self
+
     def baseline_key(self) -> dict:
         """Every spec field the R baseline run consumes. Equal keys mean a confirmed baseline can be reused."""
         return {"baseline_r": self.baseline_r, "baseline_objects": self.baseline_objects.model_dump(),
-                "r_packages": sorted(self.r_packages), "seed": self.split.seed, "response": self.response}
+                "r_packages": sorted(self.r_packages), "seed": self.split.seed, **self.capture_config()}
+
+    def capture_config(self) -> dict:
+        """The semantics the R capture harness and the Python harness both apply to the set frames."""
+        return {"response": self.response, "response_type": self.response_type,
+                "event_coding": self.event.coding if self.event else None,
+                "grouped": self.grouped_binomial.model_dump() if self.grouped_binomial else None,
+                "weights": self.weights.expression if self.weights else None,
+                "prediction": {"kind": self.prediction.kind, "keys": self.prediction.keys,
+                               "r_predict": self.prediction.r_predict},
+                "convergence": self.convergence.model_dump(),
+                "period_column": self.assessment.period_column}
 
 
 # ---------------------------------------------------------------- Translator
 class Candidate(Contract):
-    schema_version: Literal["1"] = "1"
+    schema_version: Literal["2"] = "2"
     module: str = Field(description="Complete Python module implementing the candidate interface")
     notes: list[str]
+    limitations: list[str] = Field(default=[], description="Anything the module cannot reproduce faithfully, and "
+                                                           "why; never hidden by a different model")
     changes: str = Field(default="", description="For repairs: what changed and why")
 
 
 # ---------------------------------------------------------------- Diagnostician
 class Diagnosis(Contract):
-    schema_version: Literal["1"] = "1"
+    schema_version: Literal["2"] = "2"
+    category: Literal["migration_defect", "specification", "not_reproducible", "model_fitness"] = Field(
+        description="migration_defect: the code departs from baseline.R (goes to the Translator); specification: the "
+                    "spec misdescribes baseline.R or its tolerances; not_reproducible: no faithful Python "
+                    "implementation can match R; model_fitness: the migration is faithful but the DS's concern is "
+                    "the model itself. All but migration_defect go to the DS")
     root_cause: str
     evidence: list[str] = Field(min_length=1, description="Observed differences or errors supporting the root cause")
     repair_instructions: list[str] = Field(description="What the Translator must change in the candidate")
-    spec_change_needed: bool = Field(description="True if the fix needs a new ModelSpec rather than new code")
+    assessment_findings: list[str] = Field(default=[], description="What the assessment summaries say about "
+                                                                   "sample suitability, stability, calibration and "
+                                                                   "decision performance, or that a question was "
+                                                                   "not assessed")
+    spec_change_needed: bool = Field(description="True if the fix needs the DS (a new ModelSpec) rather than new code")
     proposed_spec_change: str | None = Field(default=None, description="Required when spec_change_needed is true")
+    limitation: str | None = Field(default=None, description="Required for not_reproducible: what blocks a "
+                                                             "faithful implementation")
 
     @model_validator(mode="after")
     def _actionable(self) -> Diagnosis:
+        if self.spec_change_needed != (self.category != "migration_defect"):
+            raise ValueError("spec_change_needed must be false exactly for a migration_defect")
         if self.spec_change_needed and not (self.proposed_spec_change or "").strip():
             raise ValueError("proposed_spec_change is required when spec_change_needed is true")
         if not self.spec_change_needed and not self.repair_instructions:
             raise ValueError("repair_instructions must not be empty unless spec_change_needed is true")
+        if self.category == "not_reproducible" and not (self.limitation or "").strip():
+            raise ValueError("limitation is required for not_reproducible")
         return self
 
 
 # ---------------------------------------------------------------- Reporter
-PLACEHOLDER = re.compile(r"\{\{([A-Za-z0-9_:-]+)\.([A-Za-z0-9_.:-]+)\}\}")
+PLACEHOLDER = re.compile(r"\{\{([A-Za-z0-9_:-]+)\.([A-Za-z0-9_.:\[\]-]+)\}\}")
 CODE_SPAN = re.compile(r"`[^`\n]+`")
 
 
@@ -136,21 +354,35 @@ class Claim(Contract):
         return _no_literal_numbers(v)
 
 
-class Section(Contract):
-    heading: str = Field(description="No literal numbers and no placeholders")
-    claims: list[Claim] = Field(min_length=1)
+Claims = Field(min_length=1)
 
-    @field_validator("heading")
-    @classmethod
-    def _heading(cls, v: str) -> str:
-        if PLACEHOLDER.search(v):
-            raise ValueError("headings cannot hold placeholders")
-        return _no_literal_numbers(v)
+
+class FinancialAssessment(Contract):
+    sample_suitability: list[Claim] = Claims
+    stability: list[Claim] = Claims
+    calibration: list[Claim] = Claims
+    decision_performance: list[Claim] = Claims
 
 
 class ReportNarrative(Contract):
-    schema_version: Literal["1"] = "1"
-    sections: list[Section] = Field(min_length=1)
+    """The fixed template of the migration validation report; code adds the headings, statuses and tables."""
+    schema_version: Literal["2"] = "2"
+    scope: list[Claim] = Claims
+    model_and_data_semantics: list[Claim] = Claims
+    parity_results: list[Claim] = Claims
+    financial_assessment: FinancialAssessment
+    skipped_checks: list[Claim] = Claims
+    limitations: list[Claim] = Claims
+    acceptance_decision: list[Claim] = Claims
+
+    def sections(self) -> list[tuple[str, list[Claim]]]:
+        """(field path, claims) in report order."""
+        fa = self.financial_assessment
+        return [("scope", self.scope), ("model_and_data_semantics", self.model_and_data_semantics),
+                ("parity_results", self.parity_results)] + [
+            (f"financial_assessment.{q}", getattr(fa, q)) for q in FinancialAssessment.model_fields] + [
+            ("skipped_checks", self.skipped_checks), ("limitations", self.limitations),
+            ("acceptance_decision", self.acceptance_decision)]
 
 
 ROLES: dict[str, type[Contract]] = {

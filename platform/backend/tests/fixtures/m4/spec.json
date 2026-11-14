@@ -1,15 +1,34 @@
 {
-  "schema_version": "1",
+  "schema_version": "2",
   "target_model": "Probability that a borrower is 90+ days delinquent within two years (Give Me Some Credit)",
   "r_function": "stats::glm",
-  "statsmodels_counterpart": "statsmodels.api.GLM",
+  "python_implementation": "statsmodels.api.GLM",
   "support_tier": "exact",
+  "limitation": null,
   "family": "binomial",
   "link": "logit",
   "formula": "cs_training$SeriousDlqin2yrs ~ .",
   "response": "SeriousDlqin2yrs",
+  "response_type": "binary",
+  "event": {
+    "meaning": "serious delinquency: 90 or more days past due within two years",
+    "complement": "no serious delinquency",
+    "coding": "1"
+  },
+  "grouped_binomial": null,
   "offset": null,
   "weights": null,
+  "prediction": {
+    "kind": "scalar",
+    "quantity": "probability",
+    "units": "probability of serious delinquency within two years",
+    "exposure": null,
+    "keys": [],
+    "alignment_keys": [
+      "row"
+    ],
+    "r_predict": "predict(model, newdata = newdata, type = \"response\", na.action = na.pass)"
+  },
   "preprocessing": [
     {
       "order": 1,
@@ -57,17 +76,53 @@
     "r_code": "",
     "seed": null
   },
-  "kpis": [
+  "assessment": {
+    "business_use": "Ranking credit applicants by risk of serious delinquency",
+    "intended_population": "Consumer credit borrowers scored for credit decisions",
+    "sample_population": "The Give Me Some Credit training file; the code does not state its period or channel",
+    "evaluation_sets": [
+      {
+        "set": "train",
+        "role": "development",
+        "description": "every row of cs-training.csv"
+      }
+    ],
+    "period_column": null,
+    "decision": null,
+    "criteria": {},
+    "missing_information": [
+      "a holdout or out-of-time set",
+      "the decision threshold",
+      "acceptance criteria"
+    ]
+  },
+  "metrics": [
     "auc",
     "gini",
     "log_loss"
   ],
   "tolerances": {
-    "coef_rel": 1e-06,
-    "se_rel": 1e-06,
-    "pred_abs": 1e-08,
-    "fit_stat_rel": 1e-06,
-    "kpi_abs": 1e-06
+    "coefficients": {
+      "atol": 1e-08,
+      "rtol": 1e-06
+    },
+    "std_errors": {
+      "atol": 1e-08,
+      "rtol": 1e-06
+    },
+    "predictions": {
+      "atol": 1e-08,
+      "rtol": 1e-06
+    },
+    "fit_statistics": {
+      "atol": 1e-08,
+      "rtol": 1e-06
+    },
+    "metrics": {
+      "atol": 1e-08,
+      "rtol": 1e-06
+    },
+    "per_metric": {}
   },
   "unsupported_items": [],
   "substitutions": [

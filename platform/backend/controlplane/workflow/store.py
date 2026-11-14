@@ -181,8 +181,8 @@ class Store:
 
     # ------------------------------------------------------------ specs
     def add_spec(self, pid: str, spec: ModelSpec, matrix: SupportMatrix) -> int:
-        """Store the next spec version and record it as drafted, with its tier and proven flag taken from the
-        support matrix (never from the Analyst's own claim)."""
+        """Store the next spec version and record it as drafted, with its tier and proven flag from the support
+        matrix for a known pair (an unknown model keeps the Analyst's tier and is never proven)."""
         with self._tx() as db:
             event = self.draft_spec(db, pid, spec, matrix)
             self.apply(pid, event, db)
@@ -195,7 +195,7 @@ class Store:
         v = db.execute("SELECT COALESCE(MAX(version), 0) + 1 FROM specs WHERE project_id = ?", (pid,)).fetchone()[0]
         db.execute("INSERT INTO specs VALUES (?, ?, ?, ?, ?)",
                    (pid, v, canonical_hash(spec), spec.model_dump_json(), now()))
-        return SpecDrafted(version=v, tier=support.tier, proven=support.proven)
+        return SpecDrafted(version=v, tier=support.tier, proven=support.proven, limitation=spec.limitation or "")
 
     def specs(self, pid: str) -> list[dict]:
         with self._tx() as db:

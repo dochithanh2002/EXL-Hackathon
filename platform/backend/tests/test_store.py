@@ -110,9 +110,9 @@ def test_changing_the_seed_restarts_the_baseline(store):
     confirm(store, pid, spec())
     store.apply(pid, BaselineSucceeded(spec_version=1, baseline_id="b1"))
     split = spec().split.model_dump()
-    s = confirm(store, pid, spec(tolerances={"coef_rel": 1e-4}))
+    s = confirm(store, pid, spec(tolerances={"coefficients": {"atol": 0, "rtol": 1e-4}}))
     assert (s.step, s.baseline_id) == (Step.TRANSLATION, "b1")           # tolerances only: baseline reused
-    s = confirm(store, pid, spec(tolerances={"coef_rel": 1e-4}, split=split | {"seed": 2}))
+    s = confirm(store, pid, spec(tolerances={"coefficients": {"atol": 0, "rtol": 1e-4}}, split=split | {"seed": 2}))
     assert (s.step, s.baseline_id) == (Step.BASELINE, None)              # new seed: baseline rerun
 
 

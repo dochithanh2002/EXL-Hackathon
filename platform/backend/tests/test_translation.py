@@ -69,13 +69,19 @@ def test_a_faithful_candidate_passes_with_r_rows_offset_and_test_set(claims, tmp
     v = run(claims, POISSON_PY, tmp_path)
     assert v.passed, [c for c in v.checks if not c.passed]
     by_name = {c.name: c for c in v.checks}
-    assert by_name["coefficient max rel diff"].value < 1e-12 and by_name["std error max rel diff"].value < 1e-12
-    assert by_name["prediction max abs diff"].value < 1e-10
-    assert {"fit deviance rel diff", "fit log_lik rel diff", "fit aic rel diff"} <= set(by_name)
-    assert set(v.kpis) == {"train", "test"}
-    assert "auc is not defined for the train set's response; not compared" in v.notes      # count response
+    assert by_name["coefficient estimates"].max_abs_diff < 1e-10 and by_name["coefficient estimates"].value < 1e-3
+    assert by_name["coefficient standard errors"].max_abs_diff < 1e-10
+    assert by_name["predictions"].max_abs_diff < 1e-10 and by_name["predictions"].compared == 200
+    assert {"fit deviance", "fit log_lik", "fit aic", "Python fit converged", "valid predictions on test"} <= set(by_name)
+    assert set(v.metrics) == {"train", "test"} and set(v.metrics["test"]) == {"rmse", "deviance", "actual_expected"}
     preds = (tmp_path / "cand" / "output" / "predictions.csv").read_text().splitlines()
-    assert len(preds) == 201 and preds[0] == "row,set,y,response"
+    assert len(preds) == 201 and preds[0] == "row,set,key,y,prediction"
+    # deterministic summaries for the Diagnostician and the report
+    assert v.design["fitted_rows"] == {"r": 140, "python": 140}
+    assert v.design["reference_levels"]["area"] == {"r": "A", "python": "A"}
+    assert v.design["offset"]["differences"]["sum"] == pytest.approx(0, abs=1e-9)
+    assert v.assessment["python"]["decision_performance"]["status"] == "not assessed"     # count response
+    assert v.assessment["python"]["stability"]["results"]["psi_vs_development"]["test"] is not None
 
     # the candidate's working directory holds the dataset and R's sets, never R's estimates
     assert sorted(p.name for p in (tmp_path / "cand" / "inputs").iterdir()) == ["claims.csv", "split.csv"]
@@ -84,17 +90,18 @@ def test_a_faithful_candidate_passes_with_r_rows_offset_and_test_set(claims, tmp
 def test_statsmodels_own_starting_values_cost_standard_error_parity(claims, tmp_path):
     """Rulebook R-EST-02: the default start stops IRLS at a different iterate than R."""
     v = run(claims, POISSON_PY.replace("family=RPoisson()", "family=sm.families.Poisson()"), tmp_path)
-    by_name = {c.name: c.value for c in v.checks}
-    assert by_name["coefficient max rel diff"] < 1e-10 and 1e-8 < by_name["std error max rel diff"] < 1e-6
+    by_name = {c.name: c for c in v.checks}
+    se = by_name["coefficient standard errors"]
+    assert by_name["coefficient estimates"].max_abs_diff < 1e-10 and 1e-10 < se.max_abs_diff < 1e-7
 
 
 def test_a_drifted_candidate_fails_on_the_checks_that_moved(claims, tmp_path):
     drifted = POISSON_PY.replace("offset=np.log(train[\"exposure\"])", "offset=np.log(train[\"exposure\"]) * 0.99")
     v = run(claims, drifted, tmp_path)
     failed = {c.name for c in v.checks if not c.passed}
-    assert not v.passed and {"coefficient max rel diff", "prediction max abs diff"} <= failed
-    assert "coefficient names missing or extra" not in failed and "rows only on one side" not in failed
-    assert v.differences["worst_terms"][0]["estimate_rel"] > 1e-6
+    assert not v.passed and {"coefficient estimates", "predictions"} <= failed
+    assert "coefficient names missing or extra" not in failed and "alignment keys only on one side" not in failed
+    assert v.differences["worst_terms"][0]["estimate_score"] > 1
 
 
 def test_wrong_terms_and_imputed_rows_are_named(claims, tmp_path):
@@ -106,7 +113,7 @@ def test_wrong_terms_and_imputed_rows_are_named(claims, tmp_path):
                                  'X["age"] = frame["age"].astype(float).where(frame.index != 7)')
     v = run(claims, nan_age, tmp_path / "2")
     failed = {c.name for c in v.checks if not c.passed}
-    assert "prediction NA pattern differing" in failed
+    assert "prediction missingness differing" in failed
     assert v.differences["prediction_na_differs_rows"][0]["row"] == 7
 
 
@@ -143,11 +150,15 @@ def test_rebinding_the_dataset_path_cannot_read_another_file(claims, tmp_path):
     assert v.error["message"] == "only the project's data files may be read"
 
 
-def test_fit_cannot_return_a_candidate_defined_results_object(claims, tmp_path):
-    module = POISSON_PY.replace("def fit(train):", "class FakeResults:\n    pass\n\ndef fit(train):\n    return FakeResults()")
+def test_a_results_object_without_coefficients_or_convergence_cannot_pass(claims, tmp_path):
+    """Any results object may be returned, but what it does not report is unavailable, never passed."""
+    module = POISSON_PY.replace("def fit(train):", "class Bare:\n    def predict(self, X, offset=None):\n"
+                                "        return np.exp(offset)\n\ndef fit(train):\n    return Bare()")
     v = run(claims, module, tmp_path)
-    assert v.stage == "runtime" and v.error["stage"] == "reading the fitted results"
-    assert v.error["message"] == "fit() must return a statsmodels results object"
+    c = {x.name: x for x in v.checks}
+    assert v.stage == "parity" and not v.passed
+    assert c["coefficient names missing or extra"].value == 4 and c["coefficient estimates"].status == "unavailable"
+    assert c["Python fit converged"].status == "unavailable" and c["fit deviance"].status == "unavailable"
 
 
 def test_cancel_kills_the_candidate(claims, tmp_path):
@@ -167,6 +178,9 @@ def test_the_translator_sees_names_and_metadata_but_not_r_estimates(claims):
         "guardrail: line 1: module 'os' is not available")
     assert t.check({"module": POISSON_PY})[1] == ["notes: Field required"]
     assert t.check({"module": POISSON_PY, "notes": []})[1] == []
+    assert "Offset: log(exposure)." in prompt and "Prediction: scalar, count in claims per policy" in prompt
+    assert t.check({"module": "from sklearn.linear_model import PoissonRegressor\n" + POISSON_PY, "notes": []})[1][0] \
+        == "guardrail: line 1: scikit-learn is excluded: implement the estimator with statsmodels, scipy or numpy"
 
 
 @pytest.mark.skipif(not (M4_DIR / "data" / "cs-training.csv").exists(), reason=f"M4 not found at {M4_DIR}")
@@ -181,6 +195,157 @@ def test_m4_known_good_candidate_reaches_exact_parity(jobs, tmp_path):
     v = run_candidate(tmp_path / "cand", (FIXTURES / "m4" / "candidate.py").read_text(), spec, baseline_dir, s.files,
                       jobs.settings.project_dir(pid) / "inputs", jobs.envs)
     assert v.passed, json.dumps([c.model_dump() for c in v.checks if not c.passed])
-    worst = max(c.value for c in v.checks if c.name in ("coefficient max rel diff", "std error max rel diff"))
+    worst = max(c.max_abs_diff for c in v.checks if c.name in ("coefficient estimates", "coefficient standard errors"))
     assert worst < 1e-10
-    assert set(v.kpis["train"]) == {"auc", "gini", "log_loss"}
+    assert set(v.metrics["train"]) == {"auc", "gini", "log_loss"}
+    assert v.assessment["python"]["stability"]["status"] == "not assessed"                 # no holdout, no periods
+
+
+MNLOGIT_PY = '''import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+
+RESPONSE = "band"
+KEYS = ["A", "B", "C"]
+
+
+def prepare(path, sets):
+    df = pd.read_csv(path)
+    df.index = pd.RangeIndex(1, len(df) + 1)
+    df[RESPONSE] = df[RESPONSE].astype(str)
+    return {name: df.loc[rows] for name, rows in sets.items()}
+
+
+def design(frame):
+    return pd.DataFrame({"(Intercept)": 1.0, "x": frame["x"].astype(float),
+                         "regionS": (frame["region"] == "S").astype(float)}, index=frame.index)
+
+
+def fit(train):
+    y = pd.Categorical(train[RESPONSE], categories=KEYS).codes
+    return sm.MNLogit(y, design(train)).fit(method="newton", tol=1e-12, maxiter=100, disp=False)
+
+
+def coefficients(result):
+    rows = {}
+    for j, level in enumerate(KEYS[1:]):
+        for term in result.params.index:
+            rows[f"{level}:{term}"] = (result.params.iloc[:, j][term], result.bse.iloc[:, j][term])
+    return pd.DataFrame(rows, index=["estimate", "std_error"]).T
+
+
+def predict(result, frame):
+    return pd.DataFrame(np.asarray(result.predict(design(frame))), index=frame.index, columns=KEYS)
+'''
+
+
+def test_class_probabilities_from_any_results_object_are_compared_by_row_and_class(jobs, tmp_path):
+    from tests.test_baseline import GROUPS
+    from tests.test_schemas import spec as make_spec
+    r = ('df <- read.csv("inputs/groups.csv")\ndf$band <- factor(df$band)\ntrain <- df[df$id <= 90, ]\n'
+         'test <- df[df$id > 90, ]\nfit <- nnet::multinom(band ~ x + region, data = train, trace = FALSE, '
+         'reltol = 1e-14, maxit = 1000)\n')
+    loose = {"atol": 1e-4, "rtol": 1e-4}
+    spec = make_spec(r_function="nnet::multinom", python_implementation="statsmodels.api.MNLogit", family=None,
+                     link=None, formula="band ~ x + region", response="band", response_type="categorical",
+                     support_tier="approximate", metrics=["log_loss", "brier", "aic"], r_packages=["nnet"], baseline_r=r,
+                     tolerances={"coefficients": loose, "std_errors": {"atol": 1e-3, "rtol": 1e-2},
+                                 "predictions": loose, "fit_statistics": loose, "metrics": loose},
+                     prediction={"kind": "class_probability", "quantity": "probability", "units": "band probability",
+                                 "keys": ["A", "B", "C"], "alignment_keys": ["row", "class"],
+                                 "r_predict": 'predict(model, newdata = newdata, type = "probs")'})
+    pid = project_at_baseline(jobs.store, jobs.settings, spec, {"groups.csv": GROUPS.encode(), "m.R": b""})
+    jobs.baseline(pid)
+    s = jobs.store.state(pid)
+    assert s.step == Step.TRANSLATION, s.detail
+    baseline_dir = jobs.settings.data_dir / jobs.store.evidence(pid, s.baseline_id)["body"]["dir"]
+    v = run_candidate(tmp_path / "cand", MNLOGIT_PY, spec, baseline_dir, s.files,
+                      jobs.settings.project_dir(pid) / "inputs", jobs.envs)
+    by_name = {c.name: c for c in v.checks}
+    assert v.passed, json.dumps([c.model_dump() for c in v.checks if not c.passed])
+    assert by_name["predictions"].compared == 120 * 3 and by_name["alignment keys only on one side"].value == 0
+    assert set(v.metrics["test"]) == {"log_loss", "brier"}
+    assert by_name["aic on train"].passed
+    assert v.assessment["python"]["decision_performance"]["status"] == "not assessed"
+    assert set(v.assessment["python"]["calibration"]["results"]["sets"]["test"]) == {"A", "B", "C"}
+
+
+QUANTILE_PY = '''import numpy as np
+import pandas as pd
+from scipy.optimize import linprog
+
+KEYS = ["0.5", "0.9"]
+
+def prepare(path, sets):
+    df = pd.read_csv(path, float_precision="round_trip")
+    df.index = pd.RangeIndex(1, len(df) + 1)
+    return {name: df.loc[rows] for name, rows in sets.items()}
+
+def design(frame):
+    return np.column_stack([np.ones(len(frame)), frame["x"]])
+
+class Fit:
+    pass
+
+def fit(train):
+    result = Fit()
+    X, y = design(train), train["y"].to_numpy()
+    n, k = X.shape
+    result.fits = []
+    for key in KEYS:
+        tau = float(key)
+        cost = np.concatenate([np.zeros(k), np.full(n, tau), np.full(n, 1-tau)])
+        constraints = np.column_stack([X, np.eye(n), -np.eye(n)])
+        result.fits.append(linprog(cost, A_eq=constraints, b_eq=y,
+                                  bounds=[(None, None)] * k + [(0, None)] * (2*n), method="highs"))
+    result.converged = all(f.success for f in result.fits)
+    return result
+
+def coefficients(result):
+    rows = {}
+    for i, term in enumerate(["(Intercept)", "x"]):
+        for key, f in zip(KEYS, result.fits):
+            rows[f"{term}:tau= {key}"] = (f.x[i], np.nan)
+    return pd.DataFrame(rows, index=["estimate", "std_error"]).T
+
+def predict(result, frame):
+    return pd.DataFrame({key: design(frame) @ f.x[:2] for key, f in zip(KEYS, result.fits)}, index=frame.index)
+'''
+
+
+@pytest.mark.parametrize("solver_warning", [False, True])
+def test_quantile_migration_passes_with_solver_specific_convergence(jobs, tmp_path, solver_warning):
+    import math
+    from tests.test_schemas import spec as make_spec
+    # Exactly representable inputs keep this regression about solvers, not CSV parser rounding.
+    data = "x,y\n" + "\n".join(
+        f"{i/8},{round((2+.3*i/8+math.sin(i/8*1.37))*1024)/1024}" for i in range(1, 81))
+    r = ('df <- read.csv("inputs/quantiles.csv")\ntrain <- df\n'
+         'fit <- quantreg::rq(y ~ x, tau = c(0.5, 0.9), method = "fn", data = train)\n')
+    if solver_warning:
+        r += 'warning("solver did not converge")\n'
+    spec = make_spec(r_function="quantreg::rq", python_implementation="scipy.optimize.linprog", family=None,
+                     link=None, response="y", response_type="continuous", formula="y ~ x", event=None,
+                     metrics=["pinball_loss"], r_packages=["quantreg"], baseline_r=r,
+                     baseline_objects={"model": "fit", "train": "train", "test": None},
+                     convergence={"mode": "expression",
+                                  "r_check": 'identical(model$method, "fn") && length(fit_warnings) == 0 && all(is.finite(coef(model)))',
+                                  "rationale": "rq's Frisch-Newton solver signals failure through warnings or errors; require a finite solution and no warnings"},
+                     prediction={"kind": "quantile", "quantity": "continuous", "units": "response units",
+                                 "keys": ["0.5", "0.9"], "alignment_keys": ["row", "quantile"],
+                                 "r_predict": "predict(model, newdata = newdata)"})
+    pid = project_at_baseline(jobs.store, jobs.settings, spec, {"quantiles.csv": data.encode(), "m.R": b""})
+    jobs.baseline(pid)
+    s = jobs.store.state(pid)
+    assert s.step == Step.TRANSLATION, s.detail
+    baseline = jobs.settings.data_dir / jobs.store.evidence(pid, s.baseline_id)["body"]["dir"]
+    assert json.loads((baseline / "meta.json").read_text())["converged"] is (not solver_warning)
+    v = run_candidate(tmp_path / "quantile", QUANTILE_PY, spec, baseline, s.files,
+                      jobs.settings.project_dir(pid) / "inputs", jobs.envs)
+    if solver_warning:
+        assert not v.passed
+        assert next(c for c in v.checks if c.name == "R reference fit converged").status == "failed"
+        return
+    assert v.passed, [(c.name, c.status) for c in v.checks if not c.passed]
+    assert {c.name for c in v.checks if c.passed} >= {
+        "R reference fit converged", "Python fit converged", "predictions", "pinball_loss on train"}

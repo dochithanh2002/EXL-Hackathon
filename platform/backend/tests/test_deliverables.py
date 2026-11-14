@@ -30,7 +30,7 @@ def test_bundle_refuses_lockfiles_changed_since_approval(tmp_path, changed):
     assert not dest.exists() and not dest.with_suffix(".zip").exists()
 
 
-@pytest.mark.parametrize("case", ["identical", "reordered_terms", "fit_statistics", "response", "kpi"])
+@pytest.mark.parametrize("case", ["identical", "reordered_terms", "fit_statistics", "response", "kpi", "unavailable_metric"])
 def test_standalone_verifier_repeats_approval_checks_without_backend_dependencies(tmp_path, case):
     coefs, preds, fit = list(COEFS), [list(p) for p in PREDS], dict(PY_FIT)
     if case == "reordered_terms":
@@ -42,7 +42,9 @@ def test_standalone_verifier_repeats_approval_checks_without_backend_dependencie
     elif case == "kpi":
         preds[0][3] += 1e-9             # prediction still passes; the stricter requested KPI tolerance does not
     baseline, output = pair(tmp_path, coefs=coefs, preds=preds, py_fit=fit)
-    spec = make_spec(kpis=["auc", "gini", "log_loss", "actual_expected", "aic"], tolerances={"kpi_abs": 1e-12})
+    spec = make_spec(metrics=["auc", "gini", "log_loss", "actual_expected", "aic"],
+                     optional_metrics={} if case == "unavailable_metric" else {"test": ["auc", "gini"]},
+                     tolerances={"metrics": {"atol": 1e-12, "rtol": 0}})
     expected = compare(baseline, output, spec)
     assert expected.passed == (case in ("identical", "reordered_terms"))
 
@@ -63,10 +65,12 @@ def test_standalone_verifier_repeats_approval_checks_without_backend_dependencie
     result = subprocess.run([sys.executable, "-S", "verify.py", str(dataset)], cwd=root,
                             env={}, capture_output=True, text=True)
     assert result.returncode == (0 if expected.passed else 1), result.stdout + result.stderr
-    lines = [line.split("  ")[:2] for line in result.stdout.splitlines() if line.startswith(("pass  ", "FAIL  "))]
-    assert lines == [["pass" if c.passed else "FAIL", c.name] for c in expected.checks]
+    lines = [line.split("  ")[:2] for line in result.stdout.splitlines() if line.startswith(("pass  ", "FAIL  ", "N/A  "))]
+    label = {"passed": "pass", "failed": "FAIL", "unavailable": "N/A"}
+    assert lines == [[label[c.status], c.name + ("" if c.required else " (optional)")] for c in expected.checks]
     assert [line.removeprefix("note  ") for line in result.stdout.splitlines() if line.startswith("note  ")] == (
         expected.notes)
     if case == "kpi":
-        assert all(c.passed for c in expected.checks if not c.name.startswith("kpi "))
-        assert any(not c.passed for c in expected.checks if c.name.startswith("kpi "))
+        metrics = [c for c in expected.checks if c.quantity == "metrics"]
+        assert all(c.passed or not c.required for c in expected.checks if c.quantity != "metrics")
+        assert any(c.status == "failed" for c in metrics)

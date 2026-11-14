@@ -4,14 +4,28 @@ import { Code, Diff, ErrorText, Fields, Mono, Muted, Panel } from "@/components/
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
-import { get, p, post, type SpecRow, type SpecVersion, type Tier } from "@/lib/api";
+import type * as React from "react";
+import { get, type ModelSpec, p, post, type SpecRow, type SpecVersion, type Tier, type Tolerance } from "@/lib/api";
 import { num } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { StepProps } from "@/pages/Project";
 
 export function TierBadge({ tier, proven }: { tier: Tier; proven: boolean }) {
   const variant = tier === "exact" ? (proven ? "pass" : "secondary") : tier === "approximate" ? "warn" : "fail";
-  return <Badge variant={variant}>{tier}{tier === "exact" && !proven ? " · no passing fixture yet" : ""}</Badge>;
+  const label = tier === "unsupported" ? "no faithful Python implementation" : `${tier} parity`;
+  return <Badge variant={variant}>{label}{tier !== "unsupported" && !proven ? " · no passing fixture yet" : ""}</Badge>;
+}
+
+const tol = (t: Tolerance) => `atol ${num(t.atol)}, rtol ${num(t.rtol)}`;
+
+function List({ title, items, tone }: { title: string; items: React.ReactNode[]; tone?: string }) {
+  if (!items.length) return null;
+  return (
+    <div>
+      <h4 className={cn("mb-2 text-sm font-medium", tone)}>{title}</h4>
+      <ul className="flex list-disc flex-col gap-1 pl-5 text-sm">{items.map((x, i) => <li key={i}>{x}</li>)}</ul>
+    </div>
+  );
 }
 
 export function Alignment({ project, rev }: StepProps) {
@@ -20,7 +34,7 @@ export function Alignment({ project, rev }: StepProps) {
   const latest = specs.data?.at(-1)?.version;
   const [picked, setPicked] = useState<number>();
   const version = picked ?? latest;
-  if (specs.data && !specs.data.length) return <Muted>The Analyst is reading the R code and the dataset profile; its draft spec appears here.</Muted>;
+  if (specs.data && !specs.data.length) return <Muted>The Analyst is reading the R code and the dataset profile; its draft model specification appears here.</Muted>;
   if (!version) return <ErrorText error={specs.error} />;
   return (
     <>
@@ -60,22 +74,21 @@ function Spec({ project, version }: StepProps & { version: number }) {
     && !(s.step === 2 && s.status === "working") && s.step !== 1;
   return (
     <>
-      <Panel title={<span className="flex items-center gap-2">Spec v{version} <TierBadge tier={support.tier} proven={support.proven} /></span>}>
+      <Panel title={<span className="flex items-center gap-2">Model Specification v{version} <TierBadge tier={support.tier} proven={support.proven} /></span>}>
         <div className="flex flex-col gap-5">
           <p className="text-sm">{spec.target_model}</p>
+          {spec.limitation && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm">{spec.limitation}</div>
+          )}
           <Fields rows={[
-            ["R", <Mono>{spec.r_function}</Mono>],
-            ["statsmodels", <Mono>{spec.statsmodels_counterpart}</Mono>],
+            ["Statistical model", <Mono>{spec.r_function}</Mono>],
+            ["Python implementation", <Mono>{spec.python_implementation}</Mono>],
             ["Family", spec.family ? `${spec.family}${spec.link ? ` (${spec.link})` : ""}` : null],
             ["Formula", <Mono>{spec.formula}</Mono>],
-            ["Response", <Mono>{spec.response}</Mono>],
-            ["Offset", spec.offset && <Mono>{spec.offset}</Mono>],
-            ["Weights", spec.weights && <Mono>{spec.weights}</Mono>],
             ["Split", <>{spec.split.method}{spec.split.seed !== null ? `, seed ${spec.split.seed}` : ""}</>],
-            ["KPIs", spec.kpis.join(", ") || null],
-            ["Tolerances", Object.entries(spec.tolerances).map(([k, v]) => `${k} ${num(v)}`).join(" · ")],
             ["R packages", spec.r_packages.join(", ") || null],
           ]} />
+          <Semantics spec={spec} />
           {spec.preprocessing.length > 0 && (
             <div>
               <h4 className="mb-2 text-sm font-medium">Preprocessing</h4>
@@ -86,24 +99,12 @@ function Spec({ project, version }: StepProps & { version: number }) {
               </ol>
             </div>
           )}
-          {spec.unsupported_items.length > 0 && (
-            <div>
-              <h4 className="mb-2 text-sm font-medium text-destructive">Unsupported</h4>
-              <ul className="list-disc pl-5 text-sm">{spec.unsupported_items.map((u) => <li key={u}>{u}</li>)}</ul>
-            </div>
-          )}
-          {spec.substitutions.length > 0 && (
-            <div>
-              <h4 className="mb-2 text-sm font-medium">Substitutions</h4>
-              <ul className="flex flex-col gap-1 text-sm">
-                {spec.substitutions.map((x) => (
-                  <li key={x.original}>{x.original} → {x.proposed} <span className="text-muted-foreground">{x.rationale}</span></li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <List title="Not translated" tone="text-destructive" items={spec.unsupported_items} />
+          <List title="Substitutions" items={spec.substitutions.map((x) => <>{x.original} → {x.proposed} <span className="text-muted-foreground">{x.rationale}</span></>)} />
         </div>
       </Panel>
+
+      <Assessment spec={spec} />
 
       <Panel
         title="baseline.R"
@@ -132,13 +133,71 @@ function Spec({ project, version }: StepProps & { version: number }) {
           {risk && (
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
-              {support.tier === "approximate" ? "I accept approximate parity for this model" : "I accept that this pair has no passing fixture yet"}
+              {support.tier === "approximate" ? "I accept approximate parity for this model" : support.known ? "I accept that this pair has no passing fixture yet" : "I accept that this R → Python pair is untested"}
             </label>
           )}
           <ErrorText error={confirm.error} />
-          <Button disabled={(risk && !accepted) || confirm.isPending} onClick={() => confirm.mutate()}>Confirm spec v{version}</Button>
+          <Button disabled={(risk && !accepted) || confirm.isPending} onClick={() => confirm.mutate()}>Confirm Model Specification v{version}</Button>
         </div>
       )}
     </>
+  );
+}
+
+function Semantics({ spec }: { spec: ModelSpec }) {
+  const pr = spec.prediction;
+  const t = spec.tolerances;
+  return (
+    <div>
+      <h4 className="mb-2 text-sm font-medium">Statistical semantics</h4>
+      <Fields rows={[
+        ["Response", <><Mono>{spec.response}</Mono> {spec.response_type.replace("_", " ")}</>],
+        ["Event", spec.event && <>{spec.event.meaning} <span className="text-muted-foreground">coded <Mono>{spec.event.coding}</Mono>; otherwise {spec.event.complement}</span></>],
+        ["Grouped binomial", spec.grouped_binomial && <>{spec.grouped_binomial.form.replaceAll("_", " ")}: trials <Mono>{spec.grouped_binomial.trials}</Mono>{spec.grouped_binomial.successes && <>, successes <Mono>{spec.grouped_binomial.successes}</Mono></>}</>],
+        ["Weights", spec.weights && <><Mono>{spec.weights.expression}</Mono> {spec.weights.type} weights, normalization {spec.weights.normalization.replaceAll("_", " ")}</>],
+        ["Offset", spec.offset && <Mono>{spec.offset}</Mono>],
+        ["Prediction", <>{pr.units} <span className="text-muted-foreground">{pr.kind.replace("_", " ")}, {pr.quantity.replace("_", " ")}{pr.exposure ? ` per ${pr.exposure}` : ""}</span></>],
+        ["Prediction keys", pr.keys.length ? pr.keys.join(", ") : null],
+        ["Aligned on", pr.alignment_keys.join(" × ")],
+        ["R prediction", <Mono>{pr.r_predict}</Mono>],
+        ["Evaluation metrics", spec.metrics.join(", ") || null],
+        ["Optional metrics", Object.entries(spec.optional_metrics).map(([s, ms]) => `${s}: ${ms.join(", ")}`).join("; ") || "None"],
+        ["R convergence check", spec.convergence.r_check || spec.convergence.mode],
+        ["Convergence rationale", spec.convergence.rationale],
+        ["Tolerances", (
+          <span className="flex flex-col">
+            {(["coefficients", "std_errors", "predictions", "fit_statistics", "metrics"] as const).map((k) => (
+              <span key={k}>{k.replace("_", " ")}: {tol(t[k])}</span>
+            ))}
+            {Object.entries(t.per_metric).map(([k, v]) => <span key={k}>{k}: {tol(v)}</span>)}
+          </span>
+        )],
+      ]} />
+    </div>
+  );
+}
+
+function Assessment({ spec }: { spec: ModelSpec }) {
+  const a = spec.assessment;
+  const criteria = Object.entries(a.criteria).filter(([, v]) => v !== null);
+  return (
+    <Panel title="Financial model assessment">
+      <div className="flex flex-col gap-5">
+        <Fields rows={[
+          ["Business use", a.business_use],
+          ["Intended population", a.intended_population],
+          ["Sample", a.sample_population],
+          ["Evaluation sets", (
+            <span className="flex flex-col">
+              {a.evaluation_sets.map((e) => <span key={e.set}><Mono>{e.set}</Mono> {e.role.replace("_", " ")} <span className="text-muted-foreground">{e.description}</span></span>)}
+            </span>
+          )],
+          ["Period column", a.period_column && <Mono>{a.period_column}</Mono>],
+          ["Decision", a.decision && `${a.decision.action} at or above ${num(a.decision.threshold)}`],
+          ["Acceptance criteria", criteria.length ? criteria.map(([k, v]) => `${k.replaceAll("_", " ")} ${num(v)}`).join(" · ") : null],
+        ]} />
+        <List title="Still to provide" tone="text-[oklch(0.5_0.12_75)]" items={a.missing_information} />
+      </div>
+    </Panel>
   );
 }
