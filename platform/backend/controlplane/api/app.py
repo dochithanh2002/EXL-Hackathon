@@ -32,7 +32,7 @@ from ..workflow.machine import (Bindings, CandidateApproved, CandidateRejected, 
 log = logging.getLogger(__name__)
 LOG_TAIL = 1 << 20
 SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._ -]{0,127}$")
-EXTENSIONS = {"dataset": {".csv"}, "r_code": {".r", ".rmd", ".qmd"}, "document": {".md", ".txt", ".pdf", ".docx"}}
+EXTENSIONS = {"dataset": {".csv"}, "data": {".csv"}, "r_code": {".r", ".rmd", ".qmd"}, "document": {".md", ".txt", ".pdf", ".docx"}}
 
 
 class Message(BaseModel):
@@ -145,9 +145,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         name: Annotated[str, Form(min_length=1, max_length=200)],
         dataset: Annotated[UploadFile, File()],
         r_code: Annotated[list[UploadFile], File()],
+        data: Annotated[list[UploadFile], File()] = [],
         documents: Annotated[list[UploadFile], File()] = [],
     ):
-        uploads = [("dataset", dataset)] + [("r_code", f) for f in r_code] + [("document", f) for f in documents]
+        """`dataset` is the CSV the model's rows come from; `data` are other CSVs the R code reads."""
+        uploads = ([("dataset", dataset)] + [("data", f) for f in data] + [("r_code", f) for f in r_code]
+                   + [("document", f) for f in documents])
         for role, f in uploads:
             _check_name(role, f.filename)
         if len({f.filename for _, f in uploads}) != len(uploads):
@@ -212,9 +215,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(404, str(e))
 
     @app.get("/api/projects/{pid}/profile")
-    def dataset_profile(request: Request, pid: str):
+    def dataset_profile(request: Request, pid: str, name: str | None = None):
+        """The profile of the dataset, or of the data file `name`."""
         try:
-            return analyst(request, pid).profile()
+            return analyst(request, pid).profile(name)
         except ToolError as e:
             raise HTTPException(422, str(e))
 

@@ -140,7 +140,7 @@ def test_rebinding_the_dataset_path_cannot_read_another_file(claims, tmp_path):
     module = POISSON_PY.replace("df = pd.read_csv(path)", 'path = "inputs/split.csv"\n    df = pd.read_csv(path)')
     v = run(claims, module, tmp_path)
     assert v.stage == "runtime" and v.error["stage"] == "prepare()"
-    assert v.error["message"] == "only the dataset may be read"
+    assert v.error["message"] == "only the project's data files may be read"
 
 
 def test_fit_cannot_return_a_candidate_defined_results_object(claims, tmp_path):

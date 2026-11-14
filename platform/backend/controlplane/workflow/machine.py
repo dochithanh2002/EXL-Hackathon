@@ -60,7 +60,9 @@ class Bindings(Frozen):
 
 
 class InputFile(Frozen):
-    role: Literal["dataset", "r_code", "document"]
+    """`dataset` is the one file the model's rows come from; `data` files are other CSVs baseline.R reads (joined
+    or aggregated into the dataset, for example)."""
+    role: Literal["dataset", "data", "r_code", "document"]
     name: str
     sha256: SHA256
 

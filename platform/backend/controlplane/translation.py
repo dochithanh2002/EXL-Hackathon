@@ -61,16 +61,16 @@ class Translator:
     Diagnostician's findings (`repair`: attempt, limit, module, diagnosis)."""
 
     def __init__(self, spec: ModelSpec, baseline_dir: Path, dataset: str, envs: Environments,
-                 profile: Callable[[], dict], repair: dict | None = None):
+                 profile: Callable[[str | None], dict], data: list[str] = (), repair: dict | None = None):
         self.spec, self.baseline_dir, self.dataset, self.envs = spec, baseline_dir, dataset, envs
-        self.profile, self.repair = profile, repair
+        self.profile, self.data, self.repair = profile, list(data), repair
 
     def check(self, raw: dict) -> tuple[Candidate | None, list[str]]:
         try:
             cand = Candidate.model_validate(raw)
         except ValidationError as e:
             return None, [f"{'.'.join(map(str, err['loc'])) or '(root)'}: {err['msg']}" for err in e.errors()]
-        errors = [f"guardrail: {v}" for v in contract.check(cand.module)]
+        errors = [f"guardrail: {v}" for v in contract.check(cand.module, data=bool(self.data))]
         if self.repair:
             if cand.module.strip() == self.repair["module"].strip():
                 errors.append("module: identical to the previous candidate; apply the repair instructions")
@@ -85,10 +85,12 @@ class Translator:
             "",
             f"prepare() is called with the path of {self.dataset}. RESPONSE is '{self.spec.response}'.", "",
             contract.INTERFACE, "",
+            *([contract.DATA_INTERFACE + " The data files: " + ", ".join(self.data) + ". dataset_profile with a "
+               "file's name gives its profile.", ""] if self.data else []),
             f"Python environment: {packages}. Standard-library imports allowed: "
             + ", ".join(sorted(contract.STDLIB - {"__future__"})) + ".",
-            "The module must not read any file other than the dataset, write files, use the network, run shell "
-            "commands, use randomness, or use eval, exec, getattr or dunder attributes.", ""]
+            "The module must not read any file other than the project's data files, write files, use the network, "
+            "run shell commands, use randomness, or use eval, exec, getattr or dunder attributes.", ""]
         if not self.repair:
             return "\n".join(lines + ["Read the dataset profile and, where useful, the rulebook, then submit the "
                                        "candidate."])
@@ -110,20 +112,23 @@ class Translator:
 def run_candidate(workdir: Path, module: str, spec: ModelSpec, baseline_dir: Path, files: tuple[InputFile, ...],
                   inputs_dir: Path, envs: Environments, limits: Limits = Limits(),
                   on_start: Callable[[Process], None] = lambda p: None) -> Validation:
-    """Run the candidate under the harness in a fresh working directory holding only the dataset and R's sets, then
+    """Run the candidate under the harness in a fresh working directory holding only the data files and R's sets, then
     compare its output with the baseline. A candidate that fails to run is a failed validation, not an error."""
     workdir.mkdir(parents=True)
     inputs = workdir / "inputs"
     inputs.mkdir()
     dataset = next(f for f in files if f.role == "dataset")
-    copy_verified(inputs_dir / dataset.name, inputs / dataset.name, dataset.sha256)
+    data = [f for f in files if f.role == "data"]
+    for f in [dataset, *data]:
+        copy_verified(inputs_dir / f.name, inputs / f.name, f.sha256)
     shutil.copy(baseline_dir / "split.csv", inputs / "split.csv")
     (inputs / "split.csv").chmod(0o444)
     inputs.chmod(0o555)
     (workdir / "candidate.py").write_text(module)
     shutil.copy(HARNESS, workdir / "harness.py")
     (workdir / "config.json").write_text(json.dumps({
-        "candidate": "candidate.py", "dataset": f"inputs/{dataset.name}", "split": "inputs/split.csv",
+        "candidate": "candidate.py", "dataset": f"inputs/{dataset.name}",
+        "data": {f.name: f"inputs/{f.name}" for f in data}, "split": "inputs/split.csv",
         "response": spec.response, "out": "output"}))
 
     proc = Process([str(envs.py()), "-I", "harness.py", "config.json"], workdir, {"PYTHONDONTWRITEBYTECODE": "1"},

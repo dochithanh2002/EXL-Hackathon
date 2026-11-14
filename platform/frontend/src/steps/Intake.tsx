@@ -1,13 +1,24 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { ErrorText, Mono, Panel } from "@/components/common";
 import { Badge } from "@/components/ui/badge";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { get, p, type Profile } from "@/lib/api";
 import { num } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import type { StepProps } from "@/pages/Project";
 
+const ROLE = { dataset: "dataset", data: "other data", r_code: "R code", document: "document" };
+
 export function Intake({ project }: StepProps) {
-  const profile = useQuery({ queryKey: ["profile", project.id], queryFn: () => get<Profile>(p(project.id, "/profile")), staleTime: Infinity });
+  const csvs = project.state.files.filter((f) => f.role === "dataset" || f.role === "data");
+  const [name, setName] = useState(csvs[0]?.name);
+  const profile = useQuery({
+    queryKey: ["profile", project.id, name],
+    queryFn: () => get<Profile>(p(project.id, `/profile?name=${encodeURIComponent(name!)}`)),
+    enabled: !!name,
+    staleTime: Infinity,
+  });
   return (
     <>
       <Panel title="Files">
@@ -19,14 +30,25 @@ export function Intake({ project }: StepProps) {
             {project.state.files.map((f) => (
               <TR key={f.name}>
                 <TD className="font-medium">{f.name}</TD>
-                <TD>{f.role.replace("_", " ")}</TD>
+                <TD>{ROLE[f.role]}</TD>
                 <TD><Mono>{f.sha256}</Mono></TD>
               </TR>
             ))}
           </TBody>
         </Table>
       </Panel>
-      <Panel title={profile.data ? `${profile.data.file} · ${num(profile.data.rows)} rows` : "Dataset"}>
+      <Panel
+        title={profile.data ? `${profile.data.file} · ${num(profile.data.rows)} rows` : name}
+        actions={csvs.length > 1 && (
+          <div className="flex rounded-md border p-0.5">
+            {csvs.map((f) => (
+              <button key={f.name} className={cn("rounded px-2 py-0.5 text-xs", f.name === name && "bg-muted font-medium")} onClick={() => setName(f.name)}>
+                {f.name}
+              </button>
+            ))}
+          </div>
+        )}
+      >
         <ErrorText error={profile.error} />
         {profile.isPending && <p className="text-sm text-muted-foreground">Profiling…</p>}
         {profile.data && (

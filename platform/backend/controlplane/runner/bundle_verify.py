@@ -3,7 +3,8 @@ R reference, using the same parity engine and confirmed spec as the control plan
 
     python verify.py <path to the dataset>
 
-Run it with the Python environment in environment/ (see README.md). Exits 0 when every check passes."""
+Any other data files the model reads must be in the dataset's directory. Run it with the Python environment in
+environment/ (see README.md). Exits 0 when every check passes."""
 import hashlib
 import json
 import shutil
@@ -26,11 +27,23 @@ def main(dataset: Path) -> int:
         print(f"{dataset} is not the dataset the model was validated on (sha256 {sha}, expected "
               f"{cfg['dataset_sha256']})")
         return 1
+    data = {name: dataset.resolve().with_name(name) for name in cfg.get("data_sha256", {})}
+    for name, path in data.items():
+        if not path.is_file():
+            print(f"{name} is not next to the dataset ({path})")
+            return 1
+        with open(path, "rb") as f:
+            sha = hashlib.file_digest(f, "sha256").hexdigest()
+        if sha != cfg["data_sha256"][name]:
+            print(f"{path} is not the data file the model was validated on (sha256 {sha}, expected "
+                  f"{cfg['data_sha256'][name]})")
+            return 1
     out = HERE / "output"
     shutil.rmtree(out, ignore_errors=True)
     with tempfile.TemporaryDirectory() as tmp:
         config = Path(tmp) / "config.json"
         config.write_text(json.dumps({"candidate": str(HERE / "model.py"), "dataset": str(dataset.resolve()),
+                                      "data": {n: str(p) for n, p in data.items()},
                                       "split": str(HERE / "reference" / "split.csv"), "response": spec["response"],
                                       "out": str(out)}))
         if subprocess.run([sys.executable, "-I", str(HERE / "harness.py"), str(config)], cwd=HERE).returncode:

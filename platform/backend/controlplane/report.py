@@ -121,6 +121,7 @@ def catalog(r: Record) -> dict[str, dict]:
         "intake": {"kind": "intake", "facts": {
             "project": r.project, "dataset": next(f.name for f in files if f.role == "dataset"),
             "dataset_sha256": next(f.sha256 for f in files if f.role == "dataset"),
+            "data": ", ".join(f.name for f in files if f.role == "data"),
             "r_code": ", ".join(f.name for f in files if f.role == "r_code"),
             "documents": ", ".join(f.name for f in files if f.role == "document")}},
         f"spec-v{s.spec_version}": {"kind": "spec", "facts": {

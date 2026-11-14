@@ -61,7 +61,7 @@ React UI ──HTTP/SSE──> Control plane (Python, FastAPI)
 
 | # | State | Who acts | Gate to leave |
 |---|---|---|---|
-| 1 | Project created, dataset and R code uploaded | DS | files hashed (SHA-256) |
+| 1 | Project created, dataset, other data files and R code uploaded | DS | files hashed (SHA-256) |
 | 2 | Understanding and alignment | Analyst agent + DS chat | DS confirms `ModelSpec` vN |
 | 3 | R baseline | static code | run succeeds; baseline frozen |
 | 4 | Python translation and validation | Translator agent + static runner and validator | DS approves or rejects |
@@ -108,6 +108,11 @@ The candidate interface is fixed (`controlplane/candidate.py`): `prepare(path, s
 indexed by R's data-row numbers; `fit(train)` returns statsmodels results, whose `params` and `bse` are the
 coefficients; `predict(result, frame)` returns response-scale predictions. The Translator sees R's coefficient names
 but never R's estimates, and the candidate's working directory holds only the dataset and R's sets.
+
+Data files: one CSV is the model's dataset, whose rows R's row ids trace back to; other CSVs (M1's claim severities,
+M4's test file) are uploaded as data files. The agents see profiles of each, never rows. baseline.R reads them as
+`inputs/<name>`; a candidate's `prepare` gets their paths as a third argument and may read only those. The bundle's
+`verify.py` expects them next to the dataset and checks their hashes.
 
 Prompt rule: state the goal, the inputs, the output contract and the limits; nothing else. Domain rules from
 `legacy/agent/config/rulebook.yaml` are available to the Translator and Diagnostician as a readable reference, not

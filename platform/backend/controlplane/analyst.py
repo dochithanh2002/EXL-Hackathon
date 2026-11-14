@@ -1,7 +1,7 @@
 """Step 2: what the Analyst sees, its read-only tools, and the deterministic checks on its submissions.
 
-The Analyst reads R code and text documents and a profile of the dataset; the dataset itself is never read into its
-context. A submission is a ModelSpec only if it validates and passes every check here; otherwise the errors go
+The Analyst reads R code and text documents and profiles of the dataset and any other data files; no data file is
+ever read into its context. A submission is a ModelSpec only if it validates and passes every check here; otherwise the errors go
 back to the Analyst."""
 from __future__ import annotations
 
@@ -54,6 +54,7 @@ class Analyst:
                  envs: Environments, limits: Limits = Limits()):
         self.files = {f.name: f for f in files}
         self.dataset = next(f for f in files if f.role == "dataset")
+        self.data = [f for f in files if f.role == "data"]
         self.inputs_dir, self.cache_dir, self.matrix = inputs_dir, cache_dir, matrix
         self.envs, self.limits, self.r_packages = envs, limits, envs.r_packages()
 
@@ -62,8 +63,8 @@ class Analyst:
         f = self.files.get(name)
         if f is None:
             raise ToolError(f"no uploaded file is named {name!r}; the files are {sorted(self.files)}")
-        if f.role == "dataset":
-            raise ToolError("the dataset cannot be read; use dataset_profile")
+        if f.role in ("dataset", "data"):
+            raise ToolError(f"{name} is data and cannot be read; use dataset_profile")
         if Path(name).suffix.lower() not in TEXT:
             raise ToolError(f"{name} is not a text file")
         text = self._verified(f).read_text(encoding="utf-8", errors="replace")
@@ -71,14 +72,19 @@ class Analyst:
             return text[:MAX_CHARS] + f"\n[truncated: the file has {len(text)} characters]"
         return text
 
-    def profile(self) -> dict:
-        """Computed once per dataset and environment version."""
-        cached = self.cache_dir / f"profile-{self.dataset.sha256[:16]}-{self.envs.version()[:16]}.json"
+    def profile(self, name: str | None = None) -> dict:
+        """The profile of the dataset, or of the data file `name`; computed once per file and environment version."""
+        f = self.dataset if name in (None, "", self.dataset.name) else self.files.get(name)
+        if f is None or f.role not in ("dataset", "data"):
+            data = [d.name for d in self.data]
+            raise ToolError(f"no data file is named {name!r}" + (f"; the data files are {data}" if data else
+                                                                 "; omit the name for the dataset"))
+        cached = self.cache_dir / f"profile-{f.sha256[:16]}-{self.envs.version()[:16]}.json"
         if not cached.exists():
             self.cache_dir.mkdir(parents=True, exist_ok=True)
             work = Path(tempfile.mkdtemp(dir=self.cache_dir))
             try:
-                p = profile(self._verified(self.dataset), work / "run", self.envs, self.limits)
+                p = profile(self._verified(f), work / "run", self.envs, self.limits)
             except ProfileFailed as e:
                 raise ToolError(str(e)) from e
             finally:
@@ -87,6 +93,10 @@ class Analyst:
             tmp.write_text(json.dumps(p))
             os.replace(tmp, cached)
         return json.loads(cached.read_text())
+
+    def columns(self) -> dict:
+        """Every data file's columns in one profile-shaped dict: the names error-message redaction may keep."""
+        return {"columns": [c for f in [self.dataset, *self.data] for c in self.profile(f.name)["columns"]]}
 
     def _verified(self, f: InputFile) -> Path:
         path = self.inputs_dir / f.name
@@ -102,19 +112,25 @@ class Analyst:
             if f.role == "dataset":
                 rn = ", the first field of each row holds row names" if p["row_names_from_file"] else ""
                 lines.append(f"- {f.name}: dataset, {p['rows']} rows, {len(p['columns'])} columns{rn}")
+            elif f.role == "data":
+                q = self.profile(f.name)
+                lines.append(f"- {f.name}: other data, {q['rows']} rows, {len(q['columns'])} columns")
             elif f.role == "r_code":
                 n = self.read_file(f.name).count("\n") + 1
                 lines.append(f"- {f.name}: R code, {n} lines")
             else:
                 lines.append(f"- {f.name}: document")
-        lines += ["", f"baseline.R runs in a fresh directory and reads the dataset as inputs/{self.dataset.name}.", "",
+        lines += ["", f"baseline.R runs in a fresh directory and reads the dataset as inputs/{self.dataset.name}"
+                  + "".join(f", and {d.name} as inputs/{d.name}" for d in self.data) + ". The model's rows come from "
+                  "the dataset; the other data files may only be joined or aggregated into it.", "",
                   "Support matrix (R function [families]: statsmodels counterparts, tier). Anything else is "
                   "unsupported:"]
         for pair in self.matrix.pairs:
             fam = f" [{', '.join(pair.families)}]" if pair.families else ""
             lines.append(f"- {pair.r}{fam}: {', '.join(pair.statsmodels)} ({pair.tier})")
         lines += ["", "R packages baseline.R can load: " + ", ".join(sorted(self.r_packages, key=str.lower)), "",
-                  "Read the files and the dataset profile, then submit the ModelSpec."]
+                  "Read the files and the data profiles (dataset_profile, with a data file's name for the others), "
+                  "then submit the ModelSpec."]
         return "\n".join(lines)
 
     # ------------------------------------------------------------ checks

@@ -1,6 +1,6 @@
 """Python candidate harness, the counterpart of capture.R. Runs in the stable Python environment:
     python -I candidate_harness.py <config.json>
-    config: candidate, dataset, split (R's split.csv), response, out
+    config: candidate, dataset, data (other data file name -> path; may be empty), split (R's split.csv), response, out
 Imports the candidate, hands it R's sets, checks it returns exactly R's rows, fits, and exports the coefficients,
 predictions and fit statistics the validator compares with R's capture. A failure writes the stage, exception type,
 message and the candidate's own frames (line and function) to error.json, like capture.R; the full traceback goes
@@ -53,12 +53,13 @@ try:
     sets = {s: pd.Index(g["row"].to_numpy(), name="row") for s, g in split.groupby("set", sort=False)}
 
     # Check the resolved path too: a candidate could rebind prepare's path argument.
-    dataset_path = Path(cfg["dataset"]).resolve()
+    data = cfg.get("data", {})
+    readable = {Path(p).resolve() for p in [cfg["dataset"], *data.values()]}
 
     def dataset_reader(reader):
         def read(filepath_or_buffer, *args, **kwargs):
-            if not isinstance(filepath_or_buffer, (str, Path)) or Path(filepath_or_buffer).resolve() != dataset_path:
-                raise ValueError("only the dataset may be read")
+            if not isinstance(filepath_or_buffer, (str, Path)) or Path(filepath_or_buffer).resolve() not in readable:
+                raise ValueError("only the project's data files may be read")
             return reader(filepath_or_buffer, *args, **kwargs)
         return read
 
@@ -72,7 +73,7 @@ try:
     spec.loader.exec_module(candidate)
 
     stage = "prepare()"
-    frames = candidate.prepare(cfg["dataset"], {k: v.copy() for k, v in sets.items()})
+    frames = candidate.prepare(cfg["dataset"], {k: v.copy() for k, v in sets.items()}, *([dict(data)] if data else []))
     stage = "checking prepare()'s frames"
     if not isinstance(frames, dict) or set(frames) != set(sets):
         raise ValueError(f"prepare() must return a dict with keys {sorted(sets)}")

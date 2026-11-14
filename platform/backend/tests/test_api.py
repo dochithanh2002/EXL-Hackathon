@@ -77,3 +77,15 @@ def test_the_built_ui_is_served_next_to_the_api(tmp_path):
         assert c.get("/").text == "<div id=root></div>"
         assert c.get("/api/projects").json() == []
         assert c.get("/api/nope").status_code == 404
+
+
+def test_other_data_files_upload_beside_the_dataset(client):
+    r = client.post("/api/projects", data={"name": "M1"}, files=[
+        ("dataset", ("freq.csv", CSV)), ("data", ("sev.csv", b"IDpol,ClaimAmount\n1,10\n")),
+        ("data", ("extra.csv", b"a\n1\n")), ("r_code", ("m.R", R))])
+    assert r.status_code == 201, r.text
+    assert [(f["role"], f["name"]) for f in r.json()["state"]["files"]] == [
+        ("dataset", "freq.csv"), ("data", "sev.csv"), ("data", "extra.csv"), ("r_code", "m.R")]
+    bad = client.post("/api/projects", data={"name": "M1"}, files=[
+        ("dataset", ("freq.csv", CSV)), ("data", ("sev.txt", b"x")), ("r_code", ("m.R", R))])
+    assert bad.status_code == 422 and "data must be one of ['.csv']" in bad.json()["detail"]

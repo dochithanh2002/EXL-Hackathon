@@ -5,8 +5,9 @@ export const analyst: Role = {
 
 Goal: work out which model the uploaded R code fits and agree a ModelSpec with the data scientist (DS).
 
-Inputs: the project summary in the first message, the uploaded files (read_file), and the dataset profile
-(dataset_profile): column names, types, level sets and summary statistics. You never see data rows.
+Inputs: the project summary in the first message, the uploaded files (read_file), and profiles of the dataset and
+any other data files (dataset_profile): column names, types, level sets and summary statistics. You never see data
+rows.
 
 Output: call submit_model_spec with a complete ModelSpec, then reply to the DS in a few sentences: what the model
 is, anything you were unsure of, and what they must decide. A submission that fails validation comes back with the
@@ -22,13 +23,16 @@ model has no statsmodels counterpart in the support matrix, set support_tier to 
   tools: (submitSchema) => [
     {
       name: "read_file",
-      description: "Read an uploaded R code file or text document. The dataset cannot be read; use dataset_profile.",
+      description: "Read an uploaded R code file or text document. Data files cannot be read; use dataset_profile.",
       parameters: { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
     },
     {
       name: "dataset_profile",
-      description: "Column names, types, level sets and summary statistics of the uploaded dataset.",
-      parameters: { type: "object", properties: {} },
+      description: "Column names, types, level sets and summary statistics of the uploaded dataset, or of another data file.",
+      parameters: {
+        type: "object",
+        properties: { name: { type: "string", description: "A data file's name; omit for the dataset" } },
+      },
     },
     {
       name: "submit_model_spec",

@@ -58,9 +58,11 @@ function NewProject({ onCancel }: { onCancel: () => void }) {
         onSubmit={(e) => {
           e.preventDefault();
           const form = new FormData(e.currentTarget);
-          const docs = form.getAll("documents").filter((f) => f instanceof File && f.name);
-          form.delete("documents");                 // an empty file input still sends a nameless part
-          docs.forEach((f) => form.append("documents", f));
+          for (const field of ["data", "documents"]) {     // an empty file input still sends a nameless part
+            const files = form.getAll(field).filter((f) => f instanceof File && f.name);
+            form.delete(field);
+            files.forEach((f) => form.append(field, f));
+          }
           create.mutate(form);
         }}
       >
@@ -69,8 +71,12 @@ function NewProject({ onCancel }: { onCancel: () => void }) {
           <Input name="name" required maxLength={200} />
         </Label>
         <Label>
-          Dataset (.csv)
+          Model dataset (.csv)
           <Input name="dataset" type="file" accept=".csv" required />
+        </Label>
+        <Label>
+          Other data (.csv)
+          <Input name="data" type="file" accept=".csv" multiple />
         </Label>
         <Label>
           R code

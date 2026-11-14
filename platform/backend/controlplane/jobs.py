@@ -203,7 +203,7 @@ class Jobs:
                 turn = Turn("submit_model_spec", analyst.check,
                             "Accepted. It becomes the next draft spec when you end your turn; now reply to the DS.",
                             {"read_file": lambda a: analyst.read_file(str(a.get("name", ""))),
-                             "dataset_profile": lambda a: json.dumps(analyst.profile(), indent=1)})
+                             "dataset_profile": lambda a: json.dumps(analyst.profile(a.get("name")), indent=1)})
                 history = self.store.transcript(pid, "analyst")
                 result = self._agent(jid, "analyst", model_ref, history, self._analyst_prompt(pid, analyst, history),
                                      ModelSpec, turn, stream)
@@ -305,11 +305,12 @@ class Jobs:
                 analyst = self._analyst_inputs(pid, s.files)
                 dataset = next(f.name for f in s.files if f.role == "dataset")
                 translator = Translator(spec, baseline_dir, dataset, self.envs, analyst.profile,
+                                        [f.name for f in s.files if f.role == "data"],
                                         self._repair(pid, s.diagnosis_id, s.repairs, s.retry_limit))
                 turn = Turn("submit_candidate", translator.check,
                             "Accepted. It runs against R's sets when you end your turn; now summarise it in a few "
                             "sentences.",
-                            {"dataset_profile": lambda a: json.dumps(translator.profile(), indent=1),
+                            {"dataset_profile": lambda a: json.dumps(translator.profile(a.get("name")), indent=1),
                              "read_rulebook": lambda a: rulebook()})
                 result = self._agent(jid, "translator", model_ref, [], translator.kickoff(), Candidate, turn, stream)
                 run.metrics(tool_calls=turn.tool_calls, invalid_submissions=turn.invalid)
@@ -381,12 +382,12 @@ class Jobs:
                 model_ref, model_label = self.endpoints.for_role("diagnostician")
                 run.params(model=model_label, repairs=s.repairs, retry_limit=s.retry_limit, **common)
                 analyst = self._analyst_inputs(pid, s.files)
-                diag = Diagnostician(spec, baseline_dir, analyst.profile, cand, validation, s.ds_comment,
+                diag = Diagnostician(spec, baseline_dir, analyst.columns, cand, validation, s.ds_comment,
                                      self._earlier(pid, s.spec_version, s.baseline_id), s.repairs, s.retry_limit)
                 turn = Turn("submit_diagnosis", diag.check,
                             "Accepted. When you end your turn it goes to the Translator, or to the DS if it needs a "
                             "spec change; now summarise it in a few sentences.",
-                            {"dataset_profile": lambda a: json.dumps(analyst.profile(), indent=1),
+                            {"dataset_profile": lambda a: json.dumps(analyst.profile(a.get("name")), indent=1),
                              "read_rulebook": lambda a: rulebook()})
                 result = self._agent(jid, "diagnostician", model_ref, [], diag.kickoff(), Diagnosis, turn, stream)
                 run.metrics(tool_calls=turn.tool_calls, invalid_submissions=turn.invalid)

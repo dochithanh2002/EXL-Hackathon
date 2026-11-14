@@ -15,7 +15,7 @@ export const ROLES = ["analyst", "translator", "diagnostician", "reporter"] as c
 export type Role = (typeof ROLES)[number];
 
 export interface Bindings { spec_version: number; baseline_id: string; candidate_hash: string; validation_id: string }
-export interface InputFile { role: "dataset" | "r_code" | "document"; name: string; sha256: string }
+export interface InputFile { role: "dataset" | "data" | "r_code" | "document"; name: string; sha256: string }
 
 export interface ProjectState {
   step: Step; status: Status; reason: Reason | null; detail: string; files: InputFile[]; retry_limit: number;

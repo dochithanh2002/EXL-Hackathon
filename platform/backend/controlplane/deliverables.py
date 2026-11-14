@@ -43,8 +43,8 @@ README = """# {project}
 uv sync --frozen --project environment
 uv run --frozen --project environment python verify.py path/to/{dataset}
 ```
-
-`verify.py` checks the dataset's SHA-256, fits `model.py` on R's train rows, predicts on every set R formed and
+{data}
+`verify.py` checks the SHA-256 of every data file, fits `model.py` on R's train rows, predicts on every set R formed and
 repeats the approval checks against `reference/`: coefficient names, estimates and standard errors, row identities,
 response values, prediction missingness and values, fit statistics and the requested KPIs within the spec's
 tolerances. Statistics excluded during approval remain excluded and are listed in the output.
@@ -67,6 +67,7 @@ def build_bundle(dest: Path, record: Record, report_md: str, envs: Environments)
                          "lockfiles before retrying deliverables")
     dest.mkdir(parents=True)
     dataset = next(f for f in r.state.files if f.role == "dataset")
+    data = {f.name: f.sha256 for f in r.state.files if f.role == "data"}
     (dest / "model.py").write_text(a.candidate["body"]["module"])
     (dest / "report.md").write_text(report_md)
     (dest / "validation.json").write_text(json.dumps(a.validation["body"], indent=1, sort_keys=True))
@@ -75,7 +76,7 @@ def build_bundle(dest: Path, record: Record, report_md: str, envs: Environments)
     shutil.copy(HARNESS, dest / "harness.py")
     shutil.copy(VERIFY, dest / "verify.py")
     shutil.copy(PARITY, dest / "parity.py")
-    (dest / "verify.json").write_text(json.dumps({"dataset_sha256": dataset.sha256}, indent=1))
+    (dest / "verify.json").write_text(json.dumps({"dataset_sha256": dataset.sha256, "data_sha256": data}, indent=1))
     (dest / "reference").mkdir()
     for name in CAPTURED:
         shutil.copy(r.baseline_dir / name, dest / "reference" / name)
@@ -85,12 +86,14 @@ def build_bundle(dest: Path, record: Record, report_md: str, envs: Environments)
     (dest / "README.md").write_text(README.format(
         project=r.project, r_function=r.spec.r_function, counterpart=r.spec.statsmodels_counterpart,
         tier=r.state.spec_tier, spec_version=r.state.spec_version, dataset=dataset.name,
+        data="" if not data else "\n" + " ".join(f"`{n}`" for n in data) + " must be in the same directory as the "
+        "dataset.\n",
         r_version=r.baseline["body"]["meta"]["r_version"].removeprefix("R version ")))
 
     manifest = {
         "project": r.project, "bindings": r.state.approval.model_dump(), "spec_hash": r.spec_hash,
         "baseline_hash": r.baseline["body"]["hash"], "environment_version": r.environment_version,
-        "dataset": {"name": dataset.name, "sha256": dataset.sha256},
+        "dataset": {"name": dataset.name, "sha256": dataset.sha256}, "data": data,
         "files": {str(p.relative_to(dest)): sha256_file(p) for p in sorted(dest.rglob("*")) if p.is_file()}}
     (dest / "manifest.json").write_text(json.dumps(manifest, indent=1))
     with zipfile.ZipFile(dest.with_suffix(".zip"), "w", zipfile.ZIP_DEFLATED) as z:

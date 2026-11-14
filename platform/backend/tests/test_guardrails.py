@@ -25,14 +25,14 @@ def test_known_good_candidates_pass():
     ("x = pd.eval('1')", "dynamic code"),
     ("evaluate = pd.eval", "dynamic code"),
     ("from pandas import eval as evaluate", "dynamic code"),
-    ("x = pd.read_csv('/etc/passwd')", "only the dataset may be read"),
+    ("x = pd.read_csv('/etc/passwd')", "only the data files may be read"),
     ("reader = pd.read_csv", "dataset readers must be called directly"),
-    ("from pandas import read_csv as reader\nx = reader('/etc/passwd')", "only the dataset may be read"),
+    ("from pandas import read_csv as reader\nx = reader('/etc/passwd')", "only the data files may be read"),
     ("x = getattr(np, 'ran' + 'dom')", "'getattr' is not allowed"),
     ("x = ().__class__.__bases__", "attribute '__class__' is not allowed"),
     ("x = __builtins__", "'__builtins__' is not allowed"),
     ("x = pd.read_csv('https://example.com/x.csv')", "URLs are not allowed"),
-    ("x = pd.read_pickle('x.pkl')", "only the dataset may be read"),
+    ("x = pd.read_pickle('x.pkl')", "only the data files may be read"),
     ("def f(df):\n    df.to_csv('out.csv')", "writing files is not allowed"),
     ("def f(r):\n    r.save('fit.pickle')", "writing files is not allowed"),
     ("from . import helper", "relative imports are not allowed"),
@@ -52,7 +52,7 @@ def test_the_interface_must_be_complete():
 
 def test_dataset_reader_requires_the_prepare_argument():
     assert candidate.check(GOOD.replace('pd.read_csv(path)', 'pd.read_csv(filepath_or_buffer=path)')) == []
-    assert any("only the dataset may be read" in e for e in candidate.check(
+    assert any("only the data files may be read" in e for e in candidate.check(
         GOOD.replace('pd.read_csv(path)', 'pd.read_csv("unrelated.csv")')))
 
 

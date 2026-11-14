@@ -2,7 +2,7 @@
 
 Guardrails are evolved from `legacy/agent/tools/guardrails.py`. In local mode they are the main protection against
 candidate code (PLAN.md section 6): imports limited to the stable Python environment, no dynamic code or
-introspection, no file access other than reading the dataset, no network, no randomness."""
+introspection, no file access other than reading the project's data files, no network, no randomness."""
 from __future__ import annotations
 
 import ast
@@ -27,6 +27,13 @@ predict(result, frame: pandas.DataFrame) -> pandas.Series
     Predictions on the response scale (R's predict(type = "response")), indexed like `frame`; NaN wherever R's
     prediction is NA. Never impute or drop rows to obtain a prediction."""
 
+DATA_INTERFACE = """This project has other data files, which baseline.R reads next to the dataset. prepare therefore
+takes a third argument, data: dict[str, str], mapping each of their file names to its path:
+
+prepare(path: str, sets: dict[str, pandas.Index], data: dict[str, str]) -> dict[str, pandas.DataFrame]
+    Read each with pandas.read_csv(data["<file name>"]) inside prepare, and join or aggregate it into the dataset
+    as baseline.R does. The rows and their numbers still come from the dataset."""
+
 CONTRACT = {"prepare": 2, "fit": 1, "predict": 2}
 ENV_PACKAGES = frozenset({"numpy", "pandas", "scipy", "statsmodels", "formulaic", "patsy"})
 STDLIB = frozenset({"__future__", "math", "typing", "dataclasses", "functools", "itertools", "collections", "operator",
@@ -42,7 +49,7 @@ CALLS = {
                     "network and database access are not allowed"),
     **dict.fromkeys(["read_pickle", "read_parquet", "read_feather", "read_excel", "read_json", "read_xml",
                      "read_hdf", "read_stata", "read_sas", "read_spss", "read_orc", "read_clipboard", "load",
-                     "loadtxt", "genfromtxt", "fromfile"], "only the dataset may be read, with read_csv or read_table"),
+                     "loadtxt", "genfromtxt", "fromfile"], "only the data files may be read, with read_csv or read_table"),
     **dict.fromkeys(["to_csv", "to_pickle", "to_parquet", "to_feather", "to_excel", "to_json", "to_xml", "to_hdf",
                      "to_sql", "to_stata", "to_clipboard", "save", "savetxt", "savez", "savez_compressed", "tofile",
                      "write", "write_text", "write_bytes"], "writing files is not allowed"),
@@ -51,8 +58,9 @@ ALLOWED_DUNDERS = {"__init__", "__name__", "__doc__"}
 URL = re.compile(r"^\s*[A-Za-z][A-Za-z0-9+.-]*://")
 
 
-def check(module: str, packages: frozenset[str] = ENV_PACKAGES) -> list[str]:
-    """Every guardrail violation in the module, as `line N: message`; empty if it may run."""
+def check(module: str, packages: frozenset[str] = ENV_PACKAGES, data: bool = False) -> list[str]:
+    """Every guardrail violation in the module, as `line N: message`; empty if it may run. With `data`, the project
+    has other data files: prepare takes their paths as a third argument and may read them."""
     try:
         tree = ast.parse(module)
     except SyntaxError as e:
@@ -67,6 +75,7 @@ def check(module: str, packages: frozenset[str] = ENV_PACKAGES) -> list[str]:
     prepare = functions.get("prepare")
     prepare_args = prepare.args.posonlyargs + prepare.args.args if prepare else []
     dataset_arg = prepare_args[0].arg if prepare_args else None
+    data_arg = prepare_args[2].arg if data and len(prepare_args) > 2 else None
     prepare_nodes = set(ast.walk(prepare)) if prepare else set()
     parents = {child: parent for parent in ast.walk(tree) for child in ast.iter_child_nodes(parent)}
     readers = {"read_csv", "read_table"}
@@ -104,8 +113,12 @@ def check(module: str, packages: frozenset[str] = ENV_PACKAGES) -> list[str]:
             else:
                 path = call.args[0] if call.args else next(
                     (k.value for k in call.keywords if k.arg == "filepath_or_buffer"), None)
-                if node not in prepare_nodes or not isinstance(path, ast.Name) or path.id != dataset_arg:
-                    add(node, "only the dataset may be read; pass prepare's path argument directly")
+                dataset = isinstance(path, ast.Name) and path.id == dataset_arg
+                other = (data_arg is not None and isinstance(path, ast.Subscript) and isinstance(path.value, ast.Name)
+                         and path.value.id == data_arg)
+                if node not in prepare_nodes or not (dataset or other):
+                    add(node, "only the data files may be read; pass prepare's path argument directly"
+                        + (", or data[<file name>]" if data else ""))
 
         if isinstance(node, ast.Name) and node.id in BUILTINS | {"__builtins__"}:
             add(node, f"'{node.id}' is not allowed")
@@ -122,7 +135,7 @@ def check(module: str, packages: frozenset[str] = ENV_PACKAGES) -> list[str]:
         elif isinstance(node, ast.Constant) and isinstance(node.value, str) and URL.match(node.value):
             add(node, "URLs are not allowed")
 
-    for name, nargs in CONTRACT.items():
+    for name, nargs in (CONTRACT | {"prepare": 3} if data else CONTRACT).items():
         f = functions.get(name)
         if f is None:
             add(None, f"the interface function '{name}' is not defined at module level")

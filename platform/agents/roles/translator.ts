@@ -24,8 +24,11 @@ notes.`,
   tools: (submitSchema) => [
     {
       name: "dataset_profile",
-      description: "Column names, types, level sets and summary statistics of the uploaded dataset.",
-      parameters: { type: "object", properties: {} },
+      description: "Column names, types, level sets and summary statistics of the uploaded dataset, or of another data file.",
+      parameters: {
+        type: "object",
+        properties: { name: { type: "string", description: "A data file's name; omit for the dataset" } },
+      },
     },
     {
       name: "read_rulebook",
