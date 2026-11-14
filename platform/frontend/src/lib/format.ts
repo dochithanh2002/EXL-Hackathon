@@ -1,4 +1,6 @@
-import type { ProjectState } from "./api";
+import { CONDITIONAL_STEP, type ProjectState, type Step } from "./api";
+
+export const TITLE = "R-Pythonizer";
 
 export function num(x: unknown): string {
   if (x === null || x === undefined) return "—";
@@ -38,4 +40,12 @@ export function statusVariant(s: ProjectState): "pass" | "fail" | "warn" | "seco
   if (s.reason === "step_failed" || s.reason === "unsupported" || s.reason === "interrupted") return "fail";
   if (s.status === "awaiting_ds") return "warn";
   return "secondary";
+}
+
+/** The six steps every project passes through; Discrepancy Analysis (5) is a loop off step 4 and counts with it. */
+const MAIN_STEPS: Step[] = [1, 2, 3, 4, 6, 7];
+
+export function progress(s: ProjectState): { done: number; total: number } {
+  const at = s.step === CONDITIONAL_STEP ? CONDITIONAL_STEP - 1 : s.step;
+  return { done: MAIN_STEPS.filter((n) => n < at || (n === at && s.status === "done")).length, total: MAIN_STEPS.length };
 }

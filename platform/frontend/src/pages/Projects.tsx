@@ -1,52 +1,72 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 import { ErrorText, Panel } from "@/components/common";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { get, post, type ProjectSummary, STEPS } from "@/lib/api";
-import { statusText, statusVariant, when } from "@/lib/format";
+import { get, post, type ProjectState, type ProjectSummary, STEPS } from "@/lib/api";
+import { progress, statusText, statusVariant, when } from "@/lib/format";
 import { href, navigate } from "@/lib/route";
+import { cn } from "@/lib/utils";
+
+const BAR = { pass: "bg-pass", warn: "bg-warn", fail: "bg-destructive", secondary: "bg-primary" };
+
+function Progress({ state }: { state: ProjectState }) {
+  const { done, total } = progress(state);
+  return (
+    <span className="flex w-28 gap-0.5" role="progressbar" aria-valuenow={done} aria-valuemax={total}>
+      {Array.from({ length: total }, (_, i) => (
+        <span key={i} className={cn("h-1.5 flex-1 rounded-full bg-border", i < done && "bg-pass", i === done && BAR[statusVariant(state)], i === done && state.status === "working" && "animate-pulse")} />
+      ))}
+    </span>
+  );
+}
 
 export function Projects() {
   const projects = useQuery({ queryKey: ["projects"], queryFn: () => get<ProjectSummary[]>("/api/projects"), refetchInterval: 5000 });
-  const [creating, setCreating] = useState(false);
+  const [opened, setOpened] = useState(false);
+  const empty = projects.data?.length === 0;
+  const creating = opened || empty;
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">Projects</h1>
-        {!creating && <Button onClick={() => setCreating(true)}>New project</Button>}
+        {!creating && <Button onClick={() => setOpened(true)}><Plus />New project</Button>}
       </div>
-      {creating && <NewProject onCancel={() => setCreating(false)} />}
+      {creating && <NewProject onCancel={empty ? undefined : () => setOpened(false)} />}
       <ErrorText error={projects.error} />
       {projects.data && projects.data.length > 0 && (
-        <Table>
-          <THead>
-            <TR>
-              <TH>Name</TH>
-              <TH>Step</TH>
-              <TH>Status</TH>
-              <TH>Created</TH>
-            </TR>
-          </THead>
-          <TBody>
-            {projects.data.map((p) => (
-              <TR key={p.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(href.project(p.id))}>
-                <TD className="font-medium">{p.name}</TD>
-                <TD>{STEPS[p.state.step]}</TD>
-                <TD><Badge variant={statusVariant(p.state)}>{statusText(p.state)}</Badge></TD>
-                <TD className="text-muted-foreground">{when(p.created_at)}</TD>
+        <Card className="px-3 py-1">
+          <Table>
+            <THead>
+              <TR className="hover:bg-transparent">
+                <TH>Name</TH>
+                <TH>Step</TH>
+                <TH>Status</TH>
+                <TH>Created</TH>
               </TR>
-            ))}
-          </TBody>
-        </Table>
+            </THead>
+            <TBody>
+              {projects.data.map((p) => (
+                <TR key={p.id} className="cursor-pointer" onClick={() => navigate(href.project(p.id))}>
+                  <TD className="py-3 font-medium"><a href={href.project(p.id)}>{p.name}</a></TD>
+                  <TD><span className="flex items-center gap-3"><Progress state={p.state} />{STEPS[p.state.step]}</span></TD>
+                  <TD><Badge variant={statusVariant(p.state)}>{statusText(p.state)}</Badge></TD>
+                  <TD className="text-muted-foreground">{when(p.created_at)}</TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </Card>
       )}
     </div>
   );
 }
 
-function NewProject({ onCancel }: { onCancel: () => void }) {
+function NewProject({ onCancel }: { onCancel?: () => void }) {
   const [csvs, setCsvs] = useState<File[]>([]);
   const [dataset, setDataset] = useState(0);
   const create = useMutation({
@@ -108,11 +128,11 @@ function NewProject({ onCancel }: { onCancel: () => void }) {
           <Input name="r_code" type="file" accept=".r,.R,.rmd,.Rmd,.qmd" multiple required />
         </Label>
         <Label>
-          Documents
+          <span>Documents <span className="font-normal text-muted-foreground">optional</span></span>
           <Input name="documents" type="file" accept=".md,.txt,.pdf,.docx" multiple />
         </Label>
         <div className="flex items-end justify-end gap-2">
-          <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
+          {onCancel && <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>}
           <Button type="submit" disabled={create.isPending}>{create.isPending ? "Uploading…" : "Create"}</Button>
         </div>
         <ErrorText error={create.error} />

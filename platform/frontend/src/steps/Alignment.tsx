@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Code, Diff, ErrorText, Fields, Mono, Muted, Panel } from "@/components/common";
+import { ActionBar, Code, Diff, ErrorText, Fields, Mono, Muted, Panel } from "@/components/common";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
@@ -129,16 +129,18 @@ function Spec({ project, version }: StepProps & { version: number }) {
       </Panel>
 
       {canConfirm && (
-        <div className="flex items-center justify-end gap-4">
-          {risk && (
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
-              {support.tier === "approximate" ? "I accept approximate parity for this model" : support.known ? "I accept that this pair has no passing fixture yet" : "I accept that this R → Python pair is untested"}
-            </label>
-          )}
-          <ErrorText error={confirm.error} />
-          <Button disabled={(risk && !accepted) || confirm.isPending} onClick={() => confirm.mutate()}>Confirm Model Specification v{version}</Button>
-        </div>
+        <ActionBar tone={risk ? "warn" : undefined}>
+          <div className="flex items-center justify-end gap-4">
+            {risk && (
+              <label className="mr-auto flex items-center gap-2">
+                <input type="checkbox" className="accent-primary" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
+                {support.tier === "approximate" ? "I accept approximate parity for this model" : support.known ? "I accept that this pair has no passing fixture yet" : "I accept that this R → Python pair is untested"}
+              </label>
+            )}
+            <ErrorText error={confirm.error} />
+            <Button disabled={(risk && !accepted) || confirm.isPending} onClick={() => confirm.mutate()}>Confirm Model Specification v{version}</Button>
+          </div>
+        </ActionBar>
       )}
     </>
   );
@@ -196,7 +198,7 @@ function Assessment({ spec }: { spec: ModelSpec }) {
           ["Decision", a.decision && `${a.decision.action} at or above ${num(a.decision.threshold)}`],
           ["Acceptance criteria", criteria.length ? criteria.map(([k, v]) => `${k.replaceAll("_", " ")} ${num(v)}`).join(" · ") : null],
         ]} />
-        <List title="Still to provide" tone="text-[oklch(0.5_0.12_75)]" items={a.missing_information} />
+        <List title="Still to provide" tone="text-warn-foreground" items={a.missing_information} />
       </div>
     </Panel>
   );

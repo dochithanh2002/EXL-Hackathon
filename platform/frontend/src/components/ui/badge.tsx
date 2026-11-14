@@ -10,7 +10,7 @@ const badgeVariants = cva("inline-flex items-center gap-1 whitespace-nowrap roun
       outline: "",
       pass: "border-transparent bg-pass/15 text-pass",
       fail: "border-transparent bg-destructive/12 text-destructive",
-      warn: "border-transparent bg-warn/20 text-[oklch(0.5_0.12_75)]",
+      warn: "border-transparent bg-warn/20 text-warn-foreground",
     },
   },
   defaultVariants: { variant: "default" },

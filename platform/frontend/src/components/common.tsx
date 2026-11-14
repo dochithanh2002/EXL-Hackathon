@@ -1,6 +1,7 @@
 import { diffLines } from "diff";
-import { ExternalLink } from "lucide-react";
+import { Check, ChevronDown, Copy, ExternalLink } from "lucide-react";
 import type * as React from "react";
+import { useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,15 +9,21 @@ import { useMlflow } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 
 export function Panel({ title, actions, children, className }: { title?: React.ReactNode; actions?: React.ReactNode; children: React.ReactNode; className?: string }) {
+  const [open, setOpen] = useState(true);
   return (
     <Card className={className}>
       {(title || actions) && (
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-          {actions && <div className="flex items-center gap-2">{actions}</div>}
+        <CardHeader className={cn(!open && "pb-4")}>
+          <CardTitle>
+            <button className="flex items-center gap-2 text-left" aria-expanded={open} onClick={() => setOpen(!open)}>
+              <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", !open && "-rotate-90")} />
+              {title}
+            </button>
+          </CardTitle>
+          {open && actions && <div className="flex items-center gap-2">{actions}</div>}
         </CardHeader>
       )}
-      <CardContent>{children}</CardContent>
+      {open && <CardContent>{children}</CardContent>}
     </Card>
   );
 }
@@ -40,15 +47,38 @@ export function Mono({ children, className }: { children: React.ReactNode; class
 
 export function Code({ code, className }: { code: string; className?: string }) {
   const lines = code.replace(/\n$/, "").split("\n");
+  const [copied, setCopied] = useState(false);
+  const copy = () => navigator.clipboard.writeText(code).then(() => {
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  });
   return (
-    <pre className={cn("max-h-[36rem] overflow-auto rounded-md border bg-muted/50 py-2 font-mono text-xs leading-5", className)}>
-      {lines.map((l, i) => (
-        <div key={i} className="flex">
-          <span className="w-10 shrink-0 select-none pr-3 text-right text-muted-foreground/70">{i + 1}</span>
-          <span className="whitespace-pre pr-4">{l || " "}</span>
-        </div>
-      ))}
-    </pre>
+    <div className="group relative">
+      <button
+        aria-label="Copy"
+        onClick={copy}
+        className="absolute top-2 right-2 z-10 grid size-7 place-items-center rounded-md border bg-card text-muted-foreground opacity-0 shadow-xs transition-opacity group-hover:opacity-100 hover:text-foreground focus-visible:opacity-100"
+      >
+        {copied ? <Check className="size-3.5 text-pass" /> : <Copy className="size-3.5" />}
+      </button>
+      <pre className={cn("max-h-[36rem] overflow-auto rounded-md border bg-muted/50 py-2 font-mono text-xs leading-5", className)}>
+        {lines.map((l, i) => (
+          <div key={i} className="flex">
+            <span className="w-10 shrink-0 select-none pr-3 text-right text-muted-foreground/70">{i + 1}</span>
+            <span className="whitespace-pre pr-4">{l || " "}</span>
+          </div>
+        ))}
+      </pre>
+    </div>
+  );
+}
+
+/** The decision a step is waiting on, kept in view at the bottom of the step while its evidence scrolls. */
+export function ActionBar({ tone, children }: { tone?: "pass" | "warn"; children: React.ReactNode }) {
+  return (
+    <div className={cn("sticky -bottom-6 z-10 flex flex-col gap-3 rounded-lg border bg-card px-4 py-3 text-sm shadow-lg", tone === "pass" && "border-pass/50", tone === "warn" && "border-warn/60")}>
+      {children}
+    </div>
   );
 }
 
@@ -75,9 +105,9 @@ export function Prose({ markdown }: { markdown: string }) {
   return (
     <div
       className={cn(
-        "max-w-none text-sm leading-6",
+        "max-w-none text-sm leading-6 break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
         "[&_h1]:mb-4 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:mt-8 [&_h2]:mb-3 [&_h2]:text-base [&_h2]:font-semibold",
-        "[&_p]:my-3 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:font-mono [&_code]:text-[0.85em]",
+        "[&_p]:my-3 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:font-mono [&_code]:text-[0.85em]",
         "[&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0",
         "[&_table]:my-3 [&_table]:block [&_table]:w-full [&_table]:overflow-x-auto [&_table]:text-xs [&_th]:border-b [&_th]:px-2 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-medium [&_th]:text-muted-foreground [&_td]:border-b [&_td]:px-2 [&_td]:py-1",
       )}

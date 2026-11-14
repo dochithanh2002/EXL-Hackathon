@@ -1,4 +1,4 @@
-# ML transformation platform (R → Python)
+# R-Pythonizer
 
 An agentic platform that takes a data scientist's dataset and R model code, establishes an R baseline,
 translates the model to Python (statsmodels), validates it against the baseline within agreed tolerances, and

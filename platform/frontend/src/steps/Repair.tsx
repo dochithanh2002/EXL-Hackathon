@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { ErrorText, Fields, Muted, Panel, RunLink } from "@/components/common";
+import { ActionBar, ErrorText, Fields, Muted, Panel, RunLink } from "@/components/common";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,6 @@ export function Repair({ project, rev }: StepProps) {
   const latest = [...attempts].reverse().find((a) => a.diagnosis)?.diagnosis;
   return (
     <>
-      {s.step === 5 && s.status === "awaiting_ds" && <Resume project={project} rev={rev} />}
       <Panel title={`Discrepancy analysis · ${s.repairs} of ${s.retry_limit} repair attempts used`}>
         {attempts.length ? (
           <Table>
@@ -76,6 +75,7 @@ export function Repair({ project, rev }: StepProps) {
           </div>
         </Panel>
       )}
+      {s.step === 5 && s.status === "awaiting_ds" && <Resume project={project} rev={rev} />}
     </>
   );
 }
@@ -90,20 +90,22 @@ function Resume({ project }: StepProps) {
   });
   if (s.reason !== "retry_limit" && s.reason !== "spec_change") return null;
   return (
-    <div className="flex items-center gap-3 rounded-md border border-warn/50 bg-warn/5 px-4 py-3 text-sm">
-      <span className="font-medium">{s.reason === "retry_limit" ? "Repair limit reached" : "The Diagnostician proposes a specification change"}</span>
-      <span className="text-muted-foreground">Write to the Analyst for a new model specification, or</span>
-      <div className="ml-auto flex items-center gap-2">
-        {s.reason === "retry_limit" ? (
-          <>
-            <Input type="number" min={1} max={20} value={more} onChange={(e) => setMore(Number(e.target.value))} className="h-8 w-16" />
-            <Button size="sm" disabled={resume.isPending || more < 1} onClick={() => resume.mutate(more)}>Allow more attempts</Button>
-          </>
-        ) : (
-          <Button size="sm" disabled={resume.isPending} onClick={() => resume.mutate(0)}>Repair under the current specification</Button>
-        )}
+    <ActionBar tone="warn">
+      <div className="flex items-center gap-3">
+        <span className="shrink-0 font-medium">{s.reason === "retry_limit" ? "Repair limit reached" : "The Diagnostician proposes a specification change"}</span>
+        <span className="text-muted-foreground">Write to the Analyst for a new model specification, or</span>
+        <div className="ml-auto flex items-center gap-2">
+          {s.reason === "retry_limit" ? (
+            <>
+              <Input type="number" min={1} max={20} value={more} onChange={(e) => setMore(Number(e.target.value))} className="h-9 w-16" />
+              <Button disabled={resume.isPending || more < 1} onClick={() => resume.mutate(more)}>Allow more attempts</Button>
+            </>
+          ) : (
+            <Button disabled={resume.isPending} onClick={() => resume.mutate(0)}>Repair under the current specification</Button>
+          )}
+        </div>
       </div>
       <ErrorText error={resume.error} />
-    </div>
+    </ActionBar>
   );
 }

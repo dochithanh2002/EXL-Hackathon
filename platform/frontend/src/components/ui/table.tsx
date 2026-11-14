@@ -18,11 +18,11 @@ export function TBody(props: React.ComponentProps<"tbody">) {
 }
 
 export function TR({ className, ...props }: React.ComponentProps<"tr">) {
-  return <tr className={cn("border-b transition-colors", className)} {...props} />;
+  return <tr className={cn("border-b transition-colors hover:bg-muted/50", className)} {...props} />;
 }
 
 export function TH({ className, ...props }: React.ComponentProps<"th">) {
-  return <th className={cn("h-9 px-2 text-left align-middle font-medium whitespace-nowrap text-muted-foreground", className)} {...props} />;
+  return <th className={cn("h-9 px-2 text-left align-middle text-xs font-medium whitespace-nowrap text-muted-foreground", className)} {...props} />;
 }
 
 export function TD({ className, ...props }: React.ComponentProps<"td">) {

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CircleCheck } from "lucide-react";
 import { useState } from "react";
-import { Code, Details, ErrorText, Fields, Mono, Muted, Panel, RunLink } from "@/components/common";
+import { ActionBar, Code, Details, ErrorText, Fields, Mono, Muted, Panel, RunLink } from "@/components/common";
 import { Checks, Coefficients, EvaluationMetrics, FinancialAssessment } from "@/components/validation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
@@ -50,7 +51,7 @@ export function Translation({ project, rev }: StepProps) {
   return (
     <>
       <AttemptTabs attempts={attempts} picked={i} onPick={setPicked} />
-      {reviewing && <Review project={project} rev={rev} />}
+      {v && <Checks v={v.body} actions={<RunLink pid={project.id} runId={v.body.mlflow_run_id} />} />}
       <Panel title={`Python migration · attempt ${a.candidate.body.attempt}`} actions={<RunLink pid={project.id} runId={a.candidate.body.mlflow_run_id} />}>
         <div className="flex flex-col gap-4">
           <Fields rows={[
@@ -81,20 +82,15 @@ export function Translation({ project, rev }: StepProps) {
           ]} />
         </div>
       </Panel>
-      {v ? (
+      {v?.body.stage === "parity" && (
         <>
-          <Checks v={v.body} actions={<RunLink pid={project.id} runId={v.body.mlflow_run_id} />} />
-          {v.body.stage === "parity" && (
-            <>
-              <EvaluationMetrics v={v.body} />
-              <FinancialAssessment v={v.body} />
-              <Coefficients pid={project.id} evidenceId={v.id} />
-            </>
-          )}
+          <EvaluationMetrics v={v.body} />
+          <FinancialAssessment v={v.body} />
+          <Coefficients pid={project.id} evidenceId={v.id} />
         </>
-      ) : (
-        s.status !== "working" && <Muted>This attempt did not run.</Muted>
       )}
+      {!v && s.status !== "working" && <Muted>This attempt did not run.</Muted>}
+      {reviewing && <Review project={project} rev={rev} />}
     </>
   );
 }
@@ -109,9 +105,10 @@ function Review({ project }: StepProps) {
   const approve = useMutation({ mutationFn: () => post(p(project.id, "/approve"), bindings), onSuccess: done });
   const reject = useMutation({ mutationFn: () => post(p(project.id, "/reject"), { bindings, comment }), onSuccess: done });
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-pass/40 bg-pass/5 px-4 py-3">
-      <div className="flex items-center gap-3 text-sm">
-        <span className="font-medium">Parity Checks Passed</span>
+    <ActionBar tone="pass">
+      <div className="flex items-center gap-2">
+        <CircleCheck className="size-4 text-pass" />
+        <span className="font-medium">Parity checks passed</span>
         <div className="ml-auto flex gap-2">
           {!rejecting && <Button variant="outline" onClick={() => setRejecting(true)}>Reject</Button>}
           <Button disabled={approve.isPending} onClick={() => approve.mutate()}>Accept Migration</Button>
@@ -127,6 +124,6 @@ function Review({ project }: StepProps) {
         </div>
       )}
       <ErrorText error={approve.error ?? reject.error} />
-    </div>
+    </ActionBar>
   );
 }

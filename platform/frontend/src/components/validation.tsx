@@ -13,7 +13,7 @@ export function closeness(ratio: number | null | undefined): "pass" | "near" | "
   return ratio > 1 ? "fail" : ratio > 0.1 ? "near" : "pass";
 }
 
-const TONE = { pass: "text-pass", near: "text-[oklch(0.55_0.13_75)]", fail: "text-destructive font-medium" };
+const TONE = { pass: "text-pass", near: "text-warn-foreground", fail: "text-destructive font-medium" };
 const STATUS_BADGE = { passed: "pass", failed: "fail", unavailable: "secondary" } as const;
 
 function expected(c: Check): string {
