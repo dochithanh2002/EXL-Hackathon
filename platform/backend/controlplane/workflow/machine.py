@@ -34,6 +34,7 @@ class Status(StrEnum):
 
 class Reason(StrEnum):
     SPEC_DRAFTED = "spec_drafted"
+    ANALYST_REPLIED = "analyst_replied"
     UNSUPPORTED = "unsupported"
     CANDIDATE_PASSED = "candidate_passed"
     RETRY_LIMIT = "retry_limit"
@@ -113,6 +114,17 @@ class SpecDrafted(Frozen):
     proven: bool
 
 
+class DsMessaged(Frozen):
+    """The DS wrote to the Analyst; the Analyst takes the turn. After a failed or cancelled baseline this returns the
+    project to step 2, where a corrected spec version can be drafted and confirmed."""
+    type: Literal["ds_messaged"] = "ds_messaged"
+
+
+class AnalystReplied(Frozen):
+    """The Analyst ended its turn without a new draft."""
+    type: Literal["analyst_replied"] = "analyst_replied"
+
+
 class SpecConfirmed(Frozen):
     type: Literal["spec_confirmed"] = "spec_confirmed"
     version: int = Field(ge=1)
@@ -188,9 +200,9 @@ class RetryStep(Frozen):
 
 
 Event = Annotated[
-    FilesUploaded | SpecDrafted | SpecConfirmed | BaselineSucceeded | CandidateValidated | CandidateApproved
-    | CandidateRejected | DiagnosisSubmitted | ResumeRepair | ReportBuilt | DeliverablesBuilt | StepFailed
-    | Cancelled | RetryStep,
+    FilesUploaded | DsMessaged | AnalystReplied | SpecDrafted | SpecConfirmed | BaselineSucceeded
+    | CandidateValidated | CandidateApproved | CandidateRejected | DiagnosisSubmitted | ResumeRepair | ReportBuilt
+    | DeliverablesBuilt | StepFailed | Cancelled | RetryStep,
     Field(discriminator="type"),
 ]
 
@@ -237,6 +249,15 @@ def apply(s: ProjectState, e: Event) -> ProjectState:
             _require(len({f.name for f in files}) == len(files), "file names must be unique")
             return _move(s, Step.ALIGNMENT, files=files)
 
+        case DsMessaged():
+            if (s.step, s.status) != (Step.BASELINE, Status.AWAITING_DS):
+                _at(s, Step.ALIGNMENT, Status.AWAITING_DS)
+            return _move(s, Step.ALIGNMENT)
+
+        case AnalystReplied():
+            _at(s, Step.ALIGNMENT, Status.WORKING)
+            return _move(s, Step.ALIGNMENT, Status.AWAITING_DS, Reason.ANALYST_REPLIED)
+
         case SpecDrafted(version=v, tier=tier, proven=proven):
             _require(s.step != Step.INTAKE, "upload files first")
             _require(v > max(s.drafted_version or 0, s.spec_version or 0), f"spec v{v} is not newer than the last")
@@ -250,6 +271,7 @@ def apply(s: ProjectState, e: Event) -> ProjectState:
 
         case SpecConfirmed(version=v, tier=tier, proven=proven, baseline_key=key, parity_risk_accepted=accepted):
             _require(s.step != Step.INTAKE, "upload files first")
+            _require((s.step, s.status) != (Step.ALIGNMENT, Status.WORKING), "the Analyst is still working")
             _require(v == s.drafted_version, f"spec v{v} is not the latest draft (v{s.drafted_version})")
             _require(v > (s.spec_version or 0), f"spec v{v} is already confirmed")
             _require(tier == s.drafted_tier, f"tier '{tier}' does not match the draft's tier '{s.drafted_tier}'")

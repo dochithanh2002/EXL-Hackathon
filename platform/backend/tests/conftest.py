@@ -4,9 +4,16 @@ import time
 import urllib.request
 
 import pytest
+from cryptography.fernet import Fernet
 
+from controlplane import support
+from controlplane.agentservice import AgentService
+from controlplane.endpoints import Endpoints
 from controlplane.environments import ENVS_DIR, EnvironmentNotReady, Environments
+from controlplane.jobs import Jobs
+from controlplane.settings import Settings
 from controlplane.tracking import Tracker
+from controlplane.workflow import Store
 
 MLFLOW = ENVS_DIR / "mlflow" / ".venv" / "bin" / "mlflow"
 
@@ -55,3 +62,10 @@ def mlflow_uri(tmp_path_factory):
 @pytest.fixture
 def tracker(mlflow_uri):
     return Tracker(mlflow_uri)
+
+
+def make_jobs(tmp_path, envs, tracker, agents_url="http://127.0.0.1:9", url="http://127.0.0.1:9") -> Jobs:
+    settings = Settings(data_dir=tmp_path / "var", agents_url=agents_url, url=url)
+    store = Store(tmp_path / "db.sqlite")
+    return Jobs(store, settings, envs, tracker, Endpoints(tmp_path / "db.sqlite", Fernet(Fernet.generate_key())),
+                AgentService(agents_url), support.load())

@@ -147,6 +147,7 @@ name = "controlplane"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "cryptography" },
     { name = "fastapi" },
     { name = "mlflow-skinny" },
     { name = "pydantic" },
@@ -163,6 +164,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography", specifier = "==50.0.2" },
     { name = "fastapi", specifier = "==0.162.7" },
     { name = "mlflow-skinny", specifier = "==3.18.0" },
     { name = "pydantic", specifier = "==2.14.3" },

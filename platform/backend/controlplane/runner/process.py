@@ -53,7 +53,7 @@ class Outcome:
             head = f"killed by {signal.Signals(-self.returncode).name}"
         else:
             head = f"exited with status {self.returncode}"
-        tail = self.log.read_text(errors="replace").splitlines()[-lines:]
+        tail = self.log.read_text(errors="replace").splitlines()[-lines:] if lines > 0 else []
         return "\n".join([head, *tail])
 
 

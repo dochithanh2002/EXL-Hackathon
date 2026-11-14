@@ -1,23 +1,43 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import shutil
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi import Body, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
+from pydantic import BaseModel, Field
 
+from .. import support
+from ..agentservice import AgentService
+from ..analyst import Analyst, ToolError
+from ..endpoints import EndpointIn, Endpoints, InvalidSetting, RoleModel, load_cipher
 from ..environments import EnvironmentNotReady, Environments
-from ..schemas import ROLES, sha256_file
+from ..jobs import Jobs
+from ..schemas import ROLES, canonical_hash, sha256_file
 from ..settings import Settings
-from ..workflow import GateError, NotFound, Store
-from ..workflow.machine import FilesUploaded, InputFile
+from ..tracking import Tracker
+from ..workflow import GateError, NotFound, Status, Store
+from ..workflow.machine import FilesUploaded, InputFile, RetryStep, SpecConfirmed
 
 SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._ -]{0,127}$")
 EXTENSIONS = {"dataset": {".csv"}, "r_code": {".r", ".rmd", ".qmd"}, "document": {".md", ".txt", ".pdf", ".docx"}}
+
+
+class Message(BaseModel):
+    text: str = Field(min_length=1, max_length=20_000)
+
+
+class Confirmation(BaseModel):
+    parity_risk_accepted: bool = False
+
+
+class ModelChoice(BaseModel):
+    model: str
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -26,14 +46,39 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         settings.data_dir.mkdir(parents=True, exist_ok=True)
-        app.state.store = Store(settings.db_path)
-        app.state.store.recover()
+        st = app.state.store = Store(settings.db_path)
+        app.state.endpoints = Endpoints(settings.db_path, load_cipher(settings.data_dir))
+        app.state.agents = AgentService(settings.agents_url)
+        app.state.jobs = Jobs(st, settings, Environments(), Tracker(settings.mlflow_uri), app.state.endpoints,
+                              app.state.agents, support.load())
+        st.recover()
+        if settings.autostart:
+            for p in st.projects():
+                if p["state"].status == Status.WORKING and st.running_job(p["id"]) is None:
+                    app.state.jobs.advance(p["id"])
         yield
 
     app = FastAPI(title="controlplane", lifespan=lifespan)
 
     def store(request: Request) -> Store:
         return request.app.state.store
+
+    def jobs(request: Request) -> Jobs:
+        return request.app.state.jobs
+
+    def endpoints(request: Request) -> Endpoints:
+        return request.app.state.endpoints
+
+    def advance(request: Request, pid: str) -> None:
+        if settings.autostart:
+            jobs(request).advance(pid)
+
+    def analyst(request: Request, pid: str) -> Analyst:
+        s = store(request).state(pid)
+        if not s.files:
+            raise HTTPException(409, "no files uploaded")
+        return Analyst(s.files, settings.project_dir(pid) / "inputs", settings.project_dir(pid) / "cache",
+                       support.load(), Environments(), settings.limits)
 
     @app.exception_handler(GateError)
     async def _gate(_, e: GateError):
@@ -42,6 +87,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.exception_handler(NotFound)
     async def _missing(_, e: NotFound):
         return JSONResponse(status_code=404, content={"detail": f"not found: {e}"})
+
+    @app.exception_handler(InvalidSetting)
+    async def _invalid(_, e: InvalidSetting):
+        return JSONResponse(status_code=422, content={"detail": str(e)})
 
     @app.get("/api/health")
     def health():
@@ -94,7 +143,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except BaseException:
             shutil.rmtree(inputs, ignore_errors=True)
             raise
-        return {"id": pid, "state": st.state(pid)}
+        state = st.state(pid)
+        advance(request, pid)
+        return {"id": pid, "state": state}
 
     @app.get("/api/projects/{pid}")
     def get_project(request: Request, pid: str):
@@ -107,6 +158,124 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         st = store(request)
         st.state(pid)
         return st.transitions(pid)
+
+    @app.get("/api/projects/{pid}/files/{name}", response_class=PlainTextResponse)
+    def read_file(request: Request, pid: str, name: str):
+        try:
+            return analyst(request, pid).read_file(name)
+        except ToolError as e:
+            raise HTTPException(404, str(e))
+
+    @app.get("/api/projects/{pid}/profile")
+    def dataset_profile(request: Request, pid: str):
+        try:
+            return analyst(request, pid).profile()
+        except ToolError as e:
+            raise HTTPException(422, str(e))
+
+    # ------------------------------------------------------------ step 2
+    @app.get("/api/projects/{pid}/chat")
+    def chat(request: Request, pid: str):
+        return store(request).chat(pid)
+
+    @app.post("/api/projects/{pid}/chat", status_code=202)
+    def post_chat(request: Request, pid: str, message: Message):
+        store(request).ds_message(pid, message.text)
+        advance(request, pid)
+        return {"state": store(request).state(pid)}
+
+    @app.get("/api/projects/{pid}/specs")
+    def specs(request: Request, pid: str):
+        store(request).state(pid)
+        return store(request).specs(pid)
+
+    @app.get("/api/projects/{pid}/specs/{version}")
+    def spec(request: Request, pid: str, version: int):
+        body = store(request).spec(pid, version)
+        return {"version": version, "spec": body, "support": support.load().support(body),
+                "baseline_key": canonical_hash(body.baseline_key())}
+
+    @app.post("/api/projects/{pid}/specs/{version}/confirm")
+    def confirm(request: Request, pid: str, version: int, c: Confirmation = Body(default_factory=Confirmation)):
+        body = store(request).spec(pid, version)
+        sup = support.load().support(body)
+        state = store(request).apply(pid, SpecConfirmed(
+            version=version, tier=sup.tier, proven=sup.proven, baseline_key=canonical_hash(body.baseline_key()),
+            parity_risk_accepted=c.parity_risk_accepted))
+        advance(request, pid)
+        return {"state": state}
+
+    # ------------------------------------------------------------ jobs
+    @app.post("/api/projects/{pid}/retry")
+    def retry(request: Request, pid: str):
+        state = store(request).apply(pid, RetryStep())
+        advance(request, pid)
+        return {"state": state}
+
+    @app.post("/api/projects/{pid}/cancel", status_code=202)
+    def cancel(request: Request, pid: str):
+        job = store(request).running_job(pid)
+        if job is None:
+            raise HTTPException(409, "no job is running")
+        jobs(request).cancel(job["id"])
+        return {"job_id": job["id"]}
+
+    @app.get("/api/jobs/{jid}/events")
+    def job_events(request: Request, jid: str):
+        stream = jobs(request).stream(jid)
+        if stream is None:
+            raise HTTPException(404, "the job is not running")
+
+        def events():
+            pos = 0
+            while True:
+                batch, done = stream.read(pos, 15)
+                if done:
+                    return
+                pos += len(batch)
+                yield "".join(f"data: {json.dumps(e)}\n\n" for e in batch) or ": keepalive\n\n"
+        return StreamingResponse(events(), media_type="text/event-stream")
+
+    @app.post("/internal/tools/{name}")
+    def tool(request: Request, name: str, args: Annotated[dict, Body()], authorization: str = Header("")):
+        try:
+            return jobs(request).tool(authorization.removeprefix("Bearer "), name, args)
+        except PermissionError as e:
+            raise HTTPException(401, str(e))
+
+    # ------------------------------------------------------------ settings
+    @app.get("/api/settings/endpoints")
+    def list_endpoints(request: Request):
+        return endpoints(request).list()
+
+    @app.post("/api/settings/endpoints", status_code=201)
+    def create_endpoint(request: Request, e: EndpointIn):
+        return endpoints(request).create(e)
+
+    @app.put("/api/settings/endpoints/{eid}")
+    def update_endpoint(request: Request, eid: str, e: EndpointIn):
+        return endpoints(request).update(eid, e)
+
+    @app.delete("/api/settings/endpoints/{eid}", status_code=204)
+    def delete_endpoint(request: Request, eid: str):
+        endpoints(request).delete(eid)
+
+    @app.post("/api/settings/endpoints/{eid}/test")
+    def test_endpoint(request: Request, eid: str, choice: ModelChoice):
+        ep = endpoints(request).get(eid)
+        if choice.model not in ep.models:
+            raise HTTPException(422, f"{ep.name} does not list model {choice.model}")
+        return request.app.state.agents.test(endpoints(request).model_ref(eid, choice.model))
+
+    @app.get("/api/settings/roles")
+    def roles(request: Request):
+        assigned = endpoints(request).roles()
+        return {role: assigned.get(role) for role in ROLES}
+
+    @app.put("/api/settings/roles/{role}")
+    def assign_role(request: Request, role: str, m: RoleModel):
+        endpoints(request).assign(role, m)
+        return m
 
     return app
 

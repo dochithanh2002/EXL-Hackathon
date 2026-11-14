@@ -53,4 +53,6 @@ echo "== Control plane"
 (cd backend && uv sync --frozen)
 
 echo "== Agent service"
-(cd agents && npm ci --no-audit --no-fund)
+node -e 'const [a, b] = process.versions.node.split(".").map(Number); if (a < 22 || (a === 22 && b < 19)) {
+  console.error(`Node ${process.versions.node} found; the agent service needs 22.19 or later`); process.exit(1); }'
+(cd agents && npm ci --ignore-scripts --no-audit --no-fund)

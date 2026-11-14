@@ -1,6 +1,6 @@
 # Plan: agentic R → Python ML transformation platform
 
-Status: build steps 1–2 done (section 12). Date: 2026-11-13.
+Status: build steps 1–3 done (section 12). Date: 2026-11-13.
 
 A Python control plane owns all workflow, execution and approval logic. A small Node service hosts Pi for the
 four agents. A React UI is the data scientist's (DS) workspace. Everything runs locally as plain processes; a
@@ -25,7 +25,8 @@ Dockerfile is provided for Linux server deployment.
   config), and custom tools through extension factories (`pi.registerTool`). `session.abort()` cancels.
 - Custom endpoints are providers with `baseUrl`, `apiKey`, `models[]` and an `api` of `openai-responses`,
   `openai-completions`, `anthropic-messages` or `google-generative-ai`. Keys can be set per request with
-  `modelRuntime.setRuntimeApiKey`.
+  `modelRuntime.setRuntimeApiKey`. A provider's own `apiKey` value is expanded (`$VAR`, and `!command` runs a
+  shell command), so user-supplied keys go only through `setRuntimeApiKey`.
 - Pi has no maintained Python RPC client and no permission system. Hence the Node service, and hence agents get
   no `bash`, `write` or `edit` tools.
 - The verification endpoint in `EXL-Hackathon-26/downloads/openai.env` uses `wire_api = "responses"`, which maps
@@ -48,9 +49,9 @@ React UI ──HTTP/SSE──> Control plane (Python, FastAPI)
 
 - The agent service has one job: run role X with these inputs, stream events, return a schema-valid output. It
   holds no workflow state. Target size is about 300 lines of TypeScript.
-- Model settings: the UI manages endpoints (name, base URL, API type, key, model ids, reasoning level), assigns a
-  model per agent role, and has a "test connection" button. Keys are encrypted at rest, never sent back to the
-  browser, and passed to Pi per request.
+- Model settings: the UI manages endpoints (name, base URL, API type, key, model ids), assigns a model and
+  reasoning level per agent role, and has a "test connection" button. Keys are encrypted at rest, never sent back
+  to the browser, and passed to Pi per request.
 - One command starts all three processes locally (`./dev.sh`); `./bootstrap.sh` builds the two environments once.
 
 ## 4. Workflow (fixed; enforced by code, not by agents)
@@ -69,6 +70,8 @@ React UI ──HTTP/SSE──> Control plane (Python, FastAPI)
   changes, the approval is void.
 - The baseline, modelling intent and tolerances change only through a new `ModelSpec` version confirmed by the
   DS, which restarts from step 3 or 4.
+- After a failed or cancelled baseline the DS can retry it, or write to the Analyst, which returns the project to
+  step 2 to draft a corrected version. The Analyst sees R's error message, never the step log.
 - Every transition and job is a database row. On restart, running jobs are marked interrupted and can be resumed
   or retried. Cancel kills the step's process group and aborts the Pi session.
 

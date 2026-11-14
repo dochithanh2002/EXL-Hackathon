@@ -4,6 +4,7 @@
 marker does not match its lockfile is stale and steps refuse to run in it."""
 from __future__ import annotations
 
+import json
 import os
 import shutil
 from dataclasses import dataclass
@@ -13,6 +14,8 @@ from .schemas import canonical_hash, sha256_file
 
 ENVS_DIR = Path(__file__).resolve().parents[2] / "envs"
 MARKER = ".lock-sha256"
+R_BASE = frozenset({"base", "compiler", "datasets", "graphics", "grDevices", "grid", "methods", "parallel", "splines",
+                    "stats", "stats4", "tcltk", "tools", "utils"})
 
 
 class EnvironmentNotReady(RuntimeError):
@@ -48,12 +51,21 @@ class Environments:
         """Hash of the two lockfiles; recorded on every run."""
         return canonical_hash({name: sha256_file(p) for name, p in self.lockfiles.items()})
 
+    def r_packages(self) -> frozenset[str]:
+        """Every package baseline.R can load: R's base packages and the locked ones."""
+        return R_BASE | json.loads(self.r_lockfile.read_text())["Packages"].keys()
+
     def r(self) -> Path:
         rscript = self.rscript or os.environ.get("CONTROLPLANE_RSCRIPT") or shutil.which("Rscript")
         if not rscript:
             raise EnvironmentNotReady("Rscript not found; set CONTROLPLANE_RSCRIPT")
         self._check(self.r_library, self.r_lockfile)
         return Path(rscript)
+
+    def r_env(self) -> dict[str, str]:
+        """Environment for an Rscript step: only the stable library is visible."""
+        lib = str(self.r_library)
+        return {"PATH": f"{self.r().parent}:/usr/bin:/bin", "R_LIBS": lib, "R_LIBS_USER": lib, "R_LIBS_SITE": lib}
 
     def py(self) -> Path:
         self._check(self.python.parents[1], self.python_lockfile)

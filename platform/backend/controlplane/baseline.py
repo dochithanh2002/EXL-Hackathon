@@ -18,7 +18,11 @@ CAPTURED = ("coefficients.csv", "split.csv", "predictions.csv", "fit.json", "met
 
 
 class BaselineFailed(Exception):
-    pass
+    """`str()` is the full detail for the DS; `reason` is safe to show the Analyst (no log lines)."""
+
+    def __init__(self, detail: str, reason: str | None = None):
+        super().__init__(detail)
+        self.reason = reason or detail
 
 
 @dataclass(frozen=True)
@@ -64,15 +68,19 @@ def run_baseline(workdir: Path, spec: ModelSpec, files: tuple[InputFile, ...], i
         "script": "baseline.R", "dataset": f"inputs/{dataset}", "response": spec.response,
         "objects": spec.baseline_objects.model_dump(), "seed": spec.split.seed, "out": "capture"}))
 
-    rscript, lib = envs.r(), str(envs.r_library)
-    env = {"PATH": f"{rscript.parent}:/usr/bin:/bin", "R_LIBS": lib, "R_LIBS_USER": lib, "R_LIBS_SITE": lib}
-    proc = Process([str(rscript), "--vanilla", "capture.R", "config.json"], workdir, env, limits)
+    proc = Process([str(envs.r()), "--vanilla", "capture.R", "config.json"], workdir, envs.r_env(), limits)
     on_start(proc)
     outcome = proc.start().wait()
     if outcome.cancelled:
         raise StepCancelled()
     if not outcome.ok:
-        raise BaselineFailed("R baseline " + outcome.describe())
+        error = workdir / "capture" / "error.json"
+        if error.is_file():
+            e = json.loads(error.read_text())
+            reason = f"R stopped in {e['stage']}: {e['message']}"
+        else:
+            reason = "R " + outcome.describe(lines=0)
+        raise BaselineFailed("R baseline " + outcome.describe(), reason)
 
     out = workdir / "capture"
     missing = [n for n in CAPTURED if not (out / n).is_file()]

@@ -1,9 +1,9 @@
 import pytest
 
 from controlplane.workflow.machine import (
-    BaselineSucceeded, Bindings, CandidateApproved, CandidateRejected, CandidateValidated, Cancelled,
-    DeliverablesBuilt, DiagnosisSubmitted, FilesUploaded, GateError, InputFile, ProjectState, Reason, ReportBuilt,
-    ResumeRepair, RetryStep, SpecConfirmed, SpecDrafted, Status, Step, StepFailed, apply,
+    AnalystReplied, BaselineSucceeded, Bindings, CandidateApproved, CandidateRejected, CandidateValidated, Cancelled,
+    DeliverablesBuilt, DiagnosisSubmitted, DsMessaged, FilesUploaded, GateError, InputFile, ProjectState, Reason,
+    ReportBuilt, ResumeRepair, RetryStep, SpecConfirmed, SpecDrafted, Status, Step, StepFailed, apply,
 )
 
 H = "a" * 64
@@ -201,3 +201,33 @@ def test_failure_cancel_and_retry():
         apply(s, Cancelled(step=Step.TRANSLATION))
     with pytest.raises(GateError, match="nothing to retry"):
         apply(s, RetryStep())
+
+
+def test_chat_turns_alternate_between_the_ds_and_the_analyst():
+    s = run(ProjectState(), FilesUploaded(files=FILES))
+    with pytest.raises(GateError):
+        apply(s, DsMessaged())                                     # the Analyst has the opening turn
+    with pytest.raises(GateError, match="still working"):
+        apply(run(s, SpecDrafted(version=1, tier="exact", proven=True), DsMessaged()),
+              SpecConfirmed(version=1, tier="exact", proven=True, baseline_key=KEY1))
+    s = run(s, AnalystReplied())
+    assert where(s) == (Step.ALIGNMENT, Status.AWAITING_DS, Reason.ANALYST_REPLIED)
+    with pytest.raises(GateError):
+        apply(s, AnalystReplied())
+    s = run(s, DsMessaged(), SpecDrafted(version=1, tier="exact", proven=True))
+    assert where(s) == (Step.ALIGNMENT, Status.AWAITING_DS, Reason.SPEC_DRAFTED)
+    s = run(s, DsMessaged(), AnalystReplied())                     # a question answered; the draft stands
+    assert where(run(s, SpecConfirmed(version=1, tier="exact", proven=True, baseline_key=KEY1))) == (
+        Step.BASELINE, Status.WORKING, None)
+    with pytest.raises(GateError):
+        apply(at_translation(), DsMessaged())
+
+
+def test_a_failed_baseline_returns_to_the_analyst_for_a_corrected_spec():
+    s = run(ProjectState(), FilesUploaded(files=FILES), *confirmed())
+    with pytest.raises(GateError):
+        apply(s, DsMessaged())                                     # not while the baseline runs
+    s = run(s, StepFailed(step=Step.BASELINE, spec_version=1, detail="R error"), DsMessaged())
+    assert where(s) == (Step.ALIGNMENT, Status.WORKING, None) and s.spec_version == 1
+    s = run(s, *confirmed(version=2, key=KEY1))                    # same baseline key, but no baseline exists
+    assert where(s) == (Step.BASELINE, Status.WORKING, None) and s.spec_version == 2

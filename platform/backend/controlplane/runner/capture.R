@@ -19,6 +19,13 @@ write_full <- function(df, name) {                    # doubles with 17 signific
   df[num] <- lapply(df[num], function(x) ifelse(is.na(x), NA, sprintf("%.17g", x)))
   write.csv(df, out(name), row.names = FALSE, na = "")
 }
+# A failure writes R's message (never the log, which can hold printed rows) for the Analyst to see.
+stage <- "the capture harness"
+options(error = function() {
+  write_json(list(stage = stage, message = substr(trimws(geterrmessage()), 1, 1000)), out("error.json"),
+             auto_unbox = TRUE)
+  quit(save = "no", status = 1)
+})
 write_meta <- function(x, name) write_json(x, out(name), auto_unbox = TRUE, digits = NA, pretty = TRUE, null = "null")
 
 TAG <- 1000000000L
@@ -38,7 +45,9 @@ for (f in c("read.csv", "read.csv2", "read.table", "read.delim", "read.delim2"))
   assign(f, tagged(get(f, envir = asNamespace("utils"))), envir = env)
 if (!is.null(cfg$seed)) set.seed(cfg$seed)
 t0 <- Sys.time()
+stage <- "baseline.R"
 sys.source(cfg$script, envir = env, keep.source = FALSE)
+stage <- "the capture harness"
 runtime <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
 
 get_obj <- function(role) {

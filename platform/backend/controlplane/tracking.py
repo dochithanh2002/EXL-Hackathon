@@ -29,6 +29,9 @@ class StepRun:
     def tags(self, **values) -> None:
         self.client.log_batch(self.run_id, tags=[RunTag(k, str(v)) for k, v in values.items()])
 
+    def artifact_text(self, text: str, name: str) -> None:
+        self.client.log_text(self.run_id, text, name)
+
     def artifact(self, path: Path, folder: str | None = None) -> None:
         if path.is_dir():
             self.client.log_artifacts(self.run_id, str(path), folder)

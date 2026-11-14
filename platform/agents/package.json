@@ -5,16 +5,15 @@
   "type": "module",
   "engines": { "node": ">=22.19.0" },
   "scripts": {
-    "dev": "tsx watch server.ts",
-    "start": "tsx server.ts",
+    "start": "node server.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@earendil-works/pi-ai": "1.5.2",
     "@earendil-works/pi-coding-agent": "1.5.2"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
-    "tsx": "4.23.15",
     "typescript": "7.0.2"
   }
 }

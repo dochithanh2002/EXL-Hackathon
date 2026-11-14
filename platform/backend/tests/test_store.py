@@ -114,3 +114,18 @@ def test_changing_the_seed_restarts_the_baseline(store):
     assert (s.step, s.baseline_id) == (Step.TRANSLATION, "b1")           # tolerances only: baseline reused
     s = confirm(store, pid, spec(tolerances={"coef_rel": 1e-4}, split=split | {"seed": 2}))
     assert (s.step, s.baseline_id) == (Step.BASELINE, None)              # new seed: baseline rerun
+
+
+def test_a_discarded_job_result_writes_none_of_its_rows(store):
+    pid = store.create_project("p")
+    store.apply(pid, FilesUploaded(files=FILES))
+    jid = store.start_job(pid, "analyst")
+
+    def commit(db):
+        store.add_chat(db, pid, "analyst", "reply", jid)
+        store.save_transcript(db, pid, "analyst", [{"role": "user"}])
+        return store.draft_spec(db, pid, spec(), support.load())
+    store.apply(pid, SpecDrafted(version=1, tier="exact", proven=False))    # a draft v1 arrived meanwhile
+    store.finish_job(jid, commit)
+    assert store.chat(pid) == [] and store.transcript(pid, "analyst") == [] and store.specs(pid) == []
+    assert "result discarded" in store._row_job(jid)["detail"]

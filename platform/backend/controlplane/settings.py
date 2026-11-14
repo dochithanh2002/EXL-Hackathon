@@ -16,6 +16,9 @@ class Settings:
     data_dir: Path = field(default_factory=lambda: Path(_env("DATA_DIR", str(PLATFORM_DIR / "var"))))
     retry_limit: int = field(default_factory=lambda: int(_env("RETRY_LIMIT", "3")))
     mlflow_uri: str = field(default_factory=lambda: _env("MLFLOW_URI", "http://127.0.0.1:5000"))
+    agents_url: str = field(default_factory=lambda: _env("AGENTS_URL", "http://127.0.0.1:8100"))
+    autostart: bool = field(default_factory=lambda: _env("AUTOSTART", "1") == "1")
+    url: str = field(default_factory=lambda: _env("URL", "http://127.0.0.1:8000"))
     limits: Limits = field(default_factory=lambda: Limits(
         cpu_s=int(_env("CPU_S", "1800")), memory_mb=int(_env("MEMORY_MB", "8192")), wall_s=int(_env("WALL_S", "3600"))))
 

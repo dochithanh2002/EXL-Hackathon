@@ -8,14 +8,15 @@ import uuid
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Callable
 
 from pydantic import BaseModel, TypeAdapter
 
 from ..schemas.agents import ModelSpec
 from ..schemas.hashing import canonical_hash
 from ..support import SupportMatrix
-from .machine import (Bindings, Cancelled, Event, GateError, ProjectState, SpecDrafted, Status, Step, StepFailed,
-                      apply)
+from .machine import (Bindings, Cancelled, DsMessaged, Event, GateError, ProjectState, SpecDrafted, Status, Step,
+                      StepFailed, apply)
 
 EVENT = TypeAdapter(Event)
 
@@ -57,6 +58,23 @@ CREATE TABLE IF NOT EXISTS jobs (
     detail TEXT NOT NULL DEFAULT ''
 );
 CREATE UNIQUE INDEX IF NOT EXISTS one_running_job ON jobs(project_id) WHERE status = 'running';
+CREATE TABLE IF NOT EXISTS chat (
+    project_id TEXT NOT NULL REFERENCES projects(id),
+    seq INTEGER NOT NULL,
+    at TEXT NOT NULL,
+    author TEXT NOT NULL CHECK (author IN ('ds', 'analyst', 'platform')),
+    text TEXT NOT NULL,
+    job_id TEXT,
+    spec_version INTEGER,
+    PRIMARY KEY (project_id, seq)
+);
+CREATE TABLE IF NOT EXISTS transcripts (
+    project_id TEXT NOT NULL REFERENCES projects(id),
+    role TEXT NOT NULL,
+    messages TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (project_id, role)
+);
 CREATE TABLE IF NOT EXISTS evidence (
     id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL REFERENCES projects(id),
@@ -158,14 +176,25 @@ class Store:
     def add_spec(self, pid: str, spec: ModelSpec, matrix: SupportMatrix) -> int:
         """Store the next spec version and record it as drafted, with its tier and proven flag taken from the
         support matrix (never from the Analyst's own claim)."""
-        support = matrix.support(spec)
         with self._tx() as db:
-            v = db.execute("SELECT COALESCE(MAX(version), 0) + 1 FROM specs WHERE project_id = ?",
-                           (pid,)).fetchone()[0]
-            db.execute("INSERT INTO specs VALUES (?, ?, ?, ?, ?)",
-                       (pid, v, canonical_hash(spec), spec.model_dump_json(), now()))
-            self.apply(pid, SpecDrafted(version=v, tier=support.tier, proven=support.proven), db)
-        return v
+            event = self.draft_spec(db, pid, spec, matrix)
+            self.apply(pid, event, db)
+        return event.version
+
+    @staticmethod
+    def draft_spec(db: sqlite3.Connection, pid: str, spec: ModelSpec, matrix: SupportMatrix) -> SpecDrafted:
+        """Insert the next spec version; the caller applies the returned event in the same transaction."""
+        support = matrix.support(spec)
+        v = db.execute("SELECT COALESCE(MAX(version), 0) + 1 FROM specs WHERE project_id = ?", (pid,)).fetchone()[0]
+        db.execute("INSERT INTO specs VALUES (?, ?, ?, ?, ?)",
+                   (pid, v, canonical_hash(spec), spec.model_dump_json(), now()))
+        return SpecDrafted(version=v, tier=support.tier, proven=support.proven)
+
+    def specs(self, pid: str) -> list[dict]:
+        with self._tx() as db:
+            rows = db.execute("SELECT version, hash, created_at FROM specs WHERE project_id = ? ORDER BY version",
+                              (pid,)).fetchall()
+        return [dict(r) for r in rows]
 
     def spec(self, pid: str, version: int) -> ModelSpec:
         with self._tx() as db:
@@ -174,6 +203,40 @@ class Store:
         if row is None:
             raise NotFound(f"{pid} spec v{version}")
         return ModelSpec.model_validate_json(row["body"])
+
+    # ------------------------------------------------------------ chat
+    def ds_message(self, pid: str, text: str) -> None:
+        """The DS writes to the Analyst: record the message and hand the Analyst the turn."""
+        with self._tx() as db:
+            self.apply(pid, DsMessaged(), db)
+            self.add_chat(db, pid, "ds", text)
+
+    @staticmethod
+    def add_chat(db: sqlite3.Connection, pid: str, author: str, text: str, job_id: str | None = None,
+                 spec_version: int | None = None) -> None:
+        seq = db.execute("SELECT COALESCE(MAX(seq), 0) + 1 FROM chat WHERE project_id = ?", (pid,)).fetchone()[0]
+        db.execute("INSERT INTO chat VALUES (?, ?, ?, ?, ?, ?, ?)",
+                   (pid, seq, now(), author, text, job_id, spec_version))
+
+    def chat(self, pid: str) -> list[dict]:
+        with self._tx() as db:
+            self.state(pid, db)
+            rows = db.execute("SELECT seq, at, author, text, job_id, spec_version FROM chat WHERE project_id = ? "
+                              "ORDER BY seq", (pid,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def transcript(self, pid: str, role: str) -> list:
+        """The role's full agent transcript (Pi messages, opaque here), replayed into each new session."""
+        with self._tx() as db:
+            row = db.execute("SELECT messages FROM transcripts WHERE project_id = ? AND role = ?",
+                             (pid, role)).fetchone()
+        return json.loads(row["messages"]) if row else []
+
+    @staticmethod
+    def save_transcript(db: sqlite3.Connection, pid: str, role: str, messages: list) -> None:
+        db.execute("INSERT INTO transcripts VALUES (?, ?, ?, ?) ON CONFLICT (project_id, role) "
+                   "DO UPDATE SET messages = excluded.messages, updated_at = excluded.updated_at",
+                   (pid, role, json.dumps(messages), now()))
 
     # ------------------------------------------------------------ evidence
     def record(self, pid: str, kind: str, body: BaseModel | dict) -> tuple[str, str]:
@@ -204,9 +267,11 @@ class Store:
                        "VALUES (?, ?, ?, ?, ?, 'running', ?)", (jid, pid, s.step, kind, s.spec_version, now()))
         return jid
 
-    def finish_job(self, jid: str, event: Event | None, status: str = "succeeded", detail: str = "") -> None:
-        """Close a job and apply its result event in the same transaction. A job whose result no longer applies
-        (the spec changed meanwhile) is closed as failed with the gate's message."""
+    def finish_job(self, jid: str, event: Event | Callable[[sqlite3.Connection], Event] | None,
+                   status: str = "succeeded", detail: str = "") -> None:
+        """Close a job and apply its result event in the same transaction. `event` may be a function that writes the
+        result's rows and returns the event, so those rows commit only if the event applies. A job whose result no
+        longer applies (the spec changed meanwhile) is closed as failed with the gate's message."""
         with self._tx() as db:
             job = self._job(db, jid)
             if job["status"] != "running":
@@ -214,7 +279,7 @@ class Store:
             if event is not None:
                 try:
                     db.execute("SAVEPOINT result")
-                    self.apply(job["project_id"], event, db)
+                    self.apply(job["project_id"], event(db) if callable(event) else event, db)
                     db.execute("RELEASE result")
                 except GateError as e:
                     db.execute("ROLLBACK TO result")

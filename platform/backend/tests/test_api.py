@@ -13,7 +13,7 @@ CSV, R = b"y,x\n1,2\n0,3\n", b"fit <- glm(y ~ x, binomial, df)\n"
 
 @pytest.fixture
 def client(tmp_path):
-    with TestClient(create_app(Settings(data_dir=tmp_path, retry_limit=5))) as c:
+    with TestClient(create_app(Settings(data_dir=tmp_path, retry_limit=5, autostart=False))) as c:
         yield c
 
 
@@ -53,7 +53,7 @@ def test_missing_project_and_schema_endpoints(client):
 
 
 def test_startup_recovers_interrupted_jobs(tmp_path):
-    settings = Settings(data_dir=tmp_path)
+    settings = Settings(data_dir=tmp_path, autostart=False)
     with TestClient(create_app(settings)) as c:
         pid = upload(c).json()["id"]
     jid = Store(settings.db_path).start_job(pid, "analyst")

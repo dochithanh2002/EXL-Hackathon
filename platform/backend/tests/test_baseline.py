@@ -8,12 +8,11 @@ from pathlib import Path
 import pytest
 
 from controlplane import support
-from controlplane.jobs import Jobs
 from controlplane.runner import run
 from controlplane.schemas import ModelSpec, canonical_hash, sha256_file
-from controlplane.settings import Settings
-from controlplane.workflow import Reason, Status, Step, Store
+from controlplane.workflow import Reason, Status, Step
 from controlplane.workflow.machine import FilesUploaded, InputFile, SpecConfirmed
+from tests.conftest import make_jobs
 from tests.test_schemas import spec as make_spec
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -62,8 +61,7 @@ def project_at_baseline(store, settings, spec, files: dict[str, Path | bytes]) -
 
 @pytest.fixture
 def jobs(tmp_path, envs, tracker):
-    settings = Settings(data_dir=tmp_path / "var")
-    return Jobs(Store(tmp_path / "db.sqlite"), settings, envs, tracker)
+    return make_jobs(tmp_path, envs, tracker)
 
 
 def read_csv(path: Path) -> list[dict]:
@@ -110,12 +108,17 @@ def test_baseline_is_captured_frozen_tracked_and_reproducible(jobs):
 
 
 def test_r_error_fails_the_step_with_the_r_message(jobs):
-    spec = poisson_spec(baseline_r=POISSON_R + 'stop("boom from baseline")\n')
+    spec = poisson_spec(baseline_r=POISSON_R + 'print(head(df))\nstop("boom from baseline")\n')
     pid = project_at_baseline(jobs.store, jobs.settings, spec, {"claims.csv": CLAIMS.encode(), "m.R": b""})
     jobs.baseline(pid)
     s = jobs.store.state(pid)
     assert (s.step, s.status, s.reason) == (Step.BASELINE, Status.AWAITING_DS, Reason.STEP_FAILED)
     assert "exited with status 1" in s.detail and "boom from baseline" in s.detail
+    assert "exposure" in s.detail                                  # the DS sees the log, printed rows included
+    [note] = jobs.store.chat(pid)
+    assert note["author"] == "platform" and note["spec_version"] == 1
+    assert "R stopped in baseline.R: Error" in note["text"] and "boom from baseline" in note["text"]
+    assert "exposure" not in note["text"]                          # the Analyst gets R's message only
     runs = jobs.tracker.client.search_runs([jobs.tracker.experiment(pid)], "tags.kind = 'baseline'")
     assert [r.info.status for r in runs] == ["FAILED"]
 
