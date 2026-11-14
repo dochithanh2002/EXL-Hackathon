@@ -25,5 +25,17 @@ On Linux, `docker compose -f deploy/compose.yaml up --build` (from `platform/`) 
 with steps executed as a separate unprivileged user. Ports are published on 127.0.0.1 only: the API has no
 authentication.
 
+To serve it over HTTPS, point a DNS name at the server and make ports 80 and 443 reachable. Set `R2PY_DOMAIN`
+to that DNS name and `R2PY_AUTH_FILE` to the absolute path of a private file outside the checkout. Put one
+`username bcrypt_hash` pair per line in that file. Generate hashes with
+`docker run --rm -it caddy:2.11.9-alpine caddy hash-password`. Then run from `platform/`:
+
+```sh
+docker compose -f deploy/compose.yaml -f deploy/compose.caddy.yaml up -d --build --wait
+```
+
+Caddy obtains the TLS certificate and requires a login for the UI and API. Authorized users share the same
+projects and settings. For MLflow, use `ssh -N -L 5000:127.0.0.1:5000 user@server` and open `http://127.0.0.1:5000`.
+
 The previous Agentic Model Risk Factory is in [`legacy/`](legacy/README.md) as read-only reference; its working
 layout is at git tag `legacy-v2.1`.

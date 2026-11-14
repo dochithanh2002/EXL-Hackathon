@@ -1,0 +1,9 @@
+{$R2PY_DOMAIN} {
+	header Cache-Control "no-store"
+	basic_auth {
+		import /etc/caddy/users.caddy
+	}
+	reverse_proxy controlplane:8000 {
+		header_up -Authorization
+	}
+}
