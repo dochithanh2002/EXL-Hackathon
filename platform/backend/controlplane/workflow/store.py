@@ -133,6 +133,13 @@ class Store:
         return [{"id": r["id"], "name": r["name"], "created_at": r["created_at"],
                  "state": ProjectState.model_validate_json(r["state"])} for r in rows]
 
+    def name(self, pid: str) -> str:
+        with self._tx() as db:
+            row = db.execute("SELECT name FROM projects WHERE id = ?", (pid,)).fetchone()
+        if row is None:
+            raise NotFound(pid)
+        return row["name"]
+
     def state(self, pid: str, db: sqlite3.Connection | None = None) -> ProjectState:
         if db is None:
             with self._tx() as db:

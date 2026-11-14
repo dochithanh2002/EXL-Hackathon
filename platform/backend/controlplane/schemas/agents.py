@@ -110,24 +110,41 @@ class Diagnosis(Contract):
 
 
 # ---------------------------------------------------------------- Reporter
-PLACEHOLDER = re.compile(r"\{\{[A-Za-z0-9_.:-]+\}\}")
+PLACEHOLDER = re.compile(r"\{\{([A-Za-z0-9_:-]+)\.([A-Za-z0-9_.:-]+)\}\}")
+CODE_SPAN = re.compile(r"`[^`\n]+`")
+
+
+def _no_literal_numbers(v: str) -> str:
+    """Digits may appear only in {{evidence_id.field}} placeholders and in `code spans`, whose names the Reporter's
+    checks match against the project's known names."""
+    if any(c.isnumeric() for c in CODE_SPAN.sub("", PLACEHOLDER.sub("", v))):
+        raise ValueError("numbers must be {{evidence_id.field}} placeholders, not literals; write names that contain "
+                         "digits in `backticks`")
+    return v
 
 
 class Claim(Contract):
-    text: str = Field(description="Prose with no digits; numbers are written as {{evidence_id.field}} placeholders")
-    evidence_ids: list[str] = Field(min_length=1)
+    text: str = Field(description="Prose with no literal numbers: numbers are {{evidence_id.field}} placeholders, "
+                                  "and names that contain digits are written in `backticks`")
+    evidence_ids: list[str] = Field(min_length=1, description="Every evidence id the claim relies on, including "
+                                                              "those of its placeholders")
 
     @field_validator("text")
     @classmethod
-    def _no_literal_numbers(cls, v: str) -> str:
-        if re.search(r"\d", PLACEHOLDER.sub("", v)):
-            raise ValueError("numbers must be {{evidence_id.field}} placeholders, not literals")
-        return v
+    def _text(cls, v: str) -> str:
+        return _no_literal_numbers(v)
 
 
 class Section(Contract):
-    heading: str
+    heading: str = Field(description="No literal numbers and no placeholders")
     claims: list[Claim] = Field(min_length=1)
+
+    @field_validator("heading")
+    @classmethod
+    def _heading(cls, v: str) -> str:
+        if PLACEHOLDER.search(v):
+            raise ValueError("headings cannot hold placeholders")
+        return _no_literal_numbers(v)
 
 
 class ReportNarrative(Contract):

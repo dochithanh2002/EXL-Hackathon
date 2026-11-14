@@ -3,7 +3,8 @@ import math
 
 import pytest
 
-from controlplane.validation import _auc, compare, kpi
+from controlplane.runner.parity import _auc, kpi
+from controlplane.validation import compare
 from tests.test_schemas import spec as make_spec
 
 COEFS = [("(Intercept)", 0.5, 0.1), ("x", -1.25, 0.02)]

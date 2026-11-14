@@ -20,15 +20,17 @@ from .baseline import BaselineFailed, run_baseline
 from .endpoints import Endpoints
 from .environments import Environments
 from .runner import StepCancelled
+from .deliverables import build_bundle
 from .diagnosis import Diagnostician, failed_checks
-from .schemas import Candidate, Diagnosis, ModelSpec, canonical_hash
+from .report import Reporter, gather
+from .schemas import Candidate, Diagnosis, ModelSpec, ReportNarrative, canonical_hash, sha256_file
 from .settings import Settings
 from .support import SupportMatrix
 from .tracking import StepRun, Tracker
 from .translation import Translator, rulebook, run_candidate
 from .workflow import Status, Step, Store
-from .workflow.machine import (AnalystReplied, BaselineSucceeded, Bindings, CandidateValidated, DiagnosisSubmitted,
-                               StepFailed)
+from .workflow.machine import (AnalystReplied, BaselineSucceeded, Bindings, CandidateValidated, DeliverablesBuilt,
+                               DiagnosisSubmitted, ReportBuilt, StepFailed)
 
 log = logging.getLogger(__name__)
 
@@ -84,7 +86,8 @@ class Jobs:
     def advance(self, pid: str) -> threading.Thread | None:
         s = self.store.state(pid)
         step = {Step.ALIGNMENT: self.analyst, Step.BASELINE: self.baseline, Step.TRANSLATION: self.translation,
-                Step.REPAIR: self.diagnosis}.get(s.step)
+                Step.REPAIR: self.diagnosis, Step.REPORT: self.report,
+                Step.DELIVERABLES: self.deliverables}.get(s.step)
         if s.status != Status.WORKING or step is None:
             return None
         t = threading.Thread(target=self._run, args=(step, pid), daemon=True, name=f"job-{pid}")
@@ -423,6 +426,77 @@ class Jobs:
         """The diagnoses already made for this spec and baseline, oldest first."""
         bodies = (self.store.evidence(pid, e["id"])["body"] for e in self.store.evidence_list(pid, "diagnosis"))
         return [d for d in bodies if (d["spec_version"], d["baseline_id"]) == (spec_version, baseline_id)]
+
+    # ------------------------------------------------------------ step 6: report
+    def report(self, pid: str) -> str:
+        """The Reporter writes the narrative of the approved translation from the evidence catalog; code checks its
+        citations, fills in its numbers and adds the evidence tables."""
+        s = self.store.state(pid)
+        if (s.step, s.status) != (Step.REPORT, Status.WORKING):
+            raise ValueError(f"project is at step {s.step.value} ({s.status.value}), not reporting")
+        jid, stream = self._open(pid, "report")
+        common = dict(job_id=jid, **s.approval.model_dump())
+        try:
+            with self.tracker.step(pid, "report", f"report v{s.spec_version}") as run:
+                model_ref, model_label = self.endpoints.for_role("reporter")
+                run.params(model=model_label, **common)
+                reporter = Reporter(gather(self.store, self.settings, pid))
+                turn = Turn("submit_report", reporter.check,
+                            "Accepted. The platform fills in the numbers and adds the evidence tables when you end "
+                            "your turn; now end it with one sentence.")
+                result = self._agent(jid, "reporter", model_ref, [], reporter.kickoff(), ReportNarrative, turn,
+                                     stream)
+                run.metrics(tool_calls=turn.tool_calls, invalid_submissions=turn.invalid)
+                run.artifact_text(json.dumps(result["messages"], indent=1), "transcript.json")
+                narrative: ReportNarrative | None = turn.result
+                if narrative is None:
+                    raise AgentServiceError("the Reporter ended its turn without an accepted report: "
+                                            + (result["text"].strip()[:500] or "(no reply)"))
+                markdown = reporter.render(narrative)
+                run.artifact_text(narrative.model_dump_json(indent=2), "narrative.json")
+                run.artifact_text(markdown, "report.md")
+                rid, _ = self.store.record(pid, "report", {
+                    **common, "spec_version": s.spec_version, "narrative": narrative.model_dump(mode="json"),
+                    "catalog": reporter.entries, "markdown": markdown, "model": model_label,
+                    "mlflow_run_id": run.run_id})
+            self.store.finish_job(jid, ReportBuilt(spec_version=s.spec_version, report_id=rid))
+        except StepCancelled:
+            self.store.cancel_job(jid)
+        except Exception as e:
+            self.store.fail_job(jid, str(e))
+        finally:
+            self._close(jid)
+        return jid
+
+    # ------------------------------------------------------------ step 7: deliverables
+    def deliverables(self, pid: str) -> str:
+        s = self.store.state(pid)
+        if (s.step, s.status) != (Step.DELIVERABLES, Status.WORKING):
+            raise ValueError(f"project is at step {s.step.value} ({s.status.value}), not building deliverables")
+        jid, _ = self._open(pid, "deliverables")
+        dest = self.settings.project_dir(pid) / "deliverables" / jid
+        common = dict(job_id=jid, report_id=s.report_id, **s.approval.model_dump())
+        try:
+            with self.tracker.step(pid, "deliverables", f"deliverables v{s.spec_version}") as run:
+                run.params(environment_version=self.envs.version(), **common)
+                record = gather(self.store, self.settings, pid)
+                manifest = build_bundle(dest, record, self.store.evidence(pid, s.report_id)["body"]["markdown"],
+                                        self.envs)
+                archive = dest.with_suffix(".zip")
+                run.artifact(dest, "bundle")
+                run.artifact(archive)
+                bid, _ = self.store.record(pid, "bundle", {
+                    **common, "spec_version": s.spec_version, "dir": str(dest.relative_to(self.settings.data_dir)),
+                    "archive": str(archive.relative_to(self.settings.data_dir)), "archive_sha256": sha256_file(archive),
+                    "manifest": manifest, "mlflow_run_id": run.run_id})
+            self.store.finish_job(jid, DeliverablesBuilt(spec_version=s.spec_version, bundle_id=bid))
+        except StepCancelled:
+            self.store.cancel_job(jid)
+        except Exception as e:
+            self.store.fail_job(jid, str(e))
+        finally:
+            self._close(jid)
+        return jid
 
     def tag_decision(self, pid: str, bindings: Bindings, decision: str, comment: str | None = None) -> None:
         """Mirror a DS approval or rejection onto the candidate's and validation's MLflow runs. The transition row

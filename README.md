@@ -7,7 +7,8 @@ delivers the code, environments, validation results and a final report.
 Status: build steps 1–5 of [`PLAN.md`](PLAN.md) (skeleton, schemas, workflow state machine; stable
 environments, step runner, R capture harness, MLflow tracking; agent service, model endpoints, Analyst and the
 step 2 chat API; Translator, candidate guardrails and harness, validator and the approval gate; Diagnostician,
-repair loop, retry limit and escalation). There is no UI yet.
+repair loop, retry limit and escalation), and step 6 (Reporter, final report from recorded evidence, deliverables
+bundle). There is no UI yet.
 
 ```sh
 ./platform/bootstrap.sh                  # build the R and Python environments from their lockfiles (once)
@@ -16,7 +17,7 @@ cd platform/backend && uv run pytest     # tests; the M4 tests read M4_DIR
 ```
 
 Before the agents can run, add a model endpoint (`POST /api/settings/endpoints`) and assign it to each role
-(`PUT /api/settings/roles/{analyst,translator,diagnostician}`); keys are encrypted with `platform/var/secret.key`, or with
+(`PUT /api/settings/roles/{analyst,translator,diagnostician,reporter}`); keys are encrypted with `platform/var/secret.key`, or with
 `CONTROLPLANE_SECRET_KEY` if set.
 
 Bootstrap needs R 4.6.2, uv, Node 22.19 or later and a C, C++ and Fortran toolchain. R packages come from the Posit Package

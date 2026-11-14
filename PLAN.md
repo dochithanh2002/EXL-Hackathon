@@ -1,6 +1,6 @@
 # Plan: agentic R → Python ML transformation platform
 
-Status: build steps 1–5 done (section 12). Date: 2026-11-14.
+Status: build steps 1–6 done, including the live Reporter smoke test (sections 12, 13). Date: 2026-11-14.
 
 A Python control plane owns all workflow, execution and approval logic. A small Node service hosts Pi for the
 four agents. A React UI is the data scientist's (DS) workspace. Everything runs locally as plain processes; a
@@ -90,7 +90,7 @@ is returned to the agent with the validation error, for a bounded number of retr
 | Analyst | R code, column names, dtypes, level sets, summary statistics (no data rows) | `ModelSpec`: target model, R function, statsmodels counterpart and support tier, family, link, formula, offset, weights, preprocessing steps, split definition, KPIs, tolerances, unsupported items, proposed substitutions, and a minimal `baseline.R` slice |
 | Translator | `ModelSpec`, `baseline.R`, baseline metadata, repair instructions if any | `Candidate`: one Python module against a fixed interface, plus notes |
 | Diagnostician | filtered validation (checks, relative differences, row ids, KPIs, redacted errors), candidate, spec, DS comment, earlier attempts | `Diagnosis`: root cause, evidence, repair instructions, and whether a spec change is needed (routes to the DS) |
-| Reporter | recorded runs, validation results, approvals | `ReportNarrative`: every claim cites an evidence id; numbers are injected by code |
+| Reporter | an evidence catalogue built by code from recorded runs, validation results and approvals; the approved candidate and `baseline.R` | `ReportNarrative`: every claim cites catalogue ids; numbers are `{{id.field}}` placeholders filled in by code, and names with digits must be in backticks and known to the project |
 
 The `baseline.R` slice is the minimal part of the uploaded code that produces the target model. The DS sees it
 as a diff against the original before confirming. It is what keeps unrelated code (keras, xgboost, plotting)
@@ -215,6 +215,22 @@ platform/
 7. UI polish, recovery and cancellation tests, Dockerfile and compose for Linux.
 
 ## 13. Verification
+
+Step 6 verified on 2026-11-14: 159 tests passed, one skipped, and TypeScript typechecking passed. Scripted-model tests
+cover rejected Reporter submissions (literal numbers, unknown ids and fields, uncited placeholders, unknown names in
+code spans, missing citations of the approved validation and the approval), the rendered report, the bundle and its
+manifest, the download routes, and a rerun of the extracted bundle's `verify.py`. A dry run on M4 with a scripted
+Reporter reached step 7 done. The live Reporter smoke test (`platform/var/live-smoke/verify_step6.py`) also reached
+step 7 done using `gpt-6.1-sol` through the configured Responses endpoint: the fixture candidate stands in for the
+Translator, the DS approves it, and the live Reporter writes the report. Its nine claims were accepted on the
+first submission. The extracted bundle's README commands (`uv sync`, then `verify.py` on `cs-training.csv`) passed
+all 19 approval checks, including response values, fit statistics and KPIs. Maximum relative differences were
+1.107e-12 for coefficients and 1.115e-12 for standard errors; prediction maximum absolute difference was 1.995e-13.
+The bundle ships the same standard-library parity engine used by the control plane, matching coefficients by
+name regardless of order. Packaging rejects lockfiles that differ from the approved environment; regression tests
+cover both lockfiles, fit-statistic and KPI drift, response mismatches, reordered coefficients, unknown backtick
+names and Unicode numeric literals. Evidence: `platform/var/live-smoke/20261114-014809/report.json`, `report.md`,
+`verify.txt` and `readme-verification.json` (ignored).
 
 Step 5 verified on 2026-11-14: 148 tests passed, one skipped, and TypeScript typechecking passed. The live M4 smoke
 test (`platform/var/live-smoke/verify_step5.py`) passed both scenarios using `gpt-6.1-sol` through the configured

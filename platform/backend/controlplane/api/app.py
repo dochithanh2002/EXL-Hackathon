@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import Body, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from .. import support
@@ -247,6 +247,37 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         state = store(request).apply(pid, ResumeRepair(additional_attempts=r.additional_attempts))
         advance(request, pid)
         return {"state": state}
+
+    # ------------------------------------------------------------ steps 6 and 7
+    @app.get("/api/projects/{pid}/report")
+    def report(request: Request, pid: str):
+        rid = store(request).state(pid).report_id
+        if rid is None:
+            raise HTTPException(404, "the report is not built")
+        return store(request).evidence(pid, rid)
+
+    def bundle(request: Request, pid: str) -> dict:
+        bid = store(request).state(pid).bundle_id
+        if bid is None:
+            raise HTTPException(404, "the deliverables are not built")
+        return store(request).evidence(pid, bid)["body"]
+
+    @app.get("/api/projects/{pid}/deliverables")
+    def deliverables(request: Request, pid: str):
+        return bundle(request, pid)
+
+    @app.get("/api/projects/{pid}/deliverables/bundle.zip")
+    def deliverables_archive(request: Request, pid: str):
+        b = bundle(request, pid)
+        return FileResponse(settings.data_dir / b["archive"], media_type="application/zip",
+                            filename=f"{pid}-deliverables.zip")
+
+    @app.get("/api/projects/{pid}/deliverables/files/{path:path}")
+    def deliverable(request: Request, pid: str, path: str):
+        b = bundle(request, pid)
+        if path != "manifest.json" and path not in b["manifest"]["files"]:     # only bundle paths, never a traversal
+            raise HTTPException(404, f"no deliverable {path}")
+        return FileResponse(settings.data_dir / b["dir"] / path, filename=Path(path).name)
 
     # ------------------------------------------------------------ jobs
     @app.post("/api/projects/{pid}/retry")
