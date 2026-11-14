@@ -146,6 +146,46 @@ def test_reset_row_names_cannot_pass_as_source_rows(jobs):
     assert "rows cannot be traced to rows of the dataset file" in jobs.store.state(pid).detail
 
 
+LOOKUP = 'lk <- data.frame(area = c("A", "B", "C"), region = c("n", "s", "n"))\n'
+
+
+def joined(join: str) -> str:
+    return POISSON_R.replace("df <- df[nrow(df):1, ]\n", "df <- df[nrow(df):1, ]\n" + LOOKUP + join)
+
+
+@pytest.mark.parametrize("join", [
+    'df <- merge(df, lk, by = "area", all.x = TRUE)\n',
+    'df <- merge(lk, df, by = "area")\n',                                           # the dataset on the y side
+    # input columns named like the wrapper's key survive untouched, on either side and on both
+    'df$.capture_row <- df$age\ndf <- merge(df, lk, by = "area")\nstopifnot(identical(df$.capture_row, df$age))\n',
+    'lk$.capture_row <- 7\ndf <- merge(df, lk, by = "area")\n'
+    'stopifnot(all(df$.capture_row == 7), !any(c(".capture_row.x", ".capture_row.y") %in% names(df)))\n',
+    'df$.capture_row <- df$age\nlk$.capture_row <- 7\ndf <- merge(df, lk, by = "area")\n'
+    'stopifnot(identical(df$.capture_row.x, df$age), all(df$.capture_row.y == 7))\n',
+])
+def test_merge_keeps_each_row_traced_to_its_dataset_row(jobs, join):
+    pid = project_at_baseline(jobs.store, jobs.settings, poisson_spec(baseline_r=joined(join)),
+                              {"claims.csv": CLAIMS.encode(), "m.R": b""})
+    jobs.baseline(pid)
+    s = jobs.store.state(pid)
+    assert s.step == Step.TRANSLATION, s.detail
+    out = jobs.settings.data_dir / jobs.store.evidence(pid, s.baseline_id)["body"]["dir"]
+    predictions = read_csv(out / "predictions.csv")
+    assert len(predictions) == 200
+    assert all(float(r["y"]) == (int(r["row"]) * 7) % 4 for r in predictions)      # claims of that data row
+
+
+@pytest.mark.parametrize("join", [
+    'lk <- rbind(lk, data.frame(area = "A", region = "x"))\ndf <- merge(df, lk, by = "area")\n',   # duplicates rows
+    'lk <- rbind(lk, data.frame(area = "D", region = "x"))\ndf <- merge(df, lk, by = "area", all = TRUE)\n',
+])
+def test_a_join_that_duplicates_or_adds_rows_fails(jobs, join):
+    pid = project_at_baseline(jobs.store, jobs.settings, poisson_spec(baseline_r=joined(join)),
+                              {"claims.csv": CLAIMS.encode(), "m.R": b""})
+    jobs.baseline(pid)
+    assert "rows cannot be traced to rows of the dataset file" in jobs.store.state(pid).detail
+
+
 def test_dataset_read_without_the_tagged_readers_fails(jobs):
     spec = poisson_spec(baseline_r=POISSON_R.replace("read.csv(", "utils::read.csv("))
     pid = project_at_baseline(jobs.store, jobs.settings, spec, {"claims.csv": CLAIMS.encode(), "m.R": b""})

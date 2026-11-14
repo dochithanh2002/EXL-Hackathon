@@ -4,9 +4,9 @@
 #   config: script, dataset, response, objects {model, train, test (or null)}, seed (or null), out
 # Everything written to `out` is deterministic except timing.json, so a rerun reproduces the same baseline id.
 # Row identity: base R's readers (read.csv, read.table, ...) are masked so that the data frame read from the dataset
-# file gets row names TAG + its 1-based data row. Subsetting and reordering carry row names along; any name
-# outside the tagged range (reset, rebuilt, or a frame not read through these readers) fails the capture. Exported
-# row ids are the data rows, so Python takes exactly the same observations.
+# file gets row names TAG + its 1-based data row. Subsetting, reordering and merge() (masked too) carry row names
+# along; any name outside the tagged range (reset, rebuilt, or a frame not read through these readers) fails the
+# capture. Exported row ids are the data rows, so Python takes exactly the same observations.
 suppressPackageStartupMessages(library(jsonlite))
 args <- commandArgs(trailingOnly = TRUE)
 stopifnot(length(args) == 1)
@@ -40,9 +40,26 @@ tagged <- function(reader) { force(reader); function(file, ...) {
   }
   df
 }}
+is_tagged <- function(df) {
+  rn <- if (is.data.frame(df)) .row_names_info(df, type = 0L) else NULL
+  is.numeric(rn) && length(rn) > 0 && all(rn > TAG)
+}
+# merge() rebuilds row names; a join keeps each row of the tagged side's name when the row survives exactly once.
+keep_rows <- function(x, y, ...) {
+  side <- if (is_tagged(x)) "x" else if (is_tagged(y)) "y" else return(base::merge(x, y, ...))
+  key <- ".capture_row"                               # a name neither frame has, so no input column is touched
+  while (key %in% c(names(x), names(y))) key <- paste0(key, "_")
+  if (side == "x") x[[key]] <- .row_names_info(x, type = 0L) else y[[key]] <- .row_names_info(y, type = 0L)
+  res <- base::merge(x, y, ...)
+  r <- res[[key]]
+  res[[key]] <- NULL
+  if (!anyNA(r) && !anyDuplicated(r)) attr(res, "row.names") <- as.integer(r)
+  res
+}
 env <- new.env(parent = globalenv())
 for (f in c("read.csv", "read.csv2", "read.table", "read.delim", "read.delim2"))
   assign(f, tagged(get(f, envir = asNamespace("utils"))), envir = env)
+assign("merge", keep_rows, envir = env)
 if (!is.null(cfg$seed)) set.seed(cfg$seed)
 t0 <- Sys.time()
 stage <- "baseline.R"

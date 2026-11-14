@@ -33,7 +33,8 @@ class SplitDefinition(Contract):
 class BaselineObjects(Contract):
     model: str = Field(description="Name of the fitted model object in baseline.R")
     train: str = Field(description="Name of the training data frame in baseline.R")
-    test: str | None = Field(description="Name of the test data frame in baseline.R; null if R has no test set")
+    test: str | None = Field(description="Name of the test data frame in baseline.R, holding held-out rows of the "
+                                         "dataset; null if R has no such set (a frame read from another file is not one)")
 
 
 Kpi = Literal["auc", "gini", "actual_expected", "rmse", "mae", "deviance", "aic", "log_loss"]

@@ -226,6 +226,31 @@ platform/
 
 ## 13. Verification
 
+End to end on 2026-11-14 with `openai.env` (`gpt-6.1-sol`, Responses API) on M1–M4: every role (Analyst,
+Translator, Diagnostician, Reporter) ran on the live model, but the DS's responses were scripted
+(`platform/var/live-smoke/verify_e2e.py`): it nudges the Analyst once to draft a spec, nudges it once more toward a
+statsmodels-covered model if it reports none, confirms the latest draft with the parity risk accepted, approves a
+passing candidate, and forwards an R baseline failure to the Analyst. Rejection with a DS comment was not exercised
+here. The first run surfaced two defects, both fixed:
+- M1's code joins claim counts with `merge()`, which rebuilds row names, so the training rows could not be traced
+  to the dataset. `capture.R` now masks `merge()` to carry the dataset side's row names through a temporary column
+  that neither frame has; a row duplicated or added by the join still fails the capture. Regression tests cover
+  both sides, column-name collisions and duplicating or row-adding joins.
+- M4's Analyst named the unlabeled `cs-test.csv` scoring frame as the test set, which no dataset row can trace to.
+  The Analyst prompt and `BaselineObjects.test` now say the test set must hold held-out rows of the dataset.
+
+| Model | Spec | Outcome | Repairs | Minutes | Bundle `verify.py` |
+|---|---|---|---|---|---|
+| M1 freMTPL2 | Poisson GLM, log-exposure offset, severity counts merged in | done | 1 (coefficient 1.7e-5 > 1e-6) | 64 | exit 0, 21 checks |
+| M2 Taiwan | binomial GLM | done | 0 | 30 | exit 0 |
+| M3 ULB fraud | random forest | stopped at step 2, unsupported | – | 3 | – |
+| M4 GiveMeSomeCredit | binomial GLM, no test set | done | 1 (dtype error in `prepare()`) | 18 | exit 0, 19 checks |
+
+M1 and M4 are from the rerun after the fixes, M2 and M3 from the first run. Follow-ups: the bundle's `verify.py`
+prints a harmless pandas `DtypeWarning` reading `split.csv` (`in_fit` mixes booleans and blanks), and M1's repair
+loop is slow (about 45 minutes of model time). Evidence: `platform/var/live-smoke/e2e-20261114-024946/` and
+`e2e-20261114-032333/` (ignored).
+
 Step 7 built on 2026-11-14: 165 tests passed, two skipped (macOS address-space limits; the step-user test, which
 needs root), and both TypeScript projects typecheck.
 - Recovery: a step process now runs under a supervising launcher that kills its process group when the control
@@ -281,10 +306,8 @@ M4 fixture spec, ran a fresh R baseline, and stopped awaiting DS approval with a
 relative differences: coefficients 1.104e-12, standard errors 1.107e-12; maximum prediction absolute difference
 1.955e-13. This verifies steps 3–4; the end-to-end deliverables checks below remain pending.
 
-- End to end with `openai.env` on M4, M2 and M1, each through to deliverables.
 - Rejection and repair: reject one passing run with a DS comment, and seed one real failure (for example M2's
   factor reference levels) to exercise diagnosis.
-- Unsupported path: M3 (random forest) must stop at step 2 with a clear message.
 - Robustness: kill the backend mid-run and resume; cancel a running step; change the spec after approval and
   confirm the approval is voided.
 - Guardrails: a candidate that imports a disallowed package or opens a socket is rejected before it runs.

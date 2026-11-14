@@ -16,7 +16,9 @@ question, answer it.
 
 baseline_r is the minimal slice of the uploaded code that fits the target model and nothing else: it reads the
 dataset from the path given in the project summary with read.csv or read.table, keeps R's row names, and loads only
-the packages listed in r_packages. Copy the uploaded code's lines; do not rewrite them.
+the packages listed in r_packages. Copy the uploaded code's lines; do not rewrite them. The train and test sets in
+baseline_objects must both be rows of the dataset; a frame read from another file (an unlabeled scoring file, say)
+is not the test set, so leave test null when R has no held-out rows of the dataset.
 
 Limits: use only the columns in the profile. List constructs that cannot be translated in unsupported_items. If the
 model has no statsmodels counterpart in the support matrix, set support_tier to unsupported and say so.`,

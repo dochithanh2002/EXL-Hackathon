@@ -21,7 +21,8 @@ from tests.test_translation import POISSON_PY
 AREAS = "area,region\nA,north\nB,south\nC,north\n"
 JOINED_R = POISSON_R.replace('df$area <- factor(df$area)\n', (
     'areas <- read.csv("inputs/areas.csv")\n'
-    'df$region <- factor(areas$region[match(df$area, areas$area)])\n')).replace("area + age", "region + age")
+    'df <- merge(x = df, y = areas, by = "area", all.x = TRUE)\n'      # like M1: merge() rebuilds row names
+    'df$region <- factor(df$region)\n')).replace("area + age", "region + age")
 JOINED_PY = POISSON_PY.replace('''def prepare(path, sets):
     df = pd.read_csv(path)
 ''', '''def prepare(path, sets, data):
