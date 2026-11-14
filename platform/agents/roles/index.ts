@@ -1,4 +1,5 @@
 import { analyst } from "./analyst.ts";
+import { translator } from "./translator.ts";
 
 export interface ToolSpec {
   name: string;
@@ -13,4 +14,4 @@ export interface Role {
   tools: (submitSchema: Record<string, unknown>) => ToolSpec[];
 }
 
-export const ROLES: Record<string, Role> = { analyst };
+export const ROLES: Record<string, Role> = { analyst, translator };

@@ -248,6 +248,14 @@ class Store:
                        (eid, pid, kind, h, json.dumps(data, sort_keys=True), now()))
         return eid, h
 
+    def evidence_list(self, pid: str, kind: str | None = None) -> list[dict]:
+        """Ids, kinds, hashes and times of the project's evidence, oldest first."""
+        with self._tx() as db:
+            self.state(pid, db)
+            rows = db.execute("SELECT id, kind, hash, created_at FROM evidence WHERE project_id = ? "
+                              "AND (? IS NULL OR kind = ?) ORDER BY created_at, rowid", (pid, kind, kind)).fetchall()
+        return [dict(r) for r in rows]
+
     def evidence(self, pid: str, eid: str) -> dict:
         with self._tx() as db:
             row = db.execute("SELECT * FROM evidence WHERE project_id = ? AND id = ?", (pid, eid)).fetchone()

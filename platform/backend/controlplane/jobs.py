@@ -3,12 +3,16 @@ cancel the job. One job per project at a time (enforced by the store). `advance`
 state calls for, on a background thread; each finished job advances the project again."""
 from __future__ import annotations
 
+import hashlib
 import json
+import logging
 import secrets
 import sqlite3
 import threading
 from dataclasses import dataclass, field
 from typing import Callable
+
+from pydantic import BaseModel
 
 from .agentservice import AgentService, AgentServiceError
 from .analyst import MAX_INVALID, Analyst, ToolError, tool_schema
@@ -16,12 +20,15 @@ from .baseline import BaselineFailed, run_baseline
 from .endpoints import Endpoints
 from .environments import Environments
 from .runner import StepCancelled
-from .schemas import ModelSpec, canonical_hash
+from .schemas import Candidate, ModelSpec, canonical_hash
 from .settings import Settings
 from .support import SupportMatrix
-from .tracking import Tracker
+from .tracking import StepRun, Tracker
+from .translation import Translator, run_candidate
 from .workflow import Status, Step, Store
-from .workflow.machine import AnalystReplied, BaselineSucceeded, StepFailed
+from .workflow.machine import AnalystReplied, BaselineSucceeded, Bindings, CandidateValidated, StepFailed
+
+log = logging.getLogger(__name__)
 
 
 class JobStream:
@@ -49,13 +56,15 @@ class JobStream:
 
 
 @dataclass
-class AnalystTurn:
-    jid: str
-    analyst: Analyst
-    spec: ModelSpec | None = None
+class Turn:
+    """One agent run: its read-only tools, and the check and acknowledgement of its one submit tool."""
+    submit: str
+    check: Callable[[dict], tuple[BaseModel | None, list[str]]]
+    accepted: str
+    tools: dict[str, Callable[[dict], str]] = field(default_factory=dict)
+    result: BaseModel | None = None
     invalid: int = 0
     tool_calls: int = 0
-    errors: list[str] = field(default_factory=list)
 
 
 class Jobs:
@@ -66,13 +75,14 @@ class Jobs:
         self._cancellers: dict[str, Callable[[], None]] = {}
         self._cancel_requested: set[str] = set()
         self._streams: dict[str, JobStream] = {}
-        self._turns: dict[str, AnalystTurn] = {}           # run token -> turn
+        self._turns: dict[str, Turn] = {}                  # run token -> turn
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------ dispatch
     def advance(self, pid: str) -> threading.Thread | None:
         s = self.store.state(pid)
-        step = {Step.ALIGNMENT: self.analyst, Step.BASELINE: self.baseline}.get(s.step)
+        step = {Step.ALIGNMENT: self.analyst, Step.BASELINE: self.baseline,
+                Step.TRANSLATION: self.translation}.get(s.step)
         if s.status != Status.WORKING or step is None:
             return None
         t = threading.Thread(target=self._run, args=(step, pid), daemon=True, name=f"job-{pid}")
@@ -118,69 +128,33 @@ class Jobs:
         if stream:
             stream.close()
 
-    # ------------------------------------------------------------ step 2: Analyst
-    def analyst(self, pid: str) -> str:
-        s = self.store.state(pid)
-        if (s.step, s.status) != (Step.ALIGNMENT, Status.WORKING):
-            raise ValueError(f"project is at step {s.step.value} ({s.status.value}), not waiting for the Analyst")
-        jid, stream = self._open(pid, "analyst")
+    # ------------------------------------------------------------ agents
+    def _agent(self, jid: str, role: str, model_ref: dict, history: list, prompt: str, schema: type[BaseModel],
+               turn: Turn, stream: JobStream) -> dict:
+        """Run one role in the agent service with the turn's tools. Returns the `done` event (text, messages)."""
         token = secrets.token_urlsafe(32)
+        with self._lock:
+            self._turns[token] = turn
+
+        def on_event(e: dict) -> None:
+            if e["type"] == "started":
+                self._started(jid, lambda: self.agents.abort(jid))
+            else:
+                stream.put(e)
         try:
-            with self.tracker.step(pid, "analyst", "analyst") as run:
-                model_ref, model_label = self.endpoints.for_role("analyst")
-                run.params(job_id=jid, model=model_label)
-                turn = AnalystTurn(jid, Analyst(s.files, self.settings.project_dir(pid) / "inputs",
-                                                self.settings.project_dir(pid) / "cache", self.matrix, self.envs,
-                                                self.settings.limits))
-                history = self.store.transcript(pid, "analyst")
-                prompt = self._analyst_prompt(pid, turn.analyst, history)
-                with self._lock:
-                    self._turns[token] = turn
-
-                def on_event(e: dict) -> None:
-                    if e["type"] == "started":
-                        self._started(jid, lambda: self.agents.abort(jid))
-                    else:
-                        stream.put(e)
-
-                result = self.agents.run({
-                    "run_id": jid, "role": "analyst", "model": model_ref, "history": history, "prompt": prompt,
-                    "submit_schema": tool_schema(ModelSpec),
-                    "callback": {"url": f"{self.settings.url}/internal/tools", "token": token},
-                }, on_event)
-                if result["type"] == "aborted" or jid in self._cancel_requested:
-                    raise StepCancelled()
-                if result["type"] == "error":
-                    raise AgentServiceError(f"the Analyst's model request failed: {result['message']}")
-                run.metrics(tool_calls=turn.tool_calls, invalid_submissions=turn.invalid)
-                run.artifact_text(result["text"], "reply.md")
-                if turn.spec is not None:
-                    run.artifact_text(turn.spec.model_dump_json(indent=2), "spec.json")
-
-            def commit(db):
-                self.store.save_transcript(db, pid, "analyst", result["messages"])
-                event = self.store.draft_spec(db, pid, turn.spec, self.matrix) if turn.spec else AnalystReplied()
-                self.store.add_chat(db, pid, "analyst", result["text"], jid, getattr(event, "version", None))
-                return event
-            self.store.finish_job(jid, commit)
-        except StepCancelled:
-            self.store.cancel_job(jid)
-        except Exception as e:
-            self.store.fail_job(jid, str(e))
+            result = self.agents.run({
+                "run_id": jid, "role": role, "model": model_ref, "history": history, "prompt": prompt,
+                "submit_schema": tool_schema(schema),
+                "callback": {"url": f"{self.settings.url}/internal/tools", "token": token},
+            }, on_event)
         finally:
             with self._lock:
                 self._turns.pop(token, None)
-            self._close(jid)
-        return jid
-
-    def _analyst_prompt(self, pid: str, analyst: Analyst, history: list) -> str:
-        """The DS messages and platform notes the Analyst has not seen yet, after the project summary on the first
-        turn."""
-        chat = self.store.chat(pid)
-        answered = max((c["seq"] for c in chat if c["author"] == "analyst"), default=0)
-        parts = [] if history else [analyst.kickoff()]
-        parts += [c["text"] for c in chat if c["author"] != "analyst" and c["seq"] > answered]
-        return "\n\n".join(parts) or "Continue."
+        if result["type"] == "aborted" or jid in self._cancel_requested:
+            raise StepCancelled()
+        if result["type"] == "error":
+            raise AgentServiceError(f"the {role}'s model request failed: {result['message']}")
+        return result
 
     def tool(self, token: str, name: str, args: dict) -> dict:
         """A tool call from an agent run, authenticated by the run's token."""
@@ -190,27 +164,76 @@ class Jobs:
             raise PermissionError("unknown or expired run token")
         turn.tool_calls += 1
         try:
-            if name == "read_file":
-                return {"text": turn.analyst.read_file(str(args.get("name", "")))}
-            if name == "dataset_profile":
-                return {"text": json.dumps(turn.analyst.profile(), indent=1)}
-            if name == "submit_model_spec":
+            if name == turn.submit:
                 return {"text": self._submit(turn, args)}
+            if name in turn.tools:
+                return {"text": turn.tools[name](args)}
             raise ToolError(f"unknown tool {name}")
         except ToolError as e:
             return {"text": str(e), "is_error": True}
 
     @staticmethod
-    def _submit(turn: AnalystTurn, args: dict) -> str:
+    def _submit(turn: Turn, args: dict) -> str:
         if turn.invalid >= MAX_INVALID:
-            raise ToolError(f"{MAX_INVALID} submissions failed validation; stop and tell the DS what blocks you")
-        spec, errors = turn.analyst.check(args)
+            raise ToolError(f"{MAX_INVALID} submissions failed validation; stop and say what blocks you")
+        result, errors = turn.check(args)
         if errors:
             turn.invalid += 1
-            raise ToolError("The spec was not accepted:\n- " + "\n- ".join(errors)
+            raise ToolError("The submission was not accepted:\n- " + "\n- ".join(errors)
                             + f"\n{MAX_INVALID - turn.invalid} submissions left in this turn.")
-        turn.spec = spec
-        return "Accepted. It becomes the next draft spec when you end your turn; now reply to the DS."
+        turn.result = result
+        return turn.accepted
+
+    # ------------------------------------------------------------ step 2: Analyst
+    def analyst(self, pid: str) -> str:
+        s = self.store.state(pid)
+        if (s.step, s.status) != (Step.ALIGNMENT, Status.WORKING):
+            raise ValueError(f"project is at step {s.step.value} ({s.status.value}), not waiting for the Analyst")
+        jid, stream = self._open(pid, "analyst")
+        try:
+            with self.tracker.step(pid, "analyst", "analyst") as run:
+                model_ref, model_label = self.endpoints.for_role("analyst")
+                run.params(job_id=jid, model=model_label)
+                analyst = self._analyst_inputs(pid, s.files)
+                turn = Turn("submit_model_spec", analyst.check,
+                            "Accepted. It becomes the next draft spec when you end your turn; now reply to the DS.",
+                            {"read_file": lambda a: analyst.read_file(str(a.get("name", ""))),
+                             "dataset_profile": lambda a: json.dumps(analyst.profile(), indent=1)})
+                history = self.store.transcript(pid, "analyst")
+                result = self._agent(jid, "analyst", model_ref, history, self._analyst_prompt(pid, analyst, history),
+                                     ModelSpec, turn, stream)
+                run.metrics(tool_calls=turn.tool_calls, invalid_submissions=turn.invalid)
+                run.artifact_text(result["text"], "reply.md")
+                spec = turn.result
+                if spec is not None:
+                    run.artifact_text(spec.model_dump_json(indent=2), "spec.json")
+
+            def commit(db):
+                self.store.save_transcript(db, pid, "analyst", result["messages"])
+                event = self.store.draft_spec(db, pid, spec, self.matrix) if spec else AnalystReplied()
+                self.store.add_chat(db, pid, "analyst", result["text"], jid, getattr(event, "version", None))
+                return event
+            self.store.finish_job(jid, commit)
+        except StepCancelled:
+            self.store.cancel_job(jid)
+        except Exception as e:
+            self.store.fail_job(jid, str(e))
+        finally:
+            self._close(jid)
+        return jid
+
+    def _analyst_inputs(self, pid: str, files) -> Analyst:
+        d = self.settings.project_dir(pid)
+        return Analyst(files, d / "inputs", d / "cache", self.matrix, self.envs, self.settings.limits)
+
+    def _analyst_prompt(self, pid: str, analyst: Analyst, history: list) -> str:
+        """The DS messages and platform notes the Analyst has not seen yet, after the project summary on the first
+        turn."""
+        chat = self.store.chat(pid)
+        answered = max((c["seq"] for c in chat if c["author"] == "analyst"), default=0)
+        parts = [] if history else [analyst.kickoff()]
+        parts += [c["text"] for c in chat if c["author"] != "analyst" and c["seq"] > answered]
+        return "\n\n".join(parts) or "Continue."
 
     # ------------------------------------------------------------ step 3: R baseline
     def baseline(self, pid: str) -> str:
@@ -255,3 +278,82 @@ class Jobs:
         finally:
             self._close(jid)
         return jid
+
+    # ------------------------------------------------------------ step 4: translation and validation
+    def translation(self, pid: str) -> str:
+        """The Translator writes a candidate; the candidate runs against R's sets and is validated against the
+        baseline. Each is its own MLflow run; together they are one job."""
+        s = self.store.state(pid)
+        if (s.step, s.status) != (Step.TRANSLATION, Status.WORKING):
+            raise ValueError(f"project is at step {s.step.value} ({s.status.value}), not translating")
+        spec = self.store.spec(pid, s.spec_version)
+        baseline = self.store.evidence(pid, s.baseline_id)["body"]
+        baseline_dir = self.settings.data_dir / baseline["dir"]
+        jid, stream = self._open(pid, "translation")
+        workdir = self.settings.project_dir(pid) / "runs" / jid
+        common = dict(job_id=jid, spec_version=s.spec_version, baseline_id=s.baseline_id)
+        try:
+            with self.tracker.step(pid, "translation", f"translation v{s.spec_version}") as run:
+                model_ref, model_label = self.endpoints.for_role("translator")
+                run.params(model=model_label, **common)
+                analyst = self._analyst_inputs(pid, s.files)
+                dataset = next(f.name for f in s.files if f.role == "dataset")
+                translator = Translator(spec, baseline_dir, dataset, self.envs, analyst.profile)
+                turn = Turn("submit_candidate", translator.check,
+                            "Accepted. It runs against R's sets when you end your turn; now summarise it in a few "
+                            "sentences.",
+                            {"dataset_profile": lambda a: json.dumps(translator.profile(), indent=1),
+                             "read_rulebook": lambda a: translator.rulebook()})
+                result = self._agent(jid, "translator", model_ref, [], translator.kickoff(), Candidate, turn, stream)
+                run.metrics(tool_calls=turn.tool_calls, invalid_submissions=turn.invalid)
+                run.artifact_text(result["text"], "reply.md")
+                run.artifact_text(json.dumps(result["messages"], indent=1), "transcript.json")
+                cand: Candidate | None = turn.result
+                if cand is None:
+                    raise AgentServiceError("the Translator ended its turn without an accepted candidate: "
+                                            + (result["text"].strip()[:500] or "(no reply)"))
+                h = hashlib.sha256(cand.module.encode()).hexdigest()
+                run.params(candidate_hash=h)
+                run.artifact_text(cand.module, "candidate.py")
+                cid, _ = self.store.record(pid, "candidate", {
+                    **common, "hash": h, "module": cand.module, "notes": cand.notes, "changes": cand.changes,
+                    "reply": result["text"], "model": model_label, "mlflow_run_id": run.run_id})
+
+            with self.tracker.step(pid, "validation", f"validation v{s.spec_version}", workdir / "step.log") as run:
+                run.params(candidate_id=cid, candidate_hash=h, environment_version=self.envs.version(), **common)
+                v = run_candidate(workdir, cand.module, spec, baseline_dir, s.files,
+                                  self.settings.project_dir(pid) / "inputs", self.envs, self.settings.limits,
+                                  lambda p: self._started(jid, p.cancel))
+                body = json.loads(v.model_dump_json())
+                run.metrics(**v.metrics())
+                run.tags(passed=v.passed, stage=v.stage)
+                run.artifact_text(json.dumps(body, indent=1), "validation.json")
+                run.artifact(workdir / "candidate.py", "code")
+                if (workdir / "output").is_dir():
+                    run.artifact(workdir / "output", "output")
+                run.artifact(workdir / "step.log")
+                vid, _ = self.store.record(pid, "validation", {
+                    **common, "candidate_id": cid, "candidate_hash": h, "environment_version": self.envs.version(),
+                    **body, "mlflow_run_id": run.run_id})
+            self.store.finish_job(jid, CandidateValidated(
+                bindings=Bindings(spec_version=s.spec_version, baseline_id=s.baseline_id, candidate_hash=h,
+                                  validation_id=vid), passed=v.passed))
+        except StepCancelled:
+            self.store.cancel_job(jid)
+        except Exception as e:
+            self.store.fail_job(jid, str(e))
+        finally:
+            self._close(jid)
+        return jid
+
+    def tag_decision(self, pid: str, bindings: Bindings, decision: str, comment: str | None = None) -> None:
+        """Mirror a DS approval or rejection onto the candidate's and validation's MLflow runs. The transition row
+        is the record; a tracking failure is logged, not raised."""
+        try:
+            v = self.store.evidence(pid, bindings.validation_id)["body"]
+            c = self.store.evidence(pid, v["candidate_id"])["body"]
+            tags = {"decision": decision} | ({"ds_comment": comment[:5000]} if comment else {})
+            for run_id in (c["mlflow_run_id"], v["mlflow_run_id"]):
+                StepRun(self.tracker.client, run_id).tags(**tags)
+        except Exception:
+            log.exception("could not tag the %s decision for project %s in MLflow", decision, pid)

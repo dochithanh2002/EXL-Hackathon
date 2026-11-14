@@ -1,6 +1,6 @@
 # Plan: agentic R → Python ML transformation platform
 
-Status: build steps 1–3 done (section 12). Date: 2026-11-13.
+Status: build steps 1–4 done (section 12). Date: 2026-11-14.
 
 A Python control plane owns all workflow, execution and approval logic. A small Node service hosts Pi for the
 four agents. A React UI is the data scientist's (DS) workspace. Everything runs locally as plain processes; a
@@ -31,6 +31,9 @@ Dockerfile is provided for Linux server deployment.
   no `bash`, `write` or `edit` tools.
 - The verification endpoint in `EXL-Hackathon-26/downloads/openai.env` uses `wire_api = "responses"`, which maps
   to `openai-responses`.
+- statsmodels' GLM IRLS reproduces R's `glm` to about 1e-12 in coefficients and standard errors when it starts from
+  R's `mustart` (M4 binomial, a Poisson fixture with offset). From statsmodels' own start (Poisson: not R's),
+  coefficients still match to about 1e-11 but standard errors only to about 1e-6. Rulebook R-EST-02 records this.
 - Verification models under `EXL-Hackathon-26/downloads/`: M1 Poisson GLM with offset (1,126 lines of R, also
   trains keras/xgboost/catboost), M2 binomial GLM (caret split), M4 binomial GLM (57 lines), M3 random forest.
 
@@ -92,6 +95,11 @@ is returned to the agent with the validation error, for a bounded number of retr
 The `baseline.R` slice is the minimal part of the uploaded code that produces the target model. The DS sees it
 as a diff against the original before confirming. It is what keeps unrelated code (keras, xgboost, plotting)
 out of the baseline run.
+
+The candidate interface is fixed (`controlplane/candidate.py`): `prepare(path, sets)` returns one frame per set,
+indexed by R's data-row numbers; `fit(train)` returns statsmodels results, whose `params` and `bse` are the
+coefficients; `predict(result, frame)` returns response-scale predictions. The Translator sees R's coefficient names
+but never R's estimates, and the candidate's working directory holds only the dataset and R's sets.
 
 Prompt rule: state the goal, the inputs, the output contract and the limits; nothing else. Domain rules from
 `legacy/agent/config/rulebook.yaml` are available to the Translator and Diagnostician as a readable reference, not
@@ -200,6 +208,13 @@ platform/
 
 ## 13. Verification
 
+Step 4 verified on 2026-11-14: 136 tests passed, one skipped (macOS address-space limits), and TypeScript
+typechecking passed. Two live M4 Translator runs using `gpt-6.1-sol` through the configured Responses endpoint
+passed on the first submission, including one after tightening the guardrails. Each started from the confirmed
+M4 fixture spec, ran a fresh R baseline, and stopped awaiting DS approval with all 19 checks passing. Maximum
+relative differences: coefficients 1.104e-12, standard errors 1.107e-12; maximum prediction absolute difference
+1.955e-13. This verifies steps 3–4; the end-to-end deliverables checks below remain pending.
+
 - End to end with `openai.env` on M4, M2 and M1, each through to deliverables.
 - Rejection and repair: reject one passing run with a DS comment, and seed one real failure (for example M2's
   factor reference levels) to exercise diagnosis.
@@ -216,3 +231,8 @@ platform/
 - Approximate-tier pairs may not reach tolerances a DS expects; the UI must show the tier before work starts.
 - Local mode is not a sandbox (section 6).
 - Pi is moving quickly (1.5.2 on 10 Nov 2026); the version stays pinned and upgrades are deliberate.
+- Candidate runtime errors are retained for the DS and may contain data values. Before step 5 sends evidence to
+  the Diagnostician, it must filter error messages and omit row-level prediction values.
+- Gamma, inverse Gaussian and quasi-family likelihood statistics are excluded from fit-statistic parity because
+  R and statsmodels handle scale differently; validation records the exclusion. An explicitly requested AIC KPI
+  is still checked when R supplies it.

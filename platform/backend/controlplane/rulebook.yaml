@@ -1,0 +1,112 @@
+# R -> Python translation rulebook, copied from legacy/agent/config/rulebook.yaml (v1.4) and adapted to the platform's
+# candidate interface (controlplane/candidate.py). A readable reference for the Translator and Diagnostician; never
+# pasted into a prompt. Each rule: what to detect in R, the Python translation, and the pitfall it prevents.
+version: "2.0"
+rules:
+  # ---------------- Data loading ----------------
+  - id: R-IO-01
+    detect: "read.csv(...) with default check.names=TRUE"
+    python: "pd.read_csv(path); then apply R's make.names() exactly: keep letters, digits, '.' and '_'; replace every other character with '.'; prefix 'X' if the name does not start with a letter or a dot not followed by a digit; de-duplicate with make.unique ('.1', '.2', ...). E.g. 'default payment next month' -> 'default.payment.next.month', 'NumberOfTime30-59DaysPastDueNotWorse' -> 'NumberOfTime30.59DaysPastDueNotWorse'."
+    pitfall: "R silently renames columns with spaces or symbols, and its coefficient names use the renamed columns."
+  - id: R-IO-02
+    detect: "read.csv(...) defaults for missing values and text"
+    python: "R reads 'NA' (and empty numeric fields) as missing; pandas also treats '', 'NaN', 'null', 'N/A' and others as missing. Pass keep_default_na=False, na_values=['NA'] and handle empty fields per column type when it matters. read.csv has stringsAsFactors=FALSE since R 4.0."
+    pitfall: "A value pandas treats as missing but R does not changes the rows R's na.omit drops."
+  - id: R-IO-03
+    detect: "rows of the loaded data"
+    python: "Index the loaded frame by data-row number: df.index = pd.RangeIndex(1, len(df) + 1). If R drops rows (subsetting, na.omit, filter), drop the same rows with boolean masks and keep the surviving labels. Return each set as frame.loc[sets[name]]. Never sort, reset_index, deduplicate or append rows unless the R code does so explicitly."
+    pitfall: "prepare() must return exactly R's rows for each set, identified by data-row number; anything else fails before fitting."
+  - id: R-IO-04
+    detect: "read.csv(..., quote = ...) / string columns that need cleaning after load"
+    python: "Select text columns with pd.api.types.is_string_dtype(s), never `df.dtypes == object` alone. Reproduce R's quote handling: pandas has one quotechar, so strip any extra quote character R removes."
+    pitfall: "pandas >= 3 reads text as the 'str' dtype, so a dtype == object filter selects nothing and the cleaning silently does not happen."
+
+  # ---------------- Indexing ----------------
+  - id: R-IDX-01
+    detect: "positional column access: df[[i]], df[, i], df[-1], seq(a, b) over column positions"
+    python: "Resolve each position to a column NAME using the column order at that point in the R script (R is 1-based; negative indices drop). Then use names in Python, never iloc positions."
+    pitfall: "Off-by-one errors, and positions that shift after a column is dropped."
+  - id: R-IDX-02
+    detect: "df[which(cond), ][[i]] <- value  /  df$x[cond] <- value"
+    python: "df.loc[cond, col] = value"
+    pitfall: "Chained assignment in pandas (df[cond][col] = v) silently does nothing."
+
+  # ---------------- Recoding and scaling ----------------
+  - id: R-REC-01
+    detect: "x %in% c(...)"
+    python: "s.isin([...]) with matching dtypes."
+    pitfall: "Type mismatch between R numeric and Python int or str."
+  - id: R-REC-02
+    detect: "recodes executed in sequence"
+    python: "Apply the recodes in exactly the R order. Each recode sees the result of the one before it."
+    pitfall: "Reordering overlapping recodes changes the result."
+  - id: R-REC-03
+    detect: "scale(x)"
+    python: "(x - x.mean()) / x.std(ddof=1), over exactly the rows R scales at that point (often the whole frame before any split)."
+    pitfall: "numpy's std defaults to ddof=0; R's sd and scale use n - 1. Scaling each set separately when R scaled once changes every value."
+
+  # ---------------- Factors / design matrix ----------------
+  - id: R-FAC-01
+    detect: "as.factor(x) / factor(x)"
+    python: "Treat as categorical with levels = sorted unique values in R ordering (numeric codes sort numerically, strings by R's locale collation). The reference level is the FIRST level unless relevel() or factor(levels=) says otherwise. The baseline metadata's xlevels gives R's exact levels and order; use it."
+    pitfall: "pd.get_dummies(drop_first=True) drops the first level pandas sees, which differs from R when codes are numeric-as-strings ('10' < '2')."
+  - id: R-FAC-02
+    detect: "factor in a glm/lm formula (contr.treatment)"
+    python: "Build treatment-coded dummies explicitly, named '<var><level>' exactly as R's model.matrix names them (e.g. 'sex2', 'areaB'), from the baseline metadata's xlevels, not the levels observed in Python."
+    pitfall: "A level missing from the train set, or an extra level in the test set, silently changes the columns."
+  - id: R-FAC-03
+    detect: "factor response in a binomial glm"
+    python: "y = 1 for every level except the first, so the event is the second level ('1' for a 0/1 factor). Cast to float."
+    pitfall: "Modelling P(y = first level) flips the sign of every coefficient."
+  - id: R-FAC-04
+    detect: "intercept"
+    python: "Add a column named '(Intercept)' of 1.0 as the first design column, unless the formula has -1 or +0."
+    pitfall: "statsmodels adds no intercept to an explicit design matrix, and formulaic or patsy name it 'Intercept'."
+  - id: R-FAC-05
+    detect: "y ~ . / df$y ~ ."
+    python: "Every column of the data frame except the response, in the frame's column order, after R's preprocessing."
+    pitfall: "A column dropped or kept by mistake changes every coefficient."
+
+  # ---------------- Sampling / randomness ----------------
+  - id: R-RNG-01
+    detect: "set.seed, sample(), caret::createDataPartition, any random split"
+    python: "Never re-implement the random split. prepare() receives R's sets; use them."
+    pitfall: "R and NumPy random-number generators produce different streams; a re-randomised split can never reach parity."
+
+  # ---------------- Estimation ----------------
+  - id: R-EST-01
+    detect: "glm(..., family = binomial / poisson / Gamma / gaussian / inverse.gaussian)"
+    python: "sm.GLM(y, X, family=sm.families.<Family>(link=sm.families.links.<Link>())) on an explicit design matrix whose columns are R's coefficient names, fitted with IRLS."
+    pitfall: "A penalised estimator (sklearn LogisticRegression, fit_regularized) changes every coefficient."
+  - id: R-EST-02
+    detect: "glm convergence: glm.fit starts IRLS from family$initialize's mustart and stops at |dev - dev_old| / (|dev| + 0.1) < epsilon (default 1e-8, maxit 25)"
+    python: "Start statsmodels' IRLS where R starts: subclass the family and override starting_mu with R's mustart (poisson: y + 0.1; binomial with 0/1 response: (y + 0.5) / 2, which statsmodels already uses; gaussian, Gamma, inverse.gaussian: y). With default fit(), this gives standard-error relative differences around 2e-15 in the Poisson fixture and 1e-12 in M4. Stopping criteria still differ: validate each model rather than assuming the same accuracy for every family."
+    pitfall: "From statsmodels' own start the fit stops at a different iterate: coefficients still match to ~1e-11, but standard errors only to ~1e-6, because R takes them from the weights of its last iteration. Tightening tol alone does not help."
+  - id: R-EST-03
+    detect: "glm(..., offset =, weights =) or offset() in the formula"
+    python: "Pass offset= (on the link scale, e.g. np.log(exposure)) and var_weights= for R prior weights. predict() must apply the same offset for every set."
+    pitfall: "Dropping the offset (exposure) in frequency models, or forgetting it at prediction time."
+  - id: R-EST-04
+    detect: "lm(...)"
+    python: "sm.OLS(y, X) (sm.WLS with weights) on an explicit design matrix with R's coefficient names."
+    pitfall: "statsmodels OLS adds no intercept by default (R-FAC-04)."
+  - id: R-NA-01
+    detect: "every glm/lm (default na.action = na.omit)"
+    python: "Fit only on train rows complete in every model variable and the response, as R does (missing='drop', or drop them before fit). predict() returns NaN for any row with a missing input, exactly where R predict() returns NA. Never impute or fillna to obtain a prediction."
+    pitfall: "Imputing gives a prediction R never made; validation compares the NA pattern row by row."
+
+  # ---------------- Prediction ----------------
+  - id: R-PRED-01
+    detect: "predict(model, newdata, type = 'response')"
+    python: "result.predict(X_new, offset=...) returns the mean response. Build X_new with the same design function and R's captured levels."
+    pitfall: "Building X_new from a separate get_dummies call misaligns columns."
+
+  # ---------------- Governance ----------------
+  - id: GOV-01
+    detect: "protected attributes used in the R model"
+    python: "Translate faithfully. Never add, remove or 'fix' a feature."
+    pitfall: "Silently improving a model during translation destroys the parity proof and the audit trail."
+  - id: GOV-02
+    detect: "R code that cannot be mapped with confidence"
+    python: "Say so in the candidate's notes with the specific question for the data scientist. Do not guess silently."
+    pitfall: "A plausible-looking translation that is wrong."

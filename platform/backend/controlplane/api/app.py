@@ -22,7 +22,8 @@ from ..schemas import ROLES, canonical_hash, sha256_file
 from ..settings import Settings
 from ..tracking import Tracker
 from ..workflow import GateError, NotFound, Status, Store
-from ..workflow.machine import FilesUploaded, InputFile, RetryStep, SpecConfirmed
+from ..workflow.machine import (Bindings, CandidateApproved, CandidateRejected, FilesUploaded, InputFile, RetryStep,
+                                SpecConfirmed)
 
 SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._ -]{0,127}$")
 EXTENSIONS = {"dataset": {".csv"}, "r_code": {".r", ".rmd", ".qmd"}, "document": {".md", ".txt", ".pdf", ".docx"}}
@@ -38,6 +39,11 @@ class Confirmation(BaseModel):
 
 class ModelChoice(BaseModel):
     model: str
+
+
+class Rejection(BaseModel):
+    bindings: Bindings
+    comment: str = Field(min_length=1, max_length=20_000)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -202,6 +208,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         state = store(request).apply(pid, SpecConfirmed(
             version=version, tier=sup.tier, proven=sup.proven, baseline_key=canonical_hash(body.baseline_key()),
             parity_risk_accepted=c.parity_risk_accepted))
+        advance(request, pid)
+        return {"state": state}
+
+    # ------------------------------------------------------------ step 4
+    @app.get("/api/projects/{pid}/evidence")
+    def evidence_list(request: Request, pid: str, kind: str | None = None):
+        return store(request).evidence_list(pid, kind)
+
+    @app.get("/api/projects/{pid}/evidence/{eid}")
+    def evidence(request: Request, pid: str, eid: str):
+        return store(request).evidence(pid, eid)
+
+    @app.post("/api/projects/{pid}/approve")
+    def approve(request: Request, pid: str, bindings: Bindings):
+        """The DS approves the candidate and validation they reviewed; `bindings` must name exactly those."""
+        state = store(request).apply(pid, CandidateApproved(bindings=bindings))
+        jobs(request).tag_decision(pid, bindings, "approved")
+        advance(request, pid)
+        return {"state": state}
+
+    @app.post("/api/projects/{pid}/reject")
+    def reject(request: Request, pid: str, r: Rejection):
+        state = store(request).apply(pid, CandidateRejected(bindings=r.bindings, comment=r.comment))
+        jobs(request).tag_decision(pid, r.bindings, "rejected", r.comment)
         advance(request, pid)
         return {"state": state}
 
