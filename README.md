@@ -34,8 +34,8 @@ to that DNS name and `R2PY_AUTH_FILE` to the absolute path of a private file out
 docker compose -f deploy/compose.yaml -f deploy/compose.caddy.yaml up -d --build --wait
 ```
 
-Caddy obtains the TLS certificate and requires a login for the UI and API. Authorized users share the same
-projects and settings. For MLflow, use `ssh -N -L 5000:127.0.0.1:5000 user@server` and open `http://127.0.0.1:5000`.
+Caddy obtains the TLS certificate and requires the same login for the UI, API, and MLflow at `/mlflow/`.
+The web UI links to project experiments and runs there. Authorized users share the same projects and settings.
 
 The previous Agentic Model Risk Factory is in [`legacy/`](legacy/README.md) as read-only reference; its working
 layout is at git tag `legacy-v2.1`.

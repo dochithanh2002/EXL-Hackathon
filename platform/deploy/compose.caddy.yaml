@@ -1,5 +1,14 @@
 # Load after compose.yaml to serve the application over HTTPS.
 services:
+  controlplane:
+    environment:
+      CONTROLPLANE_MLFLOW_PUBLIC_URL: /mlflow
+
+  mlflow:
+    environment:
+      MLFLOW_SERVER_ALLOWED_HOSTS: mlflow:5000,127.0.0.1:5000,localhost:5000,${R2PY_DOMAIN:?Set the public DNS name}
+      MLFLOW_SERVER_CORS_ALLOWED_ORIGINS: https://${R2PY_DOMAIN:?Set the public DNS name}
+
   caddy:
     image: caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
     restart: unless-stopped
