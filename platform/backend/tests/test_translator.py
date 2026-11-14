@@ -6,7 +6,7 @@ import pytest
 
 from controlplane.tracking import Tracker
 from tests.fake_llm import text, tool
-from tests.test_analyst import agent_service, configure, cp, llm, settle, upload  # noqa: F401
+from tests.test_analyst import agent_service, configure, cp, llm, settle, synced, upload  # noqa: F401
 from tests.test_baseline import poisson_spec
 from tests.test_translation import POISSON_PY
 
@@ -57,6 +57,7 @@ def test_translator_candidate_passes_validation_and_the_ds_approves_it(cp, llm):
     c = cp.get(f"/api/projects/{pid}/evidence/{cand['id']}").json()["body"]
     assert c["module"] == POISSON_PY and c["model"] == "fake / fake-1"
 
+    synced(cp, pid)
     tracker = Tracker(cp.settings.mlflow_uri)
     exp = tracker.experiment(pid)
     [t_run] = tracker.client.search_runs([exp], "tags.kind = 'translation'")
@@ -99,7 +100,7 @@ def test_translator_candidate_passes_validation_and_the_ds_approves_it(cp, llm):
     assert fit.data.params["spec.family"] == "poisson" and fit.data.params["split.test.rows"] == "60"
     assert {d.dataset.name for d in fit.inputs.dataset_inputs} == {"claims.csv:train", "claims.csv:test"}
     v = cp.get(f"/api/projects/{pid}/evidence/{s['validation_id']}").json()["body"]
-    assert v["mlflow_runs"]["python_fit"] == fit.info.run_id
+    assert v["mlflow_run_id"] == v_run.info.run_id and v["dir"] == f"projects/{pid}/runs/{v['job_id']}"
     assert cp.get(f"/api/projects/{pid}/evidence/{s['validation_id']}/plots/parity.svg").text.startswith("<svg")
     assert cp.get(f"/api/projects/{pid}/evidence/{s['validation_id']}/plots/..%2Fcandidate.py").status_code == 404
 
@@ -110,6 +111,8 @@ def test_translator_candidate_passes_validation_and_the_ds_approves_it(cp, llm):
     assert r.status_code == 200 and (r.json()["state"]["step"], r.json()["state"]["status"]) == (6, "working")
     [d] = cp.get(f"/api/projects/{pid}").json()["decisions"]
     assert d["decision"] == "approved" and not d["void"]
+    settle(cp, pid)
+    synced(cp, pid)
     assert tracker.client.get_run(v_run.info.run_id).data.tags["decision"] == "approved"
     assert tracker.client.get_run(t_run.info.run_id).data.tags["decision"] == "approved"
 
@@ -135,6 +138,7 @@ def test_a_failing_candidate_goes_to_repair_and_a_rejected_one_carries_the_comme
     settle(cp, pid)
     [d] = cp.get(f"/api/projects/{pid}").json()["decisions"]
     assert d["decision"] == "rejected" and d["comment"] == "Use exposure in years."
+    synced(cp, pid)
     tracker = Tracker(cp.settings.mlflow_uri)
     [v_run] = tracker.client.search_runs([tracker.experiment(pid)], "tags.kind = 'validation'")
     assert v_run.data.tags["decision"] == "rejected" and v_run.data.tags["ds_comment"] == "Use exposure in years."
@@ -145,6 +149,7 @@ def test_a_turn_without_a_candidate_fails_and_can_be_retried(cp, llm):
     s = cp.get(f"/api/projects/{pid}").json()["state"]
     assert (s["step"], s["reason"]) == (4, "step_failed")
     assert "without an accepted candidate: I could not translate this." in s["detail"]
+    synced(cp, pid)
     tracker = Tracker(cp.settings.mlflow_uri)
     assert [r.info.status for r in tracker.client.search_runs([tracker.experiment(pid)],
                                                               "tags.kind = 'translation'")] == ["FAILED"]

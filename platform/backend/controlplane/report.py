@@ -1,15 +1,16 @@
-"""Step 6: the evidence the final report is built from, the Reporter's inputs and the checks on its narrative.
+"""Step 6: the model validation report, rendered by code from recorded evidence, with the Reporter's interpretation.
 
 `gather` collects what was recorded for the approved translation: the confirmed spec, the frozen baseline, every
 attempt under that spec and baseline (candidate, validation, diagnosis) and the DS's decisions. `catalog` turns it
-into entries of citable facts. The Reporter writes prose only: each claim cites catalog ids, and every number in it
-is a `{{id.field}}` placeholder that code fills in from the catalog. The tables after the narrative are built by
-code from the same evidence, so the report's numbers never pass through the model.
+into entries of citable facts. Code renders every factual part of the report: scope, semantics, the validation
+plan, parity results, the acceptance decision, each validation check with its status, criterion outcome, tables
+and plots, the missing evidence, the business fitness verdict and the appendix. The Reporter writes only three
+lists of claims (key findings, limitations, recommendations); each claim cites catalog ids, and every number in it
+is a `{{id.field}}` placeholder that code fills in, so the report's numbers never pass through the model.
 
-The report's plots are the approved validation run's MLflow artifacts: `retrieve_plots` downloads them into the
-report's own directory, which the bundle copies, so the report stays readable without the MLflow server. Each plot
-links to the run it came from. Migration acceptance (parity) and business fitness (the validation plan's evaluation
-and the assessment) are separate parts of the report, with separate conclusions.
+`copy_plots` copies the approved validation's plots from its work directory into the report's own directory,
+which the bundle copies, so the report reads on its own. Migration acceptance (parity) and business fitness (the
+model validation checks) are separate parts of the report, with separate conclusions.
 """
 from __future__ import annotations
 
@@ -17,20 +18,18 @@ import hashlib
 import json
 import math
 import re
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from pydantic import ValidationError
 
 from .diagnosis import failed_checks
-from .schemas import ModelSpec, ReportNarrative, canonical_hash
-from .schemas.agents import CODE_SPAN, PLACEHOLDER
-from .settings import Settings
-from .tracking import Tracker
-from .assessment import QUESTIONS
-from .evaluation import CHECKS, subgroup_prompt_results
-from .evaluation import TITLES as CHECK_TITLES
+from .evaluation import CHECKS, TITLES as CHECK_TITLES, subgroup_prompt_results, unstated
 from .runner.parity import _coefs, score
+from .schemas import ModelSpec, ReportNarrative, canonical_hash
+from .schemas.agents import CODE_SPAN, PLACEHOLDER, quote
+from .settings import Settings
 from .workflow import Store
 from .workflow.machine import Bindings, ProjectState
 
@@ -169,11 +168,13 @@ def _spec_facts(sp: ModelSpec) -> dict[str, Fact]:
 
 
 def catalog(r: Record) -> dict[str, dict]:
-    """Citable entries: id -> {"kind", "facts"}. Ids are evidence ids, `intake`, `spec-v<N>`, `assessment` (the
-    approved candidate's financial assessment) and `decision-<seq>`."""
+    """Citable entries: id -> {"kind", "facts"}. Ids are evidence ids, `intake`, `spec-v<N>`, `evaluation` (the
+    approved validation's model validation checks and verdict) and `decision-<seq>`."""
     sp, s, meta = r.spec, r.state, r.baseline["body"]["meta"]
     files = r.state.files
     v = r.approved.validation["body"]
+    verdict, basis = _verdict(v)
+    evaluation = (v.get("evaluation") or {}) | {"business_fitness": {"verdict": verdict, "basis": basis}}
     entries = {
         "intake": {"kind": "intake", "facts": {
             "project": r.project, "dataset": next(f.name for f in files if f.role == "dataset"),
@@ -189,9 +190,7 @@ def catalog(r: Record) -> dict[str, dict]:
             "r_version": meta["r_version"], "n_fit": meta["n_fit"], "converged": meta["converged"],
             "iterations": meta.get("iterations"), "coefficients": len(meta["design_columns"]),
             **{f"n.{k}": v for k, v in meta["n"].items()}, **_scalars("fit.", r.baseline["body"]["fit"])}},
-        "assessment": {"kind": "assessment", "facts": _flatten("", (v.get("assessment") or {}).get("python", {}),
-                                                               {"validation_id": r.approved.validation["id"]})},
-        "evaluation": {"kind": "evaluation", "facts": _flatten("", evaluation_facts(v.get("evaluation") or {}),
+        "evaluation": {"kind": "evaluation", "facts": _flatten("", evaluation_facts(evaluation),
                                                                {"validation_id": r.approved.validation["id"]})},
     }
     for a in r.attempts:
@@ -219,23 +218,38 @@ def catalog(r: Record) -> dict[str, dict]:
     return entries
 
 
+def _stability_psi(results: dict) -> dict:
+    """Read pre-consolidation validation records without changing their evidence or approval bindings."""
+    psi = results.get("psi") or {}
+    if "psi_vs_development" in psi:
+        return {"python": {"vs_development": psi["psi_vs_development"], "by_period": psi["by_period"],
+                           "max_psi": psi["max_psi"]}}
+    return psi
+
+
 def evaluation_facts(ev: dict) -> dict:
-    """The validation plan's results as a nested dict of citable scalars: lists of records (groups) become dicts
+    """The model validation as a nested dict of citable scalars: each check's status, criterion and headline
+    results (the Python candidate's, and R's where the comparison matters); lists of records (groups) become dicts
     keyed by their label, and per-bin and per-fold detail is left to the tables and plots."""
     checks = ev.get("checks") or {}
+    fitness = ev.get("business_fitness") or {}
     out: dict = {"missing_evidence": ev.get("missing_evidence", []),
                  "missing_evidence_count": len(ev.get("missing_evidence", [])),
-                 "primary_metric": ev.get("primary_metric")}
+                 "primary_metric": ev.get("primary_metric"),
+                 "business_fitness": {"verdict": fitness.get("verdict", "not recorded"),
+                                      "basis": fitness.get("basis", [])}}
     for name in CHECKS:
         c = checks.get(name) or {}
         out[name] = {"status": c.get("status", "not recorded"), "rationale": c.get("rationale"),
                      "needs": c.get("needs", []), "notes": c.get("notes", [])}
+        if cr := c.get("criterion"):
+            out[name]["criterion"] = {k: cr.get(k) for k in ("rule", "outcome", "limit", "value", "judged_on")}
     res = {k: (checks.get(k) or {}).get("results") or {} for k in CHECKS}
     out["baseline_comparison"] |= {"sets": res["baseline_comparison"].get("sets", {})}
-    out["calibration"] |= {"sets": {s: {k: {side: {f: d.get(f) for f in ("observed_expected", "slope", "intercept",
-                                                                         "max_bin_gap", "coverage") if f in d}
-                                            for side, d in sides.items()} for k, sides in keys.items()}
-                                    for s, keys in (res["calibration"].get("sets") or {}).items()}}
+    out["calibration"] |= {"max_deviation": res["calibration"].get("max_deviation"), "sets": {
+        s: {k: {side: {f: d.get(f) for f in ("observed_expected", "slope", "intercept", "max_bin_gap", "coverage")
+                       if f in d} for side, d in sides.items()} for k, sides in keys.items()}
+        for s, keys in (res["calibration"].get("sets") or {}).items()}}
     subgroups = subgroup_prompt_results(res["subgroup_performance"])
     out["subgroup_performance"] |= {"min_rows": subgroups.get("min_rows"), "columns": {
         col: {"status": c["status"], "cells_withheld": c["cells_withheld"],
@@ -251,8 +265,10 @@ def evaluation_facts(ev: dict) -> dict:
     if tc := st.get("training_curve"):
         out["stability"] |= {"training_curve": {"metric": tc["metric"], "iterations": tc["iterations"],
                                                 "final": tc["values"][-1], "r_iterations": tc.get("r_iterations")}}
-    if psi := st.get("psi"):
-        out["stability"] |= {"psi": {"max_psi": psi.get("max_psi"), "vs_development": psi.get("psi_vs_development")}}
+    if psi := _stability_psi(st):
+        out["stability"] |= {"psi": {side: {"max_psi": x["max_psi"], "vs_development": x["vs_development"],
+                                            "by_period": {k: p["psi_vs_first"] for k, p in x["by_period"].items()}}
+                                     for side, x in psi.items()}}
     out["sensitivity"] |= {"shift_sd": res["sensitivity"].get("shift_sd"), "columns": {
         col: c if c.get("status") != "executed" else {"status": c["status"], "shift": c["shift"], **c["sets"]}
         for col, c in (res["sensitivity"].get("columns") or {}).items()}}
@@ -260,6 +276,18 @@ def evaluation_facts(ev: dict) -> dict:
         a: {"status": x["status"], "reason": x.get("reason"), "reference": x.get("reference"),
             **{k: v for k, v in (x.get("results") or {}).items() if k != "columns"}}
         for a, x in (res["assumptions"].get("assumptions") or {}).items()}}
+    sample = res["sample_suitability"]
+    out["sample_suitability"] |= {k: sample.get(k) for k in ("per_parameter", "per_parameter_basis", "parameters",
+                                                             "fitted_rows", "excluded_from_fit") if k in sample}
+    if sample.get("sets"):
+        out["sample_suitability"]["sets"] = {s: {"role": e["role"], **{
+            k: v for k, v in (e.get("python") or e.get("r") or {}).items() if k != "class_counts"}}
+            for s, e in sample["sets"].items()}
+    dec = res["decision_performance"]
+    if dec.get("discrimination"):
+        out["decision_performance"] |= {"threshold": dec.get("threshold"), "action": dec.get("action"), "sets": {
+            s: {**(sides.get("python") or {}), **((dec.get("at_threshold") or {}).get(s, {}).get("python") or {})}
+            for s, sides in dec["discrimination"].items()}}
     return out
 
 
@@ -295,58 +323,35 @@ def known(token: str, words: set[str]) -> bool:
 
 
 # ---------------------------------------------------------------- plots
-def retrieve_plots(tracker: Tracker, validation: dict, report_dir: Path, public_url: str) -> list[dict]:
-    """Download the validation run's plots from MLflow into `report_dir`/plots. Returns each figure with the run it
-    came from and a link to that run."""
+def copy_plots(validation: dict, run_dir: Path, report_dir: Path) -> list[dict]:
+    """Copy the validation's plots from its work directory `run_dir` into `report_dir`/plots. Returns each figure
+    with its path in the report directory and its hash."""
     report_dir.mkdir(parents=True, exist_ok=True)
-    plots = validation.get("plots") or []
-    if not plots:
-        return []
-    run_id = validation["mlflow_run_id"]
-    tracker.client.download_artifacts(run_id, "plots", str(report_dir))
-    eid = tracker.client.get_run(run_id).info.experiment_id
-    url = f"{public_url.rstrip('/')}/#/experiments/{eid}/runs/{run_id}"
     out = []
-    for p in plots:
-        path = report_dir / "plots" / p["name"]
-        if path.is_file():
-            out.append(p | {"path": f"plots/{p['name']}", "run_id": run_id, "url": url,
-                            "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+    for p in validation.get("plots") or []:
+        source = run_dir / "plots" / p["name"]
+        if source.is_file():
+            path = report_dir / "plots" / p["name"]
+            path.parent.mkdir(exist_ok=True)
+            shutil.copyfile(source, path)
+            out.append(p | {"path": f"plots/{p['name']}", "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
     return out
 
 
 # ---------------------------------------------------------------- Reporter
-TITLES = {
-    "scope": "Scope", "model_and_data_semantics": "Model and data semantics",
-    "migration.parity_results": "Parity results", "migration.skipped_checks": "Skipped or unavailable checks",
-    "migration.acceptance_decision": "Acceptance decision", "validation.performance": "Performance",
-    **{f"validation.{c}": CHECK_TITLES[c] for c in CHECKS if c != "baseline_comparison"},
-    "validation.sample_suitability": "Sample suitability", "validation.decision_performance": "Decision performance",
-    "missing_evidence": "Missing evidence", "limitations": "Limitations", "business_fitness": "Business fitness"}
-STATUS = {"assessed": "Assessed", "partially assessed": "Partially assessed", "not assessed": "Not assessed"}
-CHECK_STATUS = {"executed": "Executed", "partially executed": "Partially executed", "not executed": "Not executed",
-                "not planned": "Not planned"}
-# report section -> the validation plan check and the assessment question it shows
-VALIDATION = {"performance": ("baseline_comparison", None), "calibration": ("calibration", "calibration"),
-              "subgroup_performance": ("subgroup_performance", None), "stability": ("stability", "stability"),
-              "sensitivity": ("sensitivity", None), "assumptions": ("assumptions", None),
-              "sample_suitability": (None, "sample_suitability"),
-              "decision_performance": (None, "decision_performance")}
+SECTIONS = {"key_findings": "Key findings", "limitations": "Limitations", "recommendations": "Recommendations"}
 
 
-def business_fitness(evaluation: dict, assessment: dict) -> tuple[str, list[str]]:
-    """The code's verdict on business fitness and what it rests on: established only when every planned check ran
-    and every assessment question was assessed; then supported or not by the criteria the spec states."""
-    gaps = [CHECK_TITLES[k] for k, c in (evaluation.get("checks") or {}).items()
-            if c["status"] in ("partially executed", "not executed")]
-    for q in QUESTIONS:
-        answer = assessment.get(q) or {}
-        if answer.get("status") != "assessed" or not isinstance(answer.get("meets"), bool):
-            gaps.append(q.replace("_", " "))
-    if gaps or not evaluation.get("checks"):
-        return "not established", gaps
-    unmet = [q.replace("_", " ") for q in QUESTIONS if assessment[q].get("meets") is False]
-    return ("criteria not met", unmet) if unmet else ("criteria met", [])
+def _checks(v: dict) -> dict:
+    return (v.get("evaluation") or {}).get("checks") or {}
+
+
+def _verdict(v: dict) -> tuple[str, list[str]]:
+    f = (v.get("evaluation") or {}).get("business_fitness") or {}
+    if not f and v.get("assessment"):
+        return "not established", ["this validation predates the current fitness criteria; rerun model validation "
+                                   "to establish the verdict"]
+    return f.get("verdict", "not established"), f.get("basis", ["the model validation was not recorded"])
 
 
 class Reporter:
@@ -365,28 +370,21 @@ class Reporter:
                            *[name for step in record.spec.preprocessing for name in step.columns],
                            *record.spec.validation_plan.subgroup_performance.columns,
                            *record.spec.validation_plan.sensitivity.columns])
-        validation, approval, spec = record.approved.validation["id"], record.approval_id, f"spec-v{record.state.spec_version}"
-        self.required = [validation, approval]
-        # each section must rest on the evidence it reports
-        self.section_cites = {"model_and_data_semantics": spec, "migration.parity_results": validation,
-                              "migration.skipped_checks": validation, "migration.acceptance_decision": approval,
-                              **{f"validation.{k}": "evaluation" if check else "assessment"
-                                 for k, (check, _) in VALIDATION.items()},
-                              "missing_evidence": "evaluation", "business_fitness": "evaluation"}
+        # the key findings rest on the accepted parity checks, the acceptance and the model validation
+        self.required = [record.approved.validation["id"], record.approval_id, "evaluation"]
 
     def check(self, raw: dict) -> tuple[ReportNarrative | None, list[str]]:
         try:
             n = ReportNarrative.model_validate(raw)
         except ValidationError as e:
             return None, [f"{'.'.join(map(str, err['loc'])) or '(root)'}: {err['msg']}" for err in e.errors()]
-        errors, cited = [], set()
+        errors, findings = [], set()
         for path, claims in n.sections():
-            section_ids = set()
             for j, claim in enumerate(claims):
                 at = f"{path}.{j}"
                 ids = set(claim.evidence_ids)
-                cited |= ids
-                section_ids |= ids
+                if path == "key_findings":
+                    findings |= ids
                 errors += [f"{at}.evidence_ids: unknown evidence id {x!r}" for x in sorted(ids - self.entries.keys())]
                 for m in PLACEHOLDER.finditer(claim.text):
                     eid, name = m.groups()
@@ -395,21 +393,18 @@ class Reporter:
                     elif eid in self.entries and name not in self.entries[eid]["facts"]:
                         errors.append(f"{at}.text: {eid} has no field {name!r}")
                 errors += [f"{at}.text: {e}" for e in self._spans(claim.text)]
-            need = self.section_cites.get(path)
-            if need and need not in section_ids:
-                errors.append(f"{path}: cite {need}, the evidence this section reports")
-        errors += [f"the report must cite {x}" for x in self.required if x not in cited]
+        errors += [f"key_findings: cite {x}" for x in self.required if x not in findings]
         return (None if errors else n), errors
 
     def _spans(self, text: str) -> list[str]:
         without_placeholders = PLACEHOLDER.sub("", text)
         errors = (["malformed placeholder; write {{evidence_id.field}}"]
                   if "{{" in without_placeholders or "}}" in without_placeholders else [])
-        for span in CODE_SPAN.findall(text):
-            name = span[1:-1]
+        for m in CODE_SPAN.finditer(text):
+            name = m.group(0)[1:-1]
             if not PLACEHOLDER.fullmatch(name) and not known(name, self.words):
-                errors.append(f"{span} is not a known project name; use a complete known name or write numbers as "
-                              "{{evidence_id.field}} placeholders")
+                errors.append(f"{m.group(0)} in {quote(text, m.start(), m.end())} is not a known project name; "
+                              "use a complete known name or write numbers as {{evidence_id.field}} placeholders")
         if "`" in CODE_SPAN.sub("", text):
             errors.append("use single backticks around one known project name or one placeholder")
         return errors
@@ -417,29 +412,26 @@ class Reporter:
     def kickoff(self) -> str:
         a = self.r.approved
         v = a.validation["body"]
-        assessment = (v.get("assessment") or {}).get("python", {})
-        evaluation = v.get("evaluation") or {}
-        statuses = {"assessment": {q: assessment.get(q, {}).get("status") for q in QUESTIONS},
-                    "evaluation": {k: c["status"] for k, c in (evaluation.get("checks") or {}).items()}}
-        verdict, basis = business_fitness(evaluation, assessment)
+        statuses = {k: {"status": c["status"], **({"criterion": c["criterion"]["rule"],
+                                                   "outcome": c["criterion"]["outcome"]} if c.get("criterion") else {})}
+                    for k, c in _checks(v).items()}
+        verdict, basis = _verdict(v)
+        c = a.candidate["body"]
         return "\n".join([
             f"Project {self.r.project}: the DS accepted the migration {a.candidate['id']} and its validation "
-            f"{a.validation['id']} ({self.required[1]}). Write the model validation report.", "",
+            f"{a.validation['id']} ({self.r.approval_id}). Write the key findings, limitations and recommendations "
+            "of the model validation report.", "",
             "Evidence catalog: each entry's id, kind and the facts a claim may cite as {{id.field}}:",
-            json.dumps(self.entries, indent=1), "",
-            "Status of each assessment question and validation plan check (computed by the platform): "
-            + json.dumps(statuses), "",
+            json.dumps(self.entries, separators=(",", ":")), "",
+            "Model validation checks (status: how far each ran; outcome: the specification's criterion on the "
+            "Python candidate): " + json.dumps(statuses, separators=(",", ":")), "",
             f"The platform's business fitness verdict: {verdict}" + (f" ({'; '.join(basis)})" if basis else "")
             + ". Interpret it; do not overrule it.", "",
-            "Plots the platform embeds, by section: " + json.dumps(
-                [{"title": f["title"], "section": f["section"]} for f in self.figures]), "",
-            "The approved candidate:", "```python", a.candidate["body"]["module"].rstrip(), "```", "",
-            "baseline.R, the R code the reference ran:", "```r", self.r.spec.baseline_r.rstrip(), "```", "",
-            "Code adds every heading, each status and what it needs, the plots, and tables of the semantics, "
-            "validation plan, checks, metrics, evaluation and assessment results, coefficients, attempts, inputs "
-            "and evidence.", "",
-            "Cite " + ", ".join(dict.fromkeys(self.section_cites.values())) + " in their sections, then submit the "
-            "report."])
+            "The Translator's notes on the approved candidate: " + json.dumps(c["notes"]),
+            "Limitations it reported: " + json.dumps(c.get("limitations", [])), "",
+            "The platform renders the scope, semantics, validation plan, parity results, acceptance decision, every "
+            "check with its status, criterion, tables and plots, the missing evidence and the verdict.", "",
+            f"Cite {', '.join(self.required)} in key_findings, then submit the report."])
 
     # ------------------------------------------------------------ rendering
     def render(self, n: ReportNarrative) -> str:
@@ -448,28 +440,24 @@ class Reporter:
         sp = r.spec
         facts = {eid: e["facts"] for eid, e in self.entries.items()}
         approval = next(d for d in r.decisions if d["id"] == r.approval_id)
-        assessment = (v.get("assessment") or {}).get("python", {})
         evaluation = v.get("evaluation") or {}
         checks = evaluation.get("checks") or {}
         required = [c for c in v["checks"] if c.get("required", True)]
         unavailable = [c for c in v["checks"] if c.get("status") == "unavailable"]
-        verdict, basis = business_fitness(evaluation, assessment)
+        verdict, basis = _verdict(v)
         sections = dict(n.sections())
+        meta = r.baseline["body"]["meta"]
 
         def claims(path: str) -> list[str]:
             lines = []
             for c in sections[path]:
                 text = PLACEHOLDER.sub(lambda m: fmt(facts[m.group(1)][m.group(2)]), c.text)
-                lines += [f"{text} [{', '.join(c.evidence_ids)}]", ""]
-            return lines
+                lines.append(f"- {text} [{', '.join(c.evidence_ids)}]")
+            return lines + ([""] if lines else [])
 
         def figures(section: str) -> list[str]:
-            lines = []
-            for f in self.figures:
-                if f["section"] == section:
-                    lines += [f"![{f['title']}]({f['path']})", "",
-                              f"[MLflow run `{f['run_id'][:12]}`]({f['url']}) · `{f['path']}`", ""]
-            return lines
+            return [line for f in self.figures if f["section"] == section for line in (f"![{f['title']}]({f['path']})",
+                                                                                         "")]
 
         passed = f"{sum(c['passed'] for c in required)} of {len(required)} required checks passed"
         out = [f"# {r.project}: Model Validation Report", ""]
@@ -482,19 +470,42 @@ class Reporter:
             ["Model specification", f"v{s.spec_version}"],
             ["Migration", f"accepted {approval['at']}; {passed}"
                           + (f"; {len(unavailable)} unavailable" if unavailable else "")],
-            ["Business fitness", verdict + (f": {'; '.join(basis)}" if basis else "")]]) + [""]
+            ["Business fitness", verdict]]) + [""]
 
-        out += ["## Scope", ""] + claims("scope")
+        # ---- scope
+        files = s.files
+        by_role = {role: [f.name for f in files if f.role == role] for role in ("dataset", "data", "r_code",
+                                                                                "document")}
+        dataset = next(f for f in files if f.role == "dataset")
+        out += ["## Scope", "",
+                f"{_sentence(sp.target_model)} The R code in {_names(by_role['r_code'])} fits `{sp.r_function}`; "
+                f"the migration reproduces it in Python with `{sp.python_implementation}`.",
+                "",
+                f"The model is fitted on {_names([dataset.name])} (SHA-256 `{dataset.sha256[:12]}`)"
+                + (f", with {_names(by_role['data'])}" if by_role["data"] else "")
+                + (f"; documents: {_names(by_role['document'])}" if by_role["document"] else "") + ". "
+                f"It predicts `{sp.response}`, a {sp.response_type.replace('_', ' ')} response, as "
+                f"{sp.prediction.units}, for {sp.assessment.business_use}.", ""]
+        out += _table(["Set", "Role", "Rows", "Description"], [
+            [e.set, e.role.replace("_", " "), fmt((meta.get("n") or {}).get(e.set)), e.description]
+            for e in sp.assessment.evaluation_sets]) + [""]
 
+        out += ["## Key findings", ""] + claims("key_findings")
+
+        # ---- semantics and plan
         out += ["## Model and data semantics", ""] + _table(["", ""], _semantics_rows(sp)) + [""]
+        plan = dict(sp.validation_plan.checks())
         out += ["### Validation plan", ""] + _table(["Check", "Planned", "Rationale"], [
-            [CHECK_TITLES[k], "yes" if c.run else "no", c.rationale] for k, c in sp.validation_plan.checks()]) + [""]
-        out += claims("model_and_data_semantics")
+            [CHECK_TITLES[k], "yes" if plan[k].run else "no", plan[k].rationale] if k in plan else
+            [CHECK_TITLES[k], "not applicable" if (checks.get(k) or {}).get("status") == "not applicable" else "always",
+             (checks.get(k) or {}).get("rationale", "")] for k in CHECKS]) + [""]
 
+        # ---- migration acceptance
         out += ["## Migration acceptance", "", "Does the Python code reproduce the R reference? Each value is compared "
                 "as |Python − R| ≤ atol + rtol·|R|; the ratio is the worst element's |Python − R| / "
-                "(atol + rtol·|R|).", "", "### Parity results", ""] + figures("migration.parity_results")
-        out += claims("migration.parity_results")
+                "(atol + rtol·|R|).", "", "### Parity results", "",
+                f"{_sentence(passed)}" + (f" {len(unavailable)} could not be computed." if unavailable else ""), ""]
+        out += figures("migration.parity_results")
         out += _table(["Check", "Status", "Max \\|Δ\\|", "atol", "rtol", "Ratio to tolerance"],
                       [[c["name"] + ("" if c.get("required", True) else " (optional)"), _status(c), *_check_cells(c)]
                        for c in v["checks"]]) + [""]
@@ -511,53 +522,46 @@ class Reporter:
                 [[f"`{t}`", _g(e), _g(pc[t][0]), fmt(score(e, pc[t][0], ct.atol, ct.rtol)), _g(se), _g(pc[t][1]),
                   fmt(score(se, pc[t][1], st.atol, st.rtol))] for t, (e, se) in rc.items() if t in pc]) + [""]
         out += ["### Skipped or unavailable checks", ""]
-        out += [f"- {c['name']}: unavailable{'' if c.get('required', True) else ' (optional)'}"
-                + (f", {c['reason']}" if c.get("reason") else "") for c in unavailable]
-        out += [f"- {x}" for x in v["notes"]] + ([""] if unavailable or v["notes"] else [])
-        out += claims("migration.skipped_checks")
+        skipped = [f"- {c['name']}: unavailable{'' if c.get('required', True) else ' (optional)'}"
+                   + (f", {c['reason']}" if c.get("reason") else "") for c in unavailable]
+        skipped += [f"- {x}" for x in v["notes"]]
+        out += (skipped or ["Every parity check was computed."]) + [""]
         out += ["### Acceptance decision", "",
-                f"The data scientist accepted the migration at {approval['at']}: {passed}. This acceptance attests "
-                "that the Python code reproduces the R reference within the agreed tolerances. It is not a statement "
-                "that the model is fit for business use, which the model validation below addresses.", ""]
-        out += claims("migration.acceptance_decision")
+                f"The data scientist accepted the migration at {approval['at']}: {passed}."
+                + (f" Their comment: “{approval['comment']}”" if approval["comment"] else "")
+                + " This acceptance attests that the Python code reproduces the R reference within the agreed "
+                "tolerances. It is not a statement that the model is fit for business use, which the model "
+                "validation below addresses.", ""]
 
+        # ---- model validation
         out += ["## Model validation", "",
-                "Is the model fit for its business use? The platform ran the validation plan's checks on the R "
-                "reference's and the Python candidate's predictions; the assessment questions use the Python "
-                "predictions. A faithful migration can still be unfit for use, and evidence that could not be "
-                "gathered is reported as such.", ""]
-        for key, (check, question) in VALIDATION.items():
-            out += [f"### {TITLES['validation.' + key]}", ""]
-            if check:
-                c = checks.get(check) or {"status": "not executed", "needs": ["the evaluation was not recorded"],
-                                          "rationale": ""}
-                line = f"**{CHECK_STATUS[c['status']]}.**" + (f" {_sentence(c['rationale'])}" if c.get("rationale")
-                                                               else "")
-                out += [line + (" Needs: " + "; ".join(c["needs"]) + "." if c.get("needs") else ""), ""]
-                out += [f"- {x}" for x in c.get("notes", [])] + ([""] if c.get("notes") else [])
-            if question:
-                ans = assessment.get(question) or {"status": "not assessed",
-                                                   "needs": ["the assessment was not recorded"]}
-                verdict_q = STATUS[ans["status"]] + ("" if ans.get("meets") is None else
-                                                     f": criterion {ans['criterion']} "
-                                                     f"{'met' if ans['meets'] else 'not met'}")
-                out += [f"Assessment: **{verdict_q}.**" + (" Needs: " + "; ".join(ans["needs"]) + "."
-                                                           if ans.get("needs") else ""), ""]
+                "Is the model fit for its business use? The platform ran each check on the R reference's and the "
+                "Python candidate's predictions and judged the specification's criteria on the Python candidate. "
+                "Each check states how far it ran and, separately, what its criterion concluded.", ""]
+        for key in CHECKS:
+            c = checks.get(key) or {"status": "not executed", "needs": ["the model validation was not recorded"],
+                                    "rationale": "", "notes": [], "results": {}, "criterion": None}
+            line = f"**{c['status'].capitalize()}.**" + (f" {_sentence(c['rationale'])}" if c.get("rationale") else "")
+            out += [f"### {CHECK_TITLES[key]}", "",
+                    line + (" Needs " + "; ".join(c["needs"]) + "." if c.get("needs") else ""), ""]
+            if cr := c.get("criterion"):
+                out += [_criterion(key, cr), ""]
+            out += [f"- {x}" for x in c.get("notes", [])] + ([""] if c.get("notes") else [])
             out += figures(f"validation.{key}")
-            if check:
-                head, rows = _evaluation_rows(check, (checks.get(check) or {}).get("results") or {})
+            for head, rows in _evaluation_tables(key, c.get("results") or {}):
                 if rows:
                     out += _table(head, rows) + [""]
-            # the evaluation's calibration table already holds the assessment's observed/expected and gaps
-            results = (assessment.get(question) or {}).get("results") or {} if question else {}
-            if question and question != "calibration" and (rows := _assessment_rows(question, results)):
-                out += _table(rows[0], rows[1:]) + [""]
-            out += claims(f"validation.{key}")
 
         out += ["## Missing evidence", ""]
         missing = evaluation.get("missing_evidence") or [f"Still to provide: {x}"
                                                          for x in sp.assessment.missing_information]
-        out += [f"- {x}" for x in missing] + ([""] if missing else []) + claims("missing_evidence")
+        out += ([f"- {x}" for x in missing] or ["None."]) + [""]
+
+        out += ["## Business fitness", "", f"**{verdict.capitalize()}.** The verdict reads the criterion outcomes on "
+                "the Python candidate and the checks' execution: a criterion not met decides it; otherwise every "
+                "stated criterion must be met and every check that applies must have run. It is judged separately "
+                "from the migration's acceptance.", ""]
+        out += [f"- {x}" for x in basis] + ([""] if basis else [])
 
         out += ["## Limitations", ""]
         limits = ([f"Approximate parity tier: {sp.python_implementation} does not use R's algorithm."]
@@ -566,17 +570,17 @@ class Reporter:
         limits += [f"Substituted: {x.original} → {x.proposed} ({x.rationale})" for x in sp.substitutions]
         limits += [f"Reported by the Translator: {x}" for x in a.candidate["body"].get("limitations", [])]
         limits += [f"Evaluation: {x}" for x in evaluation.get("notes", [])]
-        out += [f"- {x}" for x in limits] + ([""] if limits else []) + claims("limitations")
+        out += [f"- {x}" for x in limits] + ([""] if limits else [])
+        out += claims("limitations") or ["The Reporter identified no further limitations.", ""]
 
-        out += ["## Business fitness", "", f"**{verdict.capitalize()}**" + (f": {'; '.join(basis)}." if basis else ".")
-                + " Business fitness is established only when every planned check ran and every assessment question "
-                "was assessed against criteria the specification states; it is judged separately from the migration's "
-                "acceptance.", ""] + claims("business_fitness")
+        out += ["## Recommendations", ""]
+        out += claims("recommendations") or ["The Reporter made no recommendations.", ""]
 
+        # ---- appendix
         out += ["## Appendix: reproducibility", ""]
         out += _table(["", ""], [
             ["Spec hash", f"`{r.spec_hash[:12]}`"],
-            ["R reference", f"{r.baseline['id']}, {r.baseline['body']['meta']['r_version']}"],
+            ["R reference", f"{r.baseline['id']}, {meta['r_version']}"],
             ["Candidate", f"{a.candidate['id']} `{a.candidate['body']['hash'][:12]}`, code generated by "
                           f"{a.candidate['body']['model']}"],
             ["Validation", a.validation["id"]],
@@ -591,22 +595,38 @@ class Reporter:
              _decision(by_candidate.get(x.candidate["body"]["hash"]))] for x in r.attempts]) + [""]
         out += ["### Inputs", ""] + _table(["File", "Role", "SHA-256"],
                                            [[f.name, f.role, f"`{f.sha256}`"] for f in s.files]) + [""]
-        rows = [[r.baseline["id"], "R reference", f"`{r.baseline['hash'][:12]}`", r.baseline["body"]["mlflow_run_id"]]]
+        rows = [[r.baseline["id"], "R reference", f"`{r.baseline['hash'][:12]}`"]]
         for x in r.attempts:
-            rows += [[e["id"], e["kind"], f"`{e['hash'][:12]}`", e["body"]["mlflow_run_id"]]
-                     for e in (x.candidate, x.validation, x.diagnosis) if e]
-        rows += [["", name.replace("_", " "), "", run] for name, run in (v.get("mlflow_runs") or {}).items()]
-        out += ["### Evidence", ""] + _table(["Id", "Kind", "Hash", "MLflow run"], rows) + [""]
+            rows += [[e["id"], e["kind"], f"`{e['hash'][:12]}`"] for e in (x.candidate, x.validation, x.diagnosis) if e]
+        out += ["### Evidence", ""] + _table(["Id", "Kind", "Hash"], rows) + [""]
         if self.figures:
-            out += ["### Figures", "", "Copied from the validation run's MLflow artifacts into `plots/`.", ""]
-            out += _table(["Figure", "File", "SHA-256"],
-                          [[f["title"], f"`{f['path']}`", f"`{f['sha256'][:12]}`"] for f in self.figures])
+            out += ["### Figures", ""] + _table(["Figure", "File", "SHA-256"], [
+                [f["title"], f"`{f['path']}`", f"`{f['sha256'][:12]}`"] for f in self.figures])
         return "\n".join(out).rstrip("\n") + "\n"
+
+
+def _names(names: list[str]) -> str:
+    return ", ".join(f"`{x}`" for x in names) or "the uploaded files"
 
 
 def _sentence(text: str) -> str:
     text = text.strip()
     return text[:1].upper() + text[1:] + ("" if text.endswith((".", "!", "?")) else ".")
+
+
+def _criterion(check: str, cr: dict) -> str:
+    """One sentence: the criterion, its outcome and the statistic it was judged on."""
+    on = f" on {', '.join(cr['judged_on'])}" if cr.get("judged_on") else ""
+    values = "; ".join(f"{k.replace('_', ' ')} {fmt(cr['value'].get(k))} against {fmt(lim)}"
+                       for k, lim in cr["limit"].items())
+    if cr["outcome"] in ("met", "not met"):
+        return f"Criterion `{cr['rule']}`: **{cr['outcome']}**{on} ({values})."
+    if cr["outcome"] == "not judged":
+        return f"Criterion `{cr['rule']}`: **not judged**; its statistic could not be computed{on}."
+    computed = "; ".join(f"{k.replace('_', ' ')} {fmt(x)}" for k, x in cr["value"].items() if x is not None)
+    return (f"Criterion: **no criterion**. The specification states no {', '.join(unstated(check, cr))}"
+            + (f"; the rule it does state, `{cr['rule']}`, gives {values}" if cr["rule"] else "")
+            + (f". Computed{on}: {computed}." if computed else "."))
 
 
 def _range(group: dict) -> str:
@@ -619,12 +639,12 @@ def _range(group: dict) -> str:
     return f" ({fmt(lo)} and above)" if hi is None else f" ({fmt(lo)} to below {fmt(hi)})"
 
 
-def _evaluation_rows(check: str, res: dict) -> tuple[list[str], list[list[str]]]:
-    """A compact table of one evaluation check's results: (header, rows)."""
+def _evaluation_tables(check: str, res: dict) -> list[tuple[list[str], list[list[str]]]]:
+    """Compact tables of one check's results: (header, rows) each."""
     if check == "baseline_comparison" and res.get("sets"):
-        return (["Set", "Metric", "R", "Python", "Constant", "Python vs constant"],
-                [[s, m.replace("_", " "), fmt(x.get("r")), fmt(x.get("python")), fmt(x.get("constant")),
-                  fmt(x.get("python_vs_constant"))] for s, e in res["sets"].items() for m, x in e.items()])
+        return [(["Set", "Metric", "R", "Python", "Constant", "Python vs constant"],
+                 [[s, m.replace("_", " "), fmt(x.get("r")), fmt(x.get("python")), fmt(x.get("constant")),
+                   fmt(x.get("python_vs_constant"))] for s, e in res["sets"].items() for m, x in e.items()])]
     if check == "calibration" and res.get("sets"):
         rows = []
         for s, keys in res["sets"].items():
@@ -636,7 +656,7 @@ def _evaluation_rows(check: str, res: dict) -> tuple[list[str], list[list[str]]]
                     else:
                         rows.append([s, k, side, fmt(d["observed_expected"]), fmt(d["slope"]), fmt(d["intercept"]),
                                      fmt(d["max_bin_gap"])])
-        return ["Set", "Output", "Model", "Observed / expected", "Slope", "Intercept", "Largest decile gap"], rows
+        return [(["Set", "Output", "Model", "Observed / expected", "Slope", "Intercept", "Largest decile gap"], rows)]
     if check == "subgroup_performance" and res.get("columns"):
         rows = []
         for col, c in res["columns"].items():
@@ -646,11 +666,24 @@ def _evaluation_rows(check: str, res: dict) -> tuple[list[str], list[list[str]]]
             for g in c["groups"]:
                 for s, e in g["sets"].items():
                     py = e.get("python") or e.get("r") or {}
-                    rng = _range(g)
-                    rows.append([f"`{col}`", g["group"] + rng, s, fmt(e["rows"]) + (" (small)" if e["small"] else ""),
+                    rows.append([f"`{col}`", g["group"] + _range(g), s,
+                                 fmt(e["rows"]) + (" (small)" if e["small"] else ""),
                                  fmt(py.get("observed_expected")), fmt(py.get(res["metric"])), fmt(py.get("auc"))])
-        return ["Column", "Group", "Set", "Rows", "Observed / expected", res["metric"].replace("_", " "), "AUC"], rows
+        return [(["Column", "Group", "Set", "Rows", "Observed / expected", res["metric"].replace("_", " "), "AUC"],
+                 rows)]
     if check == "stability":
+        out = []
+        if psi := _stability_psi(res):
+            sides = list(psi)
+            compared = list(dict.fromkeys([f"{s} vs development" for x in psi.values() for s in x["vs_development"]]
+                                          + [f"period {k}" for x in psi.values() for k in x["by_period"]]))
+
+            def value(x: dict, label: str):
+                if label.startswith("period "):
+                    return (x["by_period"].get(label.removeprefix("period ")) or {}).get("psi_vs_first")
+                return x["vs_development"].get(label.removesuffix(" vs development"))
+            out.append((["Compared", *[f"PSI, {SIDE[s]}" for s in sides]],
+                        [[label, *[fmt(value(psi[s], label)) for s in sides]] for label in compared]))
         rows = []
         cv = res.get("cross_validation") or {}
         for m, x in (cv.get("summary") or {}).items():
@@ -662,7 +695,7 @@ def _evaluation_rows(check: str, res: dict) -> tuple[list[str], list[list[str]]]
         if tc := res.get("training_curve"):
             rows.append([f"{tc['metric']} by iteration", fmt(tc["values"][-1]), "",
                          f"{tc['iterations']} recorded", f"R: {fmt(tc.get('r_iterations'))} iterations"])
-        return ["Quantity", "Mean / estimate", "SD across folds", "Range", "Reference"], rows
+        return out + [(["Quantity", "Mean / estimate", "SD across folds", "Range", "Reference"], rows)]
     if check == "sensitivity" and res.get("columns"):
         rows = []
         for col, c in res["columns"].items():
@@ -674,7 +707,7 @@ def _evaluation_rows(check: str, res: dict) -> tuple[list[str], list[list[str]]]
                     rows.append([f"`{col}`" + ("" if k == "value" else f", {k}"), s, fmt(c["shift"]),
                                  fmt((d.get("down") or {}).get("mean_change")),
                                  fmt((d.get("up") or {}).get("mean_change"))])
-        return ["Column", "Set", "Shift", "Mean change, down", "Mean change, up"], rows
+        return [(["Column", "Set", "Shift", "Mean change, down", "Mean change, up"], rows)]
     if check == "assumptions" and res.get("assumptions"):
         rows = []
         for name, x in res["assumptions"].items():
@@ -688,8 +721,28 @@ def _evaluation_rows(check: str, res: dict) -> tuple[list[str], list[list[str]]]
                 rows.append([name.replace("_", " "), side if isinstance(vals, dict) else "",
                              "; ".join(f"{k.replace('_', ' ')} {fmt(v) if not isinstance(v, dict) else ''}".strip()
                                        for k, v in shown.items() if not isinstance(v, (dict, list)))])
-        return ["Assumption", "Model", "Results"], rows
-    return [], []
+        return [(["Assumption", "Model", "Results"], rows)]
+    if check == "sample_suitability" and res.get("sets"):
+        rows = []
+        for s, e in res["sets"].items():
+            x = e.get("python") or e.get("r") or {}
+            rows.append([s, e["role"].replace("_", " "), fmt(e["units"]), fmt(x.get("valid")), fmt(x.get("events")),
+                         fmt(x.get("event_rate", x.get("mean_observed")))])
+        rows.append(["per parameter", res.get("per_parameter_basis", ""), fmt(res.get("parameters")), "", "",
+                     fmt(res.get("per_parameter"))])
+        return [(["Set", "Role", "Rows", "Valid", "Events", "Event rate / mean"], rows)]
+    if check == "decision_performance" and res.get("discrimination"):
+        at = res.get("at_threshold") or {}
+        rows = [[s, SIDE[side], fmt(d["auc"]), fmt(d["gini"]), fmt(d["ks"]),
+                 *[fmt(at.get(s, {}).get(side, {}).get(k)) for k in ("flagged_share", "event_rate_flagged",
+                                                                     "events_captured")]]
+                for s, sides in res["discrimination"].items() for side, d in sides.items()]
+        return [(["Set", "Model", "AUC", "Gini", "KS", "Flagged share", "Event rate flagged", "Events captured"],
+                 rows)]
+    return []
+
+
+SIDE = {"r": "R", "python": "Python"}
 
 
 def _check_cells(c: dict) -> list[str]:
@@ -710,7 +763,8 @@ def _status(c: dict) -> str:
 
 def _semantics_rows(sp: ModelSpec) -> list[list[str]]:
     p, a = sp.prediction, sp.assessment
-    rows = [["Target", sp.target_model], ["Response", f"`{sp.response}` ({sp.response_type})"]]
+    rows = [["Target", sp.target_model], ["Response", f"`{sp.response}` ({sp.response_type})"],
+            ["Formula", f"`{sp.formula}`"]]
     rows += [["R convergence check", sp.convergence.r_check or sp.convergence.mode],
              ["Convergence rationale", sp.convergence.rationale or "Standard estimator status"],
              ["Optional metrics", "; ".join(f"{s}: {', '.join(ms)}" for s, ms in sp.optional_metrics.items()) or "None"]]
@@ -726,47 +780,12 @@ def _semantics_rows(sp: ModelSpec) -> list[list[str]]:
     rows.append(["Prediction", f"{p.kind}, {p.quantity}: {p.units}" + (f" per {p.exposure}" if p.exposure else "")
                  + (f"; keys {', '.join(p.keys)}" if p.keys else "") + f"; aligned on {', '.join(p.alignment_keys)}"])
     rows += [["Business use", a.business_use], ["Intended population", a.intended_population],
-             ["Sample", a.sample_population],
-             ["Evaluation sets", "; ".join(f"{e.set} ({e.role.replace('_', ' ')}): {e.description}"
-                                           for e in a.evaluation_sets)]]
+             ["Sample", a.sample_population]]
     if a.decision:
         rows.append(["Decision", f"{a.decision.action} at or above {fmt(a.decision.threshold)}"])
+    stated = {k: v for k, v in a.criteria.model_dump().items() if v is not None}
+    rows.append(["Criteria", "; ".join(f"{k} {fmt(v)}" for k, v in stated.items()) or "None stated"])
     return rows
-
-
-def _assessment_rows(q: str, res: dict) -> list[list[str]]:
-    """A compact table of one question's results; the first row is the header."""
-    if q == "sample_suitability" and res.get("sets"):
-        rows = [["Set", "Role", "Rows", "Valid", "Events", "Event rate / mean"]]
-        for s, e in res["sets"].items():
-            rows.append([s, e["role"].replace("_", " "), fmt(e["rows"]), fmt(e["valid"]), fmt(e.get("events")),
-                         fmt(e.get("event_rate", e.get("mean_observed")))])
-        rows.append(["per parameter", res.get("per_parameter_basis", ""), fmt(res.get("parameters")), "", "",
-                     fmt(res.get("per_parameter"))])
-        return rows
-    if q == "stability" and (res.get("psi_vs_development") or res.get("by_period")):
-        rows = [["Compared", "PSI", "Mean prediction", "Mean observed"]]
-        rows += [[f"{s} vs development", fmt(v), "", ""] for s, v in res.get("psi_vs_development", {}).items()]
-        rows += [[f"period {k}", fmt(v["psi_vs_first"]), fmt(v["mean_prediction"]), fmt(v["mean_observed"])]
-                 for k, v in res.get("by_period", {}).items()]
-        return rows
-    if q == "calibration" and res.get("sets"):
-        rows = [["Set", "Output", "Observed / expected", "Largest decile gap"]]
-        for s, e in res["sets"].items():
-            if "coverage" in e:
-                rows += [[s, f"quantile {k}", f"coverage {fmt(c['observed'])} vs {fmt(c['nominal'])}", ""]
-                         for k, c in e["coverage"].items()]
-            else:
-                rows += [[s, k, fmt(c["observed_expected"]), fmt(c["max_bin_gap"])] for k, c in e.items()]
-        return rows
-    if q == "decision_performance" and res.get("discrimination"):
-        rows = [["Set", "AUC", "Gini", "KS", "Flagged share", "Event rate flagged", "Events captured"]]
-        for s, d in res["discrimination"].items():
-            t = res.get("at_threshold", {}).get(s, {})
-            rows.append([s, fmt(d["auc"]), fmt(d["gini"]), fmt(d["ks"]), fmt(t.get("flagged_share")),
-                         fmt(t.get("event_rate_flagged")), fmt(t.get("events_captured"))])
-        return rows
-    return []
 
 
 def _decision(d: dict | None) -> str:

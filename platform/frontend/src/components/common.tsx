@@ -5,7 +5,7 @@ import { useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useMlflow } from "@/lib/hooks";
+import { useMlflow, useTrackingRun } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 
 export function Panel({ title, actions, children, className }: { title?: React.ReactNode; actions?: React.ReactNode; children: React.ReactNode; className?: string }) {
@@ -128,10 +128,16 @@ export function Prose({ markdown, assets }: { markdown: string; assets?: string 
   );
 }
 
-export function RunLink({ pid, runId, children = "MLflow" }: { pid: string; runId?: string | null; children?: React.ReactNode }) {
-  const m = useMlflow(pid);
-  if (!m.data) return null;
-  const url = `${m.data.url}/#/experiments/${m.data.experiment_id}${runId ? `/runs/${runId}` : ""}`;
+/** The project's experiment or a run, whose ID may become available after the evidence was loaded. */
+export function RunLink({ pid, runId, evidenceId, children = "MLflow" }: {
+  pid: string; runId?: string | null; evidenceId?: string; children?: React.ReactNode;
+}) {
+  const tracked = useTrackingRun(pid, runId ? undefined : evidenceId);
+  const resolved = runId ?? tracked;
+  const ready = Boolean(resolved) || (runId === undefined && !evidenceId);
+  const m = useMlflow(pid, ready);
+  if (!m.data || !ready) return null;
+  const url = `${m.data.url}/#/experiments/${m.data.experiment_id}${resolved ? `/runs/${resolved}` : ""}`;
   return (
     <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
       {children}

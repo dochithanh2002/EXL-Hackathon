@@ -22,6 +22,7 @@ from .environments import Environments
 from .runner import Limits, Process, StepCancelled
 from .schemas import Candidate, ModelSpec
 from .evaluation import diagnostics_config
+from .statistics import Inputs
 from .validation import Validation, compare, failed_run, with_evaluation
 from .workflow.machine import InputFile
 
@@ -176,7 +177,8 @@ def run_candidate(workdir: Path, module: str, spec: ModelSpec, baseline_dir: Pat
             return failed_run(json.loads(error.read_text()))
         return failed_run({"stage": "the candidate harness", "type": "Stopped",
                            "message": "the candidate " + outcome.describe(lines=0)})
-    v = compare(baseline_dir, out, spec)
+    inputs = Inputs(baseline_dir, out, None, spec.model_dump(mode="json"))
+    v = compare(baseline_dir, out, spec, inputs)
     diagnostics = None
     if v.passed and (plan := diagnostics_config(spec.model_dump(mode="json"))):
         diagnostics = workdir / "diagnostics"
@@ -187,4 +189,5 @@ def run_candidate(workdir: Path, module: str, spec: ModelSpec, baseline_dir: Pat
             diagnostics.mkdir(exist_ok=True)
             (diagnostics / "error.json").write_text(json.dumps({"stage": "the diagnostics harness",
                                                                 "type": "Stopped"}))
-    return with_evaluation(v, baseline_dir, out, diagnostics, spec)
+    inputs.diagnostics = diagnostics
+    return with_evaluation(v, inputs)

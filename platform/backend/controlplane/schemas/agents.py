@@ -378,11 +378,9 @@ class Diagnosis(Contract):
     root_cause: str
     evidence: list[str] = Field(min_length=1, description="Observed differences or errors supporting the root cause")
     repair_instructions: list[str] = Field(description="What the Translator must change in the candidate")
-    assessment_findings: list[str] = Field(default=[], description="What the assessment and model evaluation "
-                                                                   "summaries say (sample suitability, stability, "
-                                                                   "calibration, decision performance, subgroups, "
-                                                                   "sensitivity, assumptions), or what was not "
-                                                                   "assessed")
+    assessment_findings: list[str] = Field(default=[], description="What the model validation checks show "
+                                                                   "(each check's results and criterion outcome), "
+                                                                   "or what a check could not establish")
     spec_change_needed: bool = Field(description="True if the fix needs the DS (a new ModelSpec) rather than new code")
     proposed_spec_change: str | None = Field(default=None, description="Required when spec_change_needed is true")
     limitation: str | None = Field(default=None, description="Required for not_reproducible: what blocks a "
@@ -406,12 +404,26 @@ PLACEHOLDER = re.compile(r"\{\{([A-Za-z0-9_:-]+)\.([A-Za-z0-9_.:\[\]-]+)\}\}")
 CODE_SPAN = re.compile(r"`[^`\n]+`")
 
 
+def quote(text: str, start: int, end: int, context: int = 12) -> str:
+    """text[start:end] with up to `context` characters of whole words around it, quoted, e.g. …"in 2019 the"…"""
+    a, b = max(0, start - context), min(len(text), end + context)
+    while a < start and a > 0 and not text[a - 1].isspace():
+        a += 1
+    while b > end and b < len(text) and not text[b].isspace():
+        b -= 1
+    fragment = text[a:b].strip()
+    return ("…" if a > 0 else "") + f'"{fragment}"' + ("…" if b < len(text) else "")
+
+
 def _no_literal_numbers(v: str) -> str:
     """Digits may appear only in {{evidence_id.field}} placeholders and in `code spans`, whose names the Reporter's
-    checks match against the project's known names."""
-    if any(c.isnumeric() for c in CODE_SPAN.sub("", PLACEHOLDER.sub("", v))):
-        raise ValueError("numbers must be {{evidence_id.field}} placeholders, not literals; write names that contain "
-                         "digits in `backticks`")
+    checks match against the project's known names. The error quotes the text around the first literal number."""
+    blank = lambda m: " " * len(m.group(0))  # noqa: E731
+    masked = CODE_SPAN.sub(blank, PLACEHOLDER.sub(blank, v))
+    at = next((i for i, c in enumerate(masked) if c.isnumeric()), None)
+    if at is not None:
+        raise ValueError(f"literal number in {quote(v, at, at + 1)}: numbers must be {{{{evidence_id.field}}}} placeholders; "
+                         "write names that contain digits in `backticks`; change only this fragment")
     return v
 
 
@@ -427,49 +439,21 @@ class Claim(Contract):
         return _no_literal_numbers(v)
 
 
-Claims = Field(min_length=1)
-
-
-class MigrationAcceptance(Contract):
-    """Does the Python code reproduce R? Decided by the parity checks and the DS's acceptance."""
-    parity_results: list[Claim] = Claims
-    skipped_checks: list[Claim] = Claims
-    acceptance_decision: list[Claim] = Claims
-
-
-class ModelValidation(Contract):
-    """Is the model fit for its business use? Interpreted from the platform's evaluation and assessment."""
-    performance: list[Claim] = Field(min_length=1, description="Actual R and Python metrics against the constant "
-                                                               "comparator")
-    calibration: list[Claim] = Claims
-    subgroup_performance: list[Claim] = Claims
-    stability: list[Claim] = Claims
-    sensitivity: list[Claim] = Claims
-    assumptions: list[Claim] = Claims
-    sample_suitability: list[Claim] = Claims
-    decision_performance: list[Claim] = Claims
-
-
 class ReportNarrative(Contract):
-    """The fixed template of the model validation report; code adds the headings, statuses, tables and plots."""
-    schema_version: Literal["3"] = "3"
-    scope: list[Claim] = Claims
-    model_and_data_semantics: list[Claim] = Claims
-    migration: MigrationAcceptance
-    validation: ModelValidation
-    missing_evidence: list[Claim] = Claims
-    limitations: list[Claim] = Claims
-    business_fitness: list[Claim] = Field(min_length=1, description="What the evidence supports about fitness for "
-                                                                    "the business use, kept apart from migration "
-                                                                    "acceptance")
+    """The Reporter's interpretation; code renders every factual section of the report from the evidence."""
+    schema_version: Literal["4"] = "4"
+    key_findings: list[Claim] = Field(min_length=1, max_length=6, description="What the evidence shows, most "
+                                      "important first: the migration's acceptance and the business fitness verdict "
+                                      "as separate findings, and what the checks found")
+    limitations: list[Claim] = Field(default=[], max_length=6, description="What the evidence cannot show, and why")
+    recommendations: list[Claim] = Field(default=[], max_length=6, description="Actions that follow from cited "
+                                         "evidence: criteria to set, checks that failed or could not run, "
+                                         "unavailable parity checks")
 
     def sections(self) -> list[tuple[str, list[Claim]]]:
-        """(field path, claims) in report order."""
-        return ([("scope", self.scope), ("model_and_data_semantics", self.model_and_data_semantics)]
-                + [(f"migration.{k}", getattr(self.migration, k)) for k in MigrationAcceptance.model_fields]
-                + [(f"validation.{k}", getattr(self.validation, k)) for k in ModelValidation.model_fields]
-                + [("missing_evidence", self.missing_evidence), ("limitations", self.limitations),
-                   ("business_fitness", self.business_fitness)])
+        """(field, claims) in report order."""
+        return [("key_findings", self.key_findings), ("limitations", self.limitations),
+                ("recommendations", self.recommendations)]
 
 
 ROLES: dict[str, type[Contract]] = {

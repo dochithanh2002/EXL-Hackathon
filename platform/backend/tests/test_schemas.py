@@ -49,7 +49,7 @@ def spec(**overrides) -> ModelSpec:
     return ModelSpec.model_validate(base)
 
 
-@pytest.mark.parametrize("role, version", [("analyst", "3"), ("diagnostician", "2"), ("reporter", "3"),
+@pytest.mark.parametrize("role, version", [("analyst", "3"), ("diagnostician", "2"), ("reporter", "4"),
                                            ("translator", "2")])
 def test_every_role_has_a_versioned_json_schema(role, version):
     js = ROLES[role].model_json_schema()
@@ -140,29 +140,33 @@ def claims(text="Shown by {{v1.passed}}.", ids=("v1",)):
 
 
 def narrative(**overrides) -> dict:
-    migration = {k: claims() for k in ("parity_results", "skipped_checks", "acceptance_decision")}
-    validation = {k: claims() for k in ("performance", "calibration", "subgroup_performance", "stability",
-                                        "sensitivity", "assumptions", "sample_suitability", "decision_performance")}
-    return {"scope": claims(), "model_and_data_semantics": claims(), "migration": migration,
-            "validation": validation, "missing_evidence": claims(), "limitations": claims(),
-            "business_fitness": claims()} | overrides
+    return {"key_findings": claims(), "limitations": claims(), "recommendations": claims()} | overrides
 
 
-def test_report_follows_the_template_and_claims_may_not_contain_literal_numbers():
+def test_the_reporter_writes_three_lists_without_literal_numbers():
     ReportNarrative.model_validate(narrative())
-    with pytest.raises(ValidationError, match="placeholders"):
-        ReportNarrative.model_validate(narrative(business_fitness=claims("The test AUC is 0.81.")))
+    ReportNarrative.model_validate(narrative(limitations=[], recommendations=[]))
     with pytest.raises(ValidationError):
-        ReportNarrative.model_validate(narrative(limitations=[]))
+        ReportNarrative.model_validate(narrative(key_findings=[]))
     with pytest.raises(ValidationError):
-        ReportNarrative.model_validate(narrative(scope=claims("Fine.", ())))
-    missing = narrative()
-    del missing["validation"]["calibration"]
+        ReportNarrative.model_validate(narrative(key_findings=claims() * 7))
     with pytest.raises(ValidationError):
-        ReportNarrative.model_validate(missing)
-    paths = [p for p, _ in ReportNarrative.model_validate(narrative()).sections()]
-    assert paths.index("migration.acceptance_decision") < paths.index("validation.performance")
-    assert paths[-1] == "business_fitness"
+        ReportNarrative.model_validate(narrative(key_findings=claims("Fine.", ())))
+    with pytest.raises(ValidationError):
+        ReportNarrative.model_validate(narrative(scope=claims()))
+    assert [p for p, _ in ReportNarrative.model_validate(narrative()).sections()] == [
+        "key_findings", "limitations", "recommendations"]
+
+
+def test_a_literal_number_is_rejected_with_the_offending_fragment_quoted():
+    text = "The model was refitted on the data collected in 2019 by the risk team for {{v1.passed}}."
+    with pytest.raises(ValidationError) as e:
+        ReportNarrative.model_validate(narrative(recommendations=claims(text)))
+    [err] = e.value.errors()
+    assert err["loc"] == ("recommendations", 0, "text")
+    assert '…"in 2019 by the"…' in err["msg"] and "placeholders" in err["msg"]
+    with pytest.raises(ValidationError, match='literal number in "AUC 0.81"'):
+        ReportNarrative.model_validate(narrative(key_findings=claims("AUC 0.81")))
 
 
 @pytest.mark.parametrize("change, error", [

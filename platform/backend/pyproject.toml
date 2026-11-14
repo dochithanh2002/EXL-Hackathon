@@ -6,6 +6,7 @@ requires-python = "==3.12.*"
 dependencies = [
     "cryptography==50.0.2",
     "fastapi==0.162.7",
+    "matplotlib==3.11.2",
     "mlflow-skinny==3.18.0",
     "pydantic==2.14.3",
     "python-multipart==0.0.33",

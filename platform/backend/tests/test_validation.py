@@ -3,7 +3,9 @@ import math
 
 import pytest
 
-from controlplane.assessment import assess_both, design_comparison, psi
+from controlplane.design import design_comparison
+from controlplane.evaluation import Inputs, evaluate
+from controlplane.statistics import psi
 from controlplane.runner.parity import metric, score
 from controlplane.validation import compare
 from tests.test_schemas import spec as make_spec
@@ -110,39 +112,6 @@ def test_grouped_brier_equals_individual_event_score():
     individuals = [(0, "", 1., .6, 3.), (1, "", 0., .6, 1.)]
     assert metric("brier", grouped) == pytest.approx(.21)
     assert metric("brier", grouped) == pytest.approx(metric("brier", individuals))
-
-
-def test_missing_class_predictions_return_partial_assessment(tmp_path):
-    preds = [(1, "train", "a", 1., .7), (1, "train", "b", 0., math.nan),
-             (2, "train", "a", 0., .4), (2, "train", "b", 1., math.nan)]
-    s = make_spec(response_type="categorical", metrics=[],
-                  prediction={"kind": "class_probability", "quantity": "probability", "units": "probability",
-                              "keys": ["a", "b"], "alignment_keys": ["row", "class"]},
-                  baseline_objects={"model": "fit", "train": "train", "test": None})
-    v = compare(*pair(tmp_path, preds=preds, r_preds=preds), s)
-    cal = v.assessment["python"]["calibration"]
-    assert cal["status"] == "partially assessed" and cal["meets"] is None
-    assert any("output b" in n for n in cal["needs"])
-    assert cal["results"]["sets"]["train"]["b"]["status"] == "not assessed"
-
-
-@pytest.mark.parametrize("holdout, threshold, recall_limit, status, meets", [
-    (False, .5, .5, "partially assessed", None),
-    (True, .99, .5, "assessed", False),
-    (True, .5, .5, "assessed", True),
-    (True, .5, None, "partially assessed", None),
-])
-def test_decision_assessment_requires_independent_data_and_threshold_criterion(
-        tmp_path, holdout, threshold, recall_limit, status, meets):
-    preds = [(1, "train", 0., .1), (2, "train", 1., .9)]
-    if holdout:
-        preds += [(3, "test", 0., .2), (4, "test", 1., .8)]
-    s = make_spec(baseline_objects={"model": "fit", "train": "train", "test": "test" if holdout else None})
-    body = s.model_dump(mode="json")
-    body["assessment"]["decision"] = {"threshold": threshold, "action": "decline"}
-    body["assessment"]["criteria"] |= {"min_auc": .7, "min_events_captured": recall_limit}
-    a = assess_both(*pair(tmp_path, preds=preds, r_preds=preds), body)["python"]["decision_performance"]
-    assert a["status"] == status and a["meets"] is meets
 
 
 def test_each_kind_of_difference_fails_its_own_check(tmp_path):
@@ -285,22 +254,37 @@ def test_psi_is_zero_for_the_same_distribution_and_grows_with_shift():
     assert psi(base, [x / 2 for x in base], edges) > 0.5
 
 
-def test_assessment_reports_not_assessed_and_what_it_needs(tmp_path):
+def evaluation(r, py, spec) -> dict:
+    return evaluate(Inputs(r, py, None, spec if isinstance(spec, dict) else spec.model_dump(mode="json")))["checks"]
+
+
+def test_missing_class_predictions_leave_calibration_partially_executed(tmp_path):
+    preds = [(1, "train", "a", 1., .7), (1, "train", "b", 0., math.nan),
+             (2, "train", "a", 0., .4), (2, "train", "b", 1., math.nan)]
+    s = make_spec(response_type="categorical", metrics=[],
+                  prediction={"kind": "class_probability", "quantity": "probability", "units": "probability",
+                              "keys": ["a", "b"], "alignment_keys": ["row", "class"]},
+                  baseline_objects={"model": "fit", "train": "train", "test": None})
+    cal = evaluation(*pair(tmp_path, preds=preds, r_preds=preds), s)["calibration"]
+    assert cal["status"] == "partially executed" and cal["criterion"]["outcome"] == "no criterion"
+    assert any("output b" in n for n in cal["needs"])
+    assert set(cal["results"]["sets"]["train"]) == {"a"}
+
+
+def test_checks_record_what_they_need_without_a_holdout(tmp_path):
     r, py = pair(tmp_path)
-    no_test = make_spec(baseline_objects={"model": "fit", "train": "train", "test": None})
-    a = assess_both(r, py, no_test.model_dump(mode="json"))
-    assert set(a) == {"r", "python"}
-    py_a = a["python"]
-    assert py_a["stability"]["status"] == "not assessed" and "holdout" in py_a["stability"]["needs"][0]
-    assert py_a["decision_performance"]["status"] == "partially assessed"
-    assert any("threshold" in n for n in py_a["decision_performance"]["needs"])
-    assert py_a["calibration"]["status"] == "partially assessed"
-    assert any("development set only" in n for n in py_a["calibration"]["needs"])
-    s = py_a["sample_suitability"]["results"]
-    assert s["sets"]["train"]["events"] == 2 and s["per_parameter"] == 0.5        # one non-event, two parameters
+    c = evaluation(r, py, make_spec(baseline_objects={"model": "fit", "train": "train", "test": None}))
+    assert c["stability"]["status"] == "not executed" and "holdout" in c["stability"]["needs"][0]
+    assert c["stability"]["criterion"]["outcome"] == "no criterion"
+    d = c["decision_performance"]
+    assert d["status"] == "partially executed" and any("threshold" in n for n in d["needs"])
+    assert any("development set only" in n for n in c["calibration"]["needs"])
+    s = c["sample_suitability"]
+    assert s["status"] == "executed" and s["criterion"]["outcome"] == "no criterion"
+    assert s["results"]["sets"]["train"]["python"]["events"] == 2 and s["results"]["per_parameter"] == 0.5
 
 
-def test_assessment_with_criteria_and_threshold_is_assessed(tmp_path):
+def test_criteria_and_a_threshold_are_judged_on_the_python_candidate(tmp_path):
     r, py = pair(tmp_path)
     s = make_spec(assessment={
         "business_use": "approve or decline", "intended_population": "applicants", "sample_population": "file",
@@ -309,24 +293,23 @@ def test_assessment_with_criteria_and_threshold_is_assessed(tmp_path):
         "decision": {"threshold": 0.5, "action": "decline"},
         "criteria": {"min_events_per_parameter": 10, "min_auc": 0.6, "max_psi": 0.25,
                      "max_calibration_deviation": 0.1}, "missing_information": []})
-    a = assess_both(r, py, s.model_dump(mode="json"))["python"]
-    d = a["decision_performance"]
-    assert d["status"] == "partially assessed" and d["meets"] is None
+    c = evaluation(r, py, s)
+    d = c["decision_performance"]                          # one test row: no AUC there
+    assert d["status"] == "partially executed" and d["criterion"]["outcome"] == "not judged"
     assert any("computable AUC" in n for n in d["needs"])
-    assert d["results"]["at_threshold"]["train"]["flagged_share"] == pytest.approx(2 / 3)
-    assert a["sample_suitability"]["status"] == "assessed" and a["sample_suitability"]["meets"] is False
-    assert a["stability"]["status"] == "assessed"
+    assert d["results"]["at_threshold"]["train"]["python"]["flagged_share"] == pytest.approx(2 / 3)
+    assert c["sample_suitability"]["criterion"]["outcome"] == "not met"
+    assert c["stability"]["criterion"]["rule"] == "max_psi <= 0.25"
 
 
-def test_sample_suitability_reports_missing_evidence_when_parameter_count_is_unavailable(tmp_path):
+def test_sample_suitability_without_a_parameter_count_is_not_judged(tmp_path):
     r, py = pair(tmp_path)
     (r / "coefficients.csv").write_text("term,estimate,std_error\n")
     spec = make_spec().model_dump(mode="json")
     spec["assessment"]["criteria"]["min_events_per_parameter"] = 10
-
-    answer = assess_both(r, py, spec)["python"]["sample_suitability"]
-    assert answer["status"] == "partially assessed" and answer["meets"] is None
-    assert answer["needs"] == ["a computable result for per_parameter >= 10"]
+    s = evaluation(r, py, spec)["sample_suitability"]
+    assert s["status"] == "partially executed" and s["criterion"]["outcome"] == "not judged"
+    assert s["needs"] == ["a parameter count: R reports no finite coefficients"]
 
 
 def test_design_comparison_shows_fitted_rows_columns_and_reference_levels(tmp_path):

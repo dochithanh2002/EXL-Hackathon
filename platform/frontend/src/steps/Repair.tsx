@@ -46,7 +46,7 @@ export function Repair({ project, rev }: StepProps) {
         ) : <Muted>No attempts under the current model specification.</Muted>}
       </Panel>
       {latest && (
-        <Panel title="Latest diagnosis" actions={<RunLink pid={project.id} runId={latest.body.mlflow_run_id} />}>
+        <Panel title="Latest diagnosis" actions={<RunLink pid={project.id} runId={latest.body.mlflow_run_id} evidenceId={latest.id} />}>
           <div className="flex flex-col gap-4 text-sm">
             <Fields rows={[
               ["Finding", latest.body.category ? <Badge variant={latest.body.category === "migration_defect" ? "secondary" : "warn"}>{CATEGORY[latest.body.category]}</Badge> : null],
@@ -62,7 +62,7 @@ export function Repair({ project, rev }: StepProps) {
             </div>
             {(latest.body.assessment_findings ?? []).length > 0 && (
               <div>
-                <h4 className="mb-1 font-medium">Financial model assessment</h4>
+                <h4 className="mb-1 font-medium">Model validation</h4>
                 <ul className="list-disc pl-5">{latest.body.assessment_findings!.map((x) => <li key={x}>{x}</li>)}</ul>
               </div>
             )}

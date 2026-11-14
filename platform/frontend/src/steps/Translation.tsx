@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleCheck } from "lucide-react";
 import { useState } from "react";
 import { ActionBar, Code, Details, ErrorText, Fields, Mono, Muted, Panel, RunLink } from "@/components/common";
-import { Checks, Coefficients, EvaluationMetrics, FinancialAssessment, ModelValidation } from "@/components/validation";
+import { Checks, Coefficients, EvaluationMetrics, ModelValidation } from "@/components/validation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { type Bindings, get, p, post, type SpecVersion } from "@/lib/api";
@@ -51,8 +51,8 @@ export function Translation({ project, rev }: StepProps) {
   return (
     <>
       <AttemptTabs attempts={attempts} picked={i} onPick={setPicked} />
-      {v && <Checks v={v.body} actions={<RunLink pid={project.id} runId={v.body.mlflow_run_id} />} />}
-      <Panel title={`Python migration · attempt ${a.candidate.body.attempt}`} actions={<RunLink pid={project.id} runId={a.candidate.body.mlflow_run_id} />}>
+      {v && <Checks v={v.body} actions={<RunLink pid={project.id} runId={v.body.mlflow_run_id} evidenceId={v.id} />} />}
+      <Panel title={`Python migration · attempt ${a.candidate.body.attempt}`} actions={<RunLink pid={project.id} runId={a.candidate.body.mlflow_run_id} evidenceId={a.candidate.id} />}>
         <div className="flex flex-col gap-4">
           <Fields rows={[
             ["Python implementation", spec.data && <Mono>{spec.data.spec.python_implementation}</Mono>],
@@ -86,7 +86,6 @@ export function Translation({ project, rev }: StepProps) {
         <>
           <EvaluationMetrics v={v.body} />
           <ModelValidation pid={project.id} v={v} />
-          <FinancialAssessment v={v.body} />
           <Coefficients pid={project.id} evidenceId={v.id} />
         </>
       )}

@@ -45,7 +45,7 @@ React UI ──HTTP/SSE──> Control plane (Python, FastAPI)
                         ├─ schemas (Pydantic → JSON Schema, versioned)
                         ├─ runner: runs R / Python steps in the stable environments
                         ├─ validator: deterministic parity and KPIs
-                        ├─ MLflow client ──> MLflow server (SQLite + local artifact dir)
+                        ├─ MLflow mirror (queued in SQLite) ──> MLflow server (SQLite + local artifact dir)
                         └─ HTTP ──> Agent service (Node, Pi SDK)
                                      └─ agent tools call back into the control plane
 ```
@@ -89,8 +89,8 @@ is returned to the agent with the validation error, for a bounded number of retr
 |---|---|---|
 | Analyst | R code, column names, dtypes, level sets, summary statistics (no data rows) | `ModelSpec` v3: target model, R function, Python implementation and parity tier (or the limitation when none is faithful), family, link, formula, explicit semantics (response type, event meaning and coding, grouped-binomial trials, weight type and normalization, offset, prediction kind, quantity, units, keys, alignment keys and the R prediction expression), the financial assessment definition (business use, intended and sample population, evaluation-set roles, period column, decision threshold, criteria, missing information), the validation plan (section 7), preprocessing, split, evaluation metrics, `atol`/`rtol` per quantity, unsupported items, substitutions, and a minimal `baseline.R` slice |
 | Translator | `ModelSpec`, `baseline.R`, baseline metadata, repair instructions if any | `Candidate`: one Python module against a fixed interface, notes, and limitations it cannot reproduce |
-| Diagnostician | filtered validation (check statuses, differences in tolerance units, row ids, metrics, design comparison, assessment summaries, Python's side of the evaluation, redacted errors), candidate, spec, DS comment, earlier attempts | `Diagnosis`: category (migration defect, specification, not reproducible, model fitness), root cause, evidence, repair instructions, assessment findings; all but a migration defect route to the DS |
-| Reporter | an evidence catalogue built by code from recorded runs, validation results, the evaluation and approvals; check statuses, the code's business fitness verdict and the plots it embeds; the approved candidate and `baseline.R` | `ReportNarrative` v3: claims for fixed sections (scope, semantics; migration acceptance: parity, skipped checks, acceptance; model validation: performance, calibration, subgroups, stability, sensitivity, assumptions, sample suitability, decision performance; missing evidence, limitations, business fitness); every claim cites catalogue ids; numbers are `{{id.field}}` placeholders filled in by code, and names with digits must be in backticks and known to the project |
+| Diagnostician | filtered validation (check statuses, differences in tolerance units, row ids, metrics, design comparison, Python's side of the model validation checks and the verdict, redacted errors), candidate, spec, DS comment, earlier attempts | `Diagnosis`: category (migration defect, specification, not reproducible, model fitness), root cause, evidence, repair instructions, assessment findings; all but a migration defect route to the DS |
+| Reporter | a compact evidence catalogue built by code from recorded runs, validation results, the evaluation and approvals; each check's status and criterion outcome, the code's business fitness verdict, the Translator's notes | `ReportNarrative` v4: three lists of claims, key findings (one to six; they cite the approved validation, the approval and the evaluation), limitations and recommendations; code renders every factual section; every claim cites catalogue ids; numbers are `{{id.field}}` placeholders filled in by code, and names with digits must be in backticks and known to the project; an error quotes the offending fragment |
 
 The `baseline.R` slice is the minimal part of the uploaded code that produces the target model. The DS sees it
 as a diff against the original before confirming. It is what keeps unrelated code (keras, xgboost, plotting)
@@ -180,23 +180,17 @@ the estimator's status, or a confirmed `convergence.r_check` expression with a r
 model and fit warnings. A justified non-iterative exemption is recorded as unavailable, not passed. Generic
 models use their Python estimator's AIC/BIC rather than inheriting the lm scale-parameter convention.
 
-Financial model assessment (`assessment.py`), computed by code on R's and the candidate's predictions and recorded
-with the validation without deciding it: sample suitability (rows, events, event rate, events per parameter),
-stability (PSI against the development set and by period), calibration (observed/expected by decile, quantile
-coverage) and decision performance (AUC, Gini, KS, and outcomes at the decision threshold). Each question is
-assessed, partially assessed or not assessed, with what it needs. The design comparison (fitted rows,
-design-matrix column statistics, reference levels, offset and weight summaries in R and Python) goes to the
-Diagnostician. The report keeps migration parity and fitness for business use in separate sections.
-Decision assessment stays partial without independent evaluation, computable discrimination and recall, and
-agreed minimum AUC and event recall at the stated threshold. Missing output groups are listed as unassessed
-calibration evidence rather than raising an exception. Grouped-binomial Brier scores are trial-weighted
-individual-event scores, not squared errors against group proportions. These are screening summaries, not a
-complete judgment of sample representativeness or business fitness.
+The design comparison (`design.py`: fitted rows, design-matrix column statistics, reference levels, offset and
+weight summaries in R and Python) goes to the Diagnostician. Grouped-binomial Brier scores are trial-weighted
+individual-event scores, not squared errors against group proportions.
 
-Model validation beyond parity (`evaluation.py`). The spec's `validation_plan` names six checks; for each the
-Analyst sets `run` and a rationale for this prediction task and business use, including why a check is left out.
-Agents propose and interpret; code executes, on R's and the candidate's predictions with the parity engine's metric
-code:
+Model validation beyond parity (`evaluation.py`, on statistics from `statistics.py`). `statistics.Inputs` reads
+each side's predictions.csv once, shared with the parity comparison, and computes each statistic once per side and
+set: metrics (the constant comparator's too), calibration and coverage, discrimination, decisions at the threshold,
+PSI by set and period, and sample counts. Eight checks derive from it. The spec's `validation_plan` names six; for
+each the Analyst sets `run` and a rationale for this prediction task and business use, including why a check is left
+out. Sample suitability and decision performance always run (decision performance is not applicable to a model
+without a binary event probability). Agents propose and interpret; code executes:
 - baseline comparison: each model's actual metrics (the primary loss for the prediction kind plus the spec's
   metrics) against a constant fitted on the development set, as skill (losses) or lift (ranking scores). The
   constant ignores offsets and exposure, which the evaluation notes;
@@ -206,22 +200,32 @@ code:
   (`segments.csv`): rows, observed, predicted, observed/expected, the primary loss and AUC. Numeric columns are cut
   at development quintiles, categorical ones keep their 12 largest levels; small groups are flagged. Agent prompts
   omit subgroup metrics unless each output for the model has at least the plan's minimum and at least 10 scored rows;
-- stability: the assessment's PSI, K-fold refits of the Python model on R's train rows (folds fixed by a hash of
+- stability: PSI against the development set and by period, K-fold refits of the Python model on R's train rows (folds fixed by a hash of
   the row number) with out-of-fold metrics and coefficient dispersion, and the fit's iteration history;
 - sensitivity: mean, mean absolute and largest change in Python's predictions when one numeric predictor moves by
   `shift_sd` training standard deviations, all else fixed;
 - assumptions, limited by the spec validator to those of the response type: overdispersion, zero inflation
   (Poisson), multicollinearity (VIF of the Python design), residual distribution and heteroscedasticity
-  (continuous), separation (binary).
+  (continuous), separation (binary);
+- sample suitability: rows, events (or class counts, or the mean observed value) per set, and events per
+  estimated parameter on the development set;
+- decision performance: AUC, Gini and KS, and outcomes at the decision threshold.
 
 The Python-side parts (refits, shifts, VIF) run in a second harness process only for a candidate that passed
 parity; its failure is recorded by stage and exception type, never message, and never fails the validation. Each
-check is executed, partially executed, not executed or not planned with what it needs; `missing_evidence`
-collects these with the assessment's needs and the spec's missing information. Business fitness is "not
-established" unless every planned check ran and every assessment question has an explicit criterion result; then
-the spec's criteria decide "criteria met" or "criteria not met". Migration acceptance is never business fitness.
+check carries two independent answers: `status` (executed, partially executed, not executed, not planned, not
+applicable) with `needs`, what prevented full execution; and `criterion` {rule, limit, value, outcome, judged_on},
+the spec's criterion judged on the Python candidate (min_events_per_parameter → sample suitability, max_psi →
+stability, max_calibration_deviation → calibration, min_auc and min_events_captured → decision performance), with
+outcome met, not met, no criterion or not judged (statistic not computable). A check the plan leaves out still runs
+when the spec sets its criterion, with a note. `missing_evidence` collects every gap and the spec's missing
+information. `business_fitness` is part of the evaluation: any criterion not met → "criteria not met"; else any
+missing or unjudged criterion, or a check partially or not executed → "not established"; else "criteria met". Not
+planned and not applicable checks are not gaps. Migration acceptance is never business fitness.
 
 Spec v1 and v2 records from earlier projects do not load under v3; those projects must be recreated.
+Older v3 validation evidence remains readable in reports, including its recorded PSI. Its business fitness
+verdict requires a new validation under the current criteria; reporting does not rewrite approved evidence.
 
 ## 8. MLflow
 
@@ -242,13 +246,21 @@ Model runs (R fit, Python fit, challenger) share the `model/` keys, the spec par
 dataset inputs (digest: hash of the set's row numbers), so MLflow compares them directly. The validation run is
 the only one with parity differences, all under `parity/`. Lineage tags: `reference_run_id`, `candidate_run_id`,
 `validation_run_id`, `fit_run_id`, plus evidence ids. The validation run's artifacts include SVG plots
-(`plots.py`: parity, performance, calibration, subgroups, CV, training curve, sensitivity, VIF; drawn without a
-plotting dependency, light and dark styles, a hover title per mark) and CSV tables of the same data. Runs end
-FINISHED, or FAILED with logs; approvals and rejections are tags. The UI links to each run.
+(`plots.py`: parity, performance, calibration, subgroups, CV, training curve, sensitivity, VIF; drawn with pinned
+Matplotlib, with fonts included as paths) and CSV tables of the same data. Runs end
+FINISHED, or FAILED with logs; approvals and rejections are tags. The UI links to each run once it is mirrored.
 
-The report job downloads the approved validation run's plots from MLflow into the report's directory, embeds them
-beside their tables with a link to the source run, and logs the report with its plots. The deliverables bundle
-copies them to `plots/` beside `report.md`, so the report reads without an MLflow server.
+MLflow mirrors the record; it is never on a job's path. A job computes and writes its files locally, then commits
+its evidence, outcome and tracking intent in SQLite together. If that transaction fails, the step can be retried.
+A background mirror logs queued rows to MLflow; a row naming another row
+(its parent, a lineage tag, a decision's runs) waits until that row is mirrored. Failures stay on the row (failed,
+attempts, last error) and are retried through `GET /api/projects/{id}/tracking` and `POST …/tracking/retry`. A retry
+of a row that had created its run deletes that half-made run first. Files over `CONTROLPLANE_MLFLOW_MAX_FILE_MB`
+(default 50) are not uploaded; the run's `skipped_artifacts` tag lists them.
+
+The report job copies the approved validation's plots from its work directory (`dir` on the validation evidence)
+into the report's directory and embeds them beside their tables. The deliverables bundle copies them to `plots/`
+beside `report.md`. Neither the report nor the bundle refers to MLflow.
 
 ## 9. UI
 

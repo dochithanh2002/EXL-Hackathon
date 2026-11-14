@@ -80,8 +80,8 @@ def test_a_faithful_candidate_passes_with_r_rows_offset_and_test_set(claims, tmp
     assert v.design["fitted_rows"] == {"r": 140, "python": 140}
     assert v.design["reference_levels"]["area"] == {"r": "A", "python": "A"}
     assert v.design["offset"]["differences"]["sum"] == pytest.approx(0, abs=1e-9)
-    assert v.assessment["python"]["decision_performance"]["status"] == "not assessed"     # count response
-    assert v.assessment["python"]["stability"]["results"]["psi_vs_development"]["test"] is not None
+    assert v.evaluation["checks"]["decision_performance"]["status"] == "not applicable"     # count response
+    assert v.evaluation["checks"]["stability"]["results"]["psi"]["python"]["vs_development"]["test"] is not None
 
     # the candidate's working directory holds the dataset and R's sets, never R's estimates
     assert sorted(p.name for p in (tmp_path / "cand" / "inputs").iterdir()) == ["claims.csv", "split.csv"]
@@ -198,11 +198,12 @@ def test_m4_known_good_candidate_reaches_exact_parity(jobs, tmp_path):
     worst = max(c.max_abs_diff for c in v.checks if c.name in ("coefficient estimates", "coefficient standard errors"))
     assert worst < 1e-10
     assert set(v.metrics["train"]) == {"auc", "gini", "log_loss"}
-    assert v.assessment["python"]["stability"]["status"] == "not assessed"                 # no holdout, no periods
+    assert "holdout" in v.evaluation["checks"]["stability"]["needs"][0]                     # no holdout, no periods
     checks = v.evaluation["checks"]
     assert {k: c["status"] for k, c in checks.items()} == {
         "baseline_comparison": "executed", "calibration": "partially executed", "subgroup_performance": "executed",
-        "stability": "partially executed", "sensitivity": "executed", "assumptions": "executed"}, json.dumps(
+        "stability": "partially executed", "sensitivity": "executed", "assumptions": "executed",
+        "sample_suitability": "executed", "decision_performance": "partially executed"}, json.dumps(
         {k: c["needs"] for k, c in checks.items()})
     perf = checks["baseline_comparison"]["results"]["sets"]["train"]
     assert perf["auc"]["python"] > 0.6 > perf["auc"]["constant"] and perf["log_loss"]["python_vs_constant"] > 0
@@ -279,8 +280,8 @@ def test_class_probabilities_from_any_results_object_are_compared_by_row_and_cla
     assert by_name["predictions"].compared == 120 * 3 and by_name["alignment keys only on one side"].value == 0
     assert set(v.metrics["test"]) == {"log_loss", "brier"}
     assert by_name["aic on train"].passed
-    assert v.assessment["python"]["decision_performance"]["status"] == "not assessed"
-    assert set(v.assessment["python"]["calibration"]["results"]["sets"]["test"]) == {"A", "B", "C"}
+    assert v.evaluation["checks"]["decision_performance"]["status"] == "not applicable"
+    assert set(v.evaluation["checks"]["calibration"]["results"]["sets"]["test"]) == {"A", "B", "C"}
 
 
 QUANTILE_PY = '''import numpy as np

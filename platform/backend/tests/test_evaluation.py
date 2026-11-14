@@ -7,15 +7,21 @@ import xml.etree.ElementTree as ET
 
 import pytest
 
-from controlplane.evaluation import (evaluate, evaluation_view, linear_recalibration, logistic_recalibration,
-                                     tables)
+from controlplane import runner, statistics
+from controlplane.evaluation import Inputs, business_fitness, evaluate, evaluation_view, tables
 from controlplane.plots import render
 from controlplane.report import evaluation_facts
-from controlplane.validation import Validation
+from controlplane.statistics import linear_recalibration, logistic_recalibration
+from controlplane.validation import Validation, compare, with_evaluation
 from tests.test_schemas import plan
 from tests.test_schemas import spec as make_spec
+from tests.test_validation import pair
 
 N = 400
+
+
+def run(r, py, diagnostics, spec: dict) -> dict:
+    return evaluate(Inputs(r, py, diagnostics, spec))
 
 
 def logistic(x: float) -> float:
@@ -79,7 +85,7 @@ def test_recalibration_recovers_a_calibrated_model():
 
 def test_every_planned_check_runs_and_what_could_not_run_is_missing_evidence(sides):
     r, py = sides
-    ev = evaluate(r, py, None, body(), {})
+    ev = run(r, py, None, body())
     c = ev["checks"]
     assert ev["primary_metric"] == "log_loss" and ev["metrics"] == ["log_loss", "auc", "brier"]
 
@@ -98,7 +104,7 @@ def test_every_planned_check_runs_and_what_could_not_run_is_missing_evidence(sid
     x = sub["results"]["columns"]["x"]
     assert [g["group"] for g in x["groups"]][-1] == "(missing)" and x["groups"][0]["lower"] is None
 
-    assert c["stability"]["status"] == "not executed"
+    assert c["stability"]["status"] == "partially executed" and set(c["stability"]["results"]) == {"psi"}
     assert "cross-validation refits (the Python diagnostics did not run)" in c["stability"]["needs"]
     assert c["sensitivity"]["status"] == "not planned"
     a = c["assumptions"]["results"]["assumptions"]
@@ -114,7 +120,7 @@ def test_a_failed_diagnostics_run_is_recorded_by_stage_and_type_only(sides, tmp_
     d = tmp_path / "diagnostics"
     d.mkdir()
     (d / "error.json").write_text(json.dumps({"stage": "prepare()", "type": "KeyError", "message": "'secret-42'"}))
-    ev = evaluate(r, py, d, body(), {})
+    ev = run(r, py, d, body())
     needs = ev["checks"]["stability"]["needs"]
     assert "cross-validation refits (failed in prepare() (KeyError))" in needs
     assert "secret" not in json.dumps(ev)
@@ -137,7 +143,7 @@ def test_agent_subgroup_evidence_uses_the_number_of_rows_scored_by_each_side(sid
         writer.writeheader()
         writer.writerows(rows)
 
-    ev = evaluate(r, py, None, spec, {})
+    ev = run(r, py, None, spec)
     raw = ev["checks"]["subgroup_performance"]["results"]["columns"]["region"]
     assert next(g for g in raw["groups"] if g["group"] == "rare")["sets"]["train"]["python"]
 
@@ -170,7 +176,7 @@ def test_cross_validation_and_vif_results(sides, tmp_path):
         "vif": {"status": "executed", "condition_number": 4.0, "columns": [{"name": "x", "vif": 1.5},
                                                                            {"name": "z", "vif": 7.25}]}}))
     (py / "fit_history.json").write_text(json.dumps({"deviance": [500.0, 430.0, 420.5, 420.0]}))
-    ev = evaluate(r, py, d, body(), {})
+    ev = run(r, py, d, body())
     st = ev["checks"]["stability"]
     assert st["status"] == "partially executed" and "converged refits on folds [2]" in st["needs"]
     cv = st["results"]["cross_validation"]
@@ -185,7 +191,7 @@ def test_cross_validation_and_vif_results(sides, tmp_path):
     view = json.dumps(evaluation_view(ev))
     assert '"r"' not in view and '"estimate"' not in view and '"bins"' not in view and '"fold_sd"' in view
 
-    # every plot is well-formed SVG with a title per mark; every table has its header
+    # every plot is well-formed SVG with its title; every table has its header
     v = Validation(passed=True, stage="parity", evaluation=ev).model_dump(mode="json")
     written = render(v, tmp_path / "plots")
     names = {p["name"] for p in written}
@@ -205,7 +211,106 @@ def test_cross_validation_and_vif_results(sides, tmp_path):
 
 def test_a_broken_plot_never_fails_the_validation(sides, tmp_path, caplog):
     r, py = sides
-    ev = evaluate(r, py, None, body(), {})
+    ev = run(r, py, None, body())
     ev["checks"]["calibration"]["results"]["sets"]["test"]["value"]["python"]["bins"] = "not a list"
     written = render(Validation(passed=True, stage="parity", evaluation=ev).model_dump(mode="json"), tmp_path)
     assert "performance.svg" in {p["name"] for p in written} and "could not draw a plot" in caplog.text
+
+
+def criteria(spec: dict, **limits) -> dict:
+    spec["assessment"]["criteria"] |= limits
+    return spec
+
+
+def test_status_and_criterion_outcome_are_independent(sides):
+    r, py = sides
+    c = run(r, py, None, criteria(body(), min_events_per_parameter=1000, max_calibration_deviation=10))["checks"]
+    sample = c["sample_suitability"]
+    assert (sample["status"], sample["criterion"]["outcome"]) == ("executed", "not met")
+    assert sample["criterion"]["rule"] == "per_parameter >= 1000" and sample["needs"] == []
+    assert sample["criterion"]["value"]["per_parameter"] == sample["results"]["per_parameter"]
+    cal = c["calibration"]
+    assert (cal["status"], cal["criterion"]["outcome"], cal["criterion"]["judged_on"]) == ("executed", "met", ["test"])
+    stab = c["stability"]                                   # PSI computed, no max_psi stated
+    assert stab["criterion"]["outcome"] == "no criterion" and stab["criterion"]["rule"] is None
+    assert stab["results"]["psi"]["python"]["vs_development"]["test"] is not None
+    assert c["baseline_comparison"]["criterion"] is None and c["sensitivity"]["status"] == "not planned"
+
+
+def test_decision_performance_is_not_applicable_to_a_count_model(tmp_path):
+    r, py = pair(tmp_path)
+    c = run(r, py, None, make_spec(family="poisson").model_dump(mode="json"))["checks"]["decision_performance"]
+    assert c["status"] == "not applicable" and c["criterion"] is None and c["needs"] == []
+    assert "count response" in c["rationale"]
+
+
+@pytest.mark.parametrize("holdout, threshold, recall, status, outcome", [
+    (False, .5, .5, "partially executed", "met"),            # judged on development data only
+    (True, .99, .5, "executed", "not met"),
+    (True, .5, .5, "executed", "met"),
+    (True, .5, None, "executed", "no criterion"),
+    (True, None, .5, "partially executed", "not judged"),     # no threshold: recall cannot be computed
+])
+def test_decision_performance_judges_the_python_candidate_on_independent_data(
+        tmp_path, holdout, threshold, recall, status, outcome):
+    preds = [(1, "train", 0., .1), (2, "train", 1., .9)] + ([(3, "test", 0., .2), (4, "test", 1., .8)]
+                                                             if holdout else [])
+    s = make_spec(baseline_objects={"model": "fit", "train": "train", "test": "test" if holdout else None})
+    spec = criteria(s.model_dump(mode="json"), min_auc=.7, min_events_captured=recall)
+    if threshold is not None:
+        spec["assessment"]["decision"] = {"threshold": threshold, "action": "decline"}
+    c = run(*pair(tmp_path, preds=preds, r_preds=preds), None, spec)["checks"]["decision_performance"]
+    assert (c["status"], c["criterion"]["outcome"]) == (status, outcome), c
+    assert c["criterion"]["judged_on"] == (["test"] if holdout else ["train"])
+
+
+def test_a_check_left_out_of_the_plan_runs_when_the_spec_sets_its_criterion(sides):
+    r, py = sides
+    spec = criteria(body(calibration={"run": False, "rationale": "not asked for"}), max_calibration_deviation=.5)
+    cal = run(r, py, None, spec)["checks"]["calibration"]
+    assert cal["status"] == "executed" and cal["criterion"]["outcome"] == "met"
+    assert cal["notes"][0] == ("not in the validation plan (not asked for); executed because the specification "
+                               "sets max_calibration_deviation")
+    left_out = run(r, py, None, body(calibration={"run": False, "rationale": "not asked for"}))["checks"]
+    assert left_out["calibration"]["status"] == "not planned" and left_out["calibration"]["criterion"] is None
+
+
+def test_predictions_are_read_once_per_side(tmp_path, monkeypatch):
+    calls = []
+    real = runner.parity._predictions
+
+    def counted(path):
+        calls.append(path)
+        return real(path)
+    monkeypatch.setattr(runner.parity, "_predictions", counted)
+    monkeypatch.setattr(statistics, "_predictions", counted)
+    r, py = pair(tmp_path)
+    spec = make_spec(metrics=["log_loss"])
+    inputs = Inputs(r, py, None, spec.model_dump(mode="json"))
+    v = with_evaluation(compare(r, py, spec, inputs), inputs)
+    assert v.evaluation["checks"]["sample_suitability"]["status"] == "executed"
+    assert sorted(p.parent.name for p in calls) == ["py", "r"]
+
+
+def check(status="executed", outcome=None, rule="x >= 1", needs=()):
+    criterion = None if outcome is None else {"rule": rule, "limit": {"x": 1} if rule else {}, "value": {"x": 2},
+                                              "outcome": outcome, "judged_on": ["test"]}
+    return {"status": status, "needs": list(needs), "criterion": criterion}
+
+
+@pytest.mark.parametrize("checks, verdict, basis", [
+    ({"sample_suitability": check(outcome="met"), "calibration": check(outcome="met"),
+      "sensitivity": check("not planned"), "decision_performance": check("not applicable")},
+     "criteria met", ["Sample suitability: x >= 1 met (x 2)", "Calibration: x >= 1 met (x 2)"]),
+    ({"sample_suitability": check(outcome="met"), "calibration": check("partially executed", "not met",
+                                                                        needs=["a holdout"])},
+     "criteria not met", ["Calibration: x >= 1 not met (x 2)"]),
+    ({"sample_suitability": check(outcome="no criterion", rule=None)},
+     "not established", ["Sample suitability: no criterion for min_events_per_parameter"]),
+    ({"stability": check(outcome="not judged")}, "not established", ["Stability: x >= 1 not judged"]),
+    ({"sample_suitability": check(outcome="met"), "assumptions": check("partially executed", needs=["vif"])},
+     "not established", ["Model assumptions: partially executed (needs vif)"]),
+    ({}, "not established", ["the model validation was not recorded"]),
+])
+def test_business_fitness_reads_criterion_outcomes_and_execution_gaps(checks, verdict, basis):
+    assert business_fitness(checks) == {"verdict": verdict, "basis": basis}

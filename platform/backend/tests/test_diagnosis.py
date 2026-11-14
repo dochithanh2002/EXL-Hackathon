@@ -28,7 +28,6 @@ PARITY = {
                 "nonfinite_mismatch": 0, "total": None}],
     "metrics": {"test": {"rmse": {"r": 0.81, "python": 0.83}}},
     "design": {"fitted_rows": {"r": 140, "python": 139}, "reference_levels": {"area": {"r": "A", "python": "B"}}},
-    "assessment": {"python": {"stability": {"status": "not assessed", "needs": ["a holdout"]}}},
     "evaluation": {"missing_evidence": ["Sensitivity: not in the validation plan (no lever)"], "checks": {
         "assumptions": {"status": "executed", "rationale": "count", "needs": [], "notes": [], "results": {
             "assumptions": {"overdispersion": {"status": "executed", "results": {
@@ -62,7 +61,7 @@ def test_the_view_keeps_checks_names_rows_metrics_and_summaries_but_no_estimates
     [check] = view["checks"]
     assert check["status"] == "failed" and check["missing_one_side"] == 1 and "total" not in check
     assert view["metrics"] == PARITY["metrics"]
-    assert view["design"] == PARITY["design"] and view["assessment"] == PARITY["assessment"]
+    assert view["design"] == PARITY["design"] and "assessment" not in view
     ev = view["evaluation"]                         # Python's side only: no R values, estimates or binned values
     assert ev["missing_evidence"] == PARITY["evaluation"]["missing_evidence"]
     assert ev["checks"]["assumptions"]["results"]["assumptions"]["overdispersion"]["results"] == {

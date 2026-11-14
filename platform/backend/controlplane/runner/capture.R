@@ -245,6 +245,29 @@ if (is_glm) {
 }
 write_meta(fit, "fit.json")
 
+# ---- training curve: glm.fit's deviance by IRLS iteration, laid out like statsmodels' fit_history (the deviance
+# at the starting values, then after each iteration). glm keeps only the last one, so the fit is replayed with
+# maxit = 1, 2, ...; written only if the full replay reproduces the fit, so the curve is the path R took.
+deviance_path <- function() {
+  if (!identical(m$method, "glm.fit") || inherits(m, "negbin") ||
+      any(c("start", "etastart", "mustart") %in% names(m$call))) return(NULL)
+  x <- model.matrix(m)
+  replay <- function(maxit) suppressWarnings(glm.fit(
+    x, m$y, weights = m$prior.weights, offset = m$offset, family = m$family,
+    control = modifyList(m$control, list(maxit = maxit, trace = FALSE)),
+    intercept = attr(terms(m), "intercept") > 0))
+  full <- replay(m$iter)
+  if (full$iter != m$iter || !isTRUE(all.equal(full$deviance, m$deviance, tolerance = 1e-12)) ||
+      !isTRUE(all.equal(unname(full$coefficients), unname(coef(m)), tolerance = 1e-10))) return(NULL)
+  init <- list2env(list(y = m$y, weights = m$prior.weights, nobs = NROW(m$y), x = x, family = m$family,
+                        start = NULL, etastart = NULL, mustart = NULL))
+  suppressWarnings(eval(m$family$initialize, init))     # glm.fit's own starting values
+  start <- sum(m$family$dev.resids(init$y, m$family$linkinv(m$family$linkfun(init$mustart)), init$weights))
+  c(start, vapply(seq_len(m$iter - 1), function(k) replay(k)$deviance, numeric(1)), full$deviance)
+}
+if (is_glm && !is.null(path <- optional(deviance_path())) && all(is.finite(path)))
+  write_meta(list(deviance = path), "fit_history.json")
+
 # ---- design summary for the Diagnostician: aggregates of what the fit consumed, never a row
 summary_of <- function(x) {
   if (is.null(x) || !length(x)) return(NULL)

@@ -105,24 +105,32 @@ def test_baseline_is_captured_frozen_tracked_and_reproducible(jobs):
     assert meta["packages"]["jsonlite"] and "R_LIBS" not in meta
     assert oct((out / "coefficients.csv").stat().st_mode & 0o777) == "0o444"
 
-    run = jobs.tracker.client.get_run(ev["mlflow_run_id"])
+    assert "mlflow_run_id" not in ev and jobs.mirror.sync() == 1
+    tracker = jobs.mirror.tracker
+    [run_id] = jobs.store.mirrored(pid)[s.baseline_id]
+    run = tracker.client.get_run(run_id)
     assert run.info.status == "FINISHED" and run.data.params["spec_version"] == "1"
-    assert run.data.tags["mlflow.parentRunId"] == jobs.tracker.workflow_run(pid)
+    assert run.data.tags["mlflow.parentRunId"] == tracker.workflow_run(pid)
     assert float(run.data.metrics["fit/deviance"]) == ev["fit"]["deviance"]
     assert {"model/train/mean_deviance", "model/test/rmse"} <= run.data.metrics.keys()
+    curve = tracker.client.get_metric_history(run.info.run_id, "train/deviance")
+    assert [c.step for c in curve] == list(range(1, meta["iterations"] + 2))      # the start, then each iteration
+    assert curve[-1].value == ev["fit"]["deviance"] < curve[1].value
     assert run.data.tags["model"] == "r" and run.data.params["split.train.rows"] == "140"
     assert {d.dataset.name for d in run.inputs.dataset_inputs} == {"claims.csv:train", "claims.csv:test"}
     segments = read_csv(out / "segments.csv")
     assert {r["column"] for r in segments} == {"area", "age"} and len(segments) == 400
     assert meta["segments"] == {"area": "categorical", "age": "numeric"}
-    logged = {a.path for a in jobs.tracker.client.list_artifacts(run.info.run_id)}
+    logged = {a.path for a in tracker.client.list_artifacts(run.info.run_id)}
     assert {"code", "capture", "environment", "step.log"} <= logged
+    assert {a.path for a in tracker.client.list_artifacts(run.info.run_id, "environment")} == {
+        f"environment/{p.name}" for p in jobs.envs.lockfiles.values()}
 
     # a second project with the same inputs and spec reproduces the same baseline, bit for bit
     pid2 = project_at_baseline(jobs.store, jobs.settings, poisson_spec(), files)
     jobs.baseline(pid2)
     ev2 = jobs.store.evidence(pid2, jobs.store.state(pid2).baseline_id)["body"]
-    assert ev2["hash"] == ev["hash"] and ev2["mlflow_run_id"] != ev["mlflow_run_id"]
+    assert ev2["hash"] == ev["hash"]
 
 
 def test_r_error_fails_the_step_with_the_r_message(jobs):
@@ -137,7 +145,9 @@ def test_r_error_fails_the_step_with_the_r_message(jobs):
     assert note["author"] == "platform" and note["spec_version"] == 1
     assert "R stopped in baseline.R: Error" in note["text"] and "boom from baseline" in note["text"]
     assert "exposure" not in note["text"]                          # the Analyst gets R's message only
-    runs = jobs.tracker.client.search_runs([jobs.tracker.experiment(pid)], "tags.kind = 'baseline'")
+    jobs.mirror.sync()
+    t = jobs.mirror.tracker
+    runs = t.client.search_runs([t.experiment(pid)], "tags.kind = 'baseline'")
     assert [r.info.status for r in runs] == ["FAILED"]
 
 
@@ -248,7 +258,9 @@ def test_cancel_kills_r_and_closes_the_job(jobs):
     jobs.baseline(pid)
     s = jobs.store.state(pid)
     assert (s.status, s.reason) == (Status.AWAITING_DS, Reason.CANCELLED)
-    runs = jobs.tracker.client.search_runs([jobs.tracker.experiment(pid)], "tags.kind = 'baseline'")
+    jobs.mirror.sync()
+    t = jobs.mirror.tracker
+    runs = t.client.search_runs([t.experiment(pid)], "tags.kind = 'baseline'")
     assert [r.info.status for r in runs] == ["KILLED"]
 
 

@@ -1,5 +1,6 @@
 """SQLite persistence. A project's state changes only through `Store.apply`, which runs the state machine and writes
-the new state and a transition row in one transaction. Jobs and recorded evidence are rows too."""
+the new state and a transition row in one transaction. Jobs and recorded evidence are rows too, and so is the queue
+of runs to mirror into MLflow (`tracking`, see `tracking.py`)."""
 from __future__ import annotations
 
 import json
@@ -15,8 +16,8 @@ from pydantic import BaseModel, TypeAdapter
 from ..schemas.agents import ModelSpec
 from ..schemas.hashing import canonical_hash
 from ..support import SupportMatrix
-from .machine import (Bindings, Cancelled, DsMessaged, Event, GateError, ProjectState, SpecDrafted, Status, Step,
-                      StepFailed, apply)
+from .machine import (Bindings, Cancelled, CandidateApproved, CandidateRejected, DsMessaged, Event, GateError,
+                      ProjectState, SpecDrafted, Status, Step, StepFailed, apply)
 
 EVENT = TypeAdapter(Event)
 
@@ -83,6 +84,22 @@ CREATE TABLE IF NOT EXISTS evidence (
     body TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS tracking (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id TEXT NOT NULL REFERENCES projects(id),
+    job_id TEXT,
+    evidence_id TEXT,
+    kind TEXT NOT NULL,
+    parent_id INTEGER REFERENCES tracking(id),
+    payload TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'done', 'failed')),
+    attempts INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT NOT NULL DEFAULT '',
+    mlflow_run_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS tracking_pending ON tracking(status) WHERE status = 'pending';
 """
 
 
@@ -179,6 +196,17 @@ class Store:
                             "comment": e.get("comment"), "bindings": b, "void": b != current})
         return out
 
+    def decide(self, pid: str, event: CandidateApproved | CandidateRejected, targets: list[int | str]) -> ProjectState:
+        """Commit the decision and its tracking intent together."""
+        with self._tx() as db:
+            state = self.apply(pid, event, db)
+            if targets:
+                tags = {"decision": event.type.removeprefix("candidate_")}
+                if isinstance(event, CandidateRejected):
+                    tags["ds_comment"] = event.comment[:5000]
+                self.track(pid, "decision", {"targets": targets, "tags": tags}, db=db)
+        return state
+
     # ------------------------------------------------------------ specs
     def add_spec(self, pid: str, spec: ModelSpec, matrix: SupportMatrix) -> int:
         """Store the next spec version and record it as drafted, with its tier and proven flag from the support
@@ -246,13 +274,18 @@ class Store:
                    (pid, role, json.dumps(messages), now()))
 
     # ------------------------------------------------------------ evidence
-    def record(self, pid: str, kind: str, body: BaseModel | dict) -> tuple[str, str]:
-        """Store an immutable piece of evidence (baseline, candidate, validation, ...). Returns (id, hash)."""
+    def record(self, pid: str, kind: str, body: BaseModel | dict, db: sqlite3.Connection | None = None, *,
+               track: Callable[[sqlite3.Connection, str], None] | None = None) -> tuple[str, str]:
+        """Store immutable evidence and, if supplied, its tracking intent. Returns (id, hash)."""
+        if db is None:
+            with self._tx() as db:
+                return self.record(pid, kind, body, db, track=track)
         data = body.model_dump(mode="json") if isinstance(body, BaseModel) else body
         eid, h = f"{kind}-{uuid.uuid4().hex[:10]}", canonical_hash(data)
-        with self._tx() as db:
-            db.execute("INSERT INTO evidence VALUES (?, ?, ?, ?, ?, ?)",
-                       (eid, pid, kind, h, json.dumps(data, sort_keys=True), now()))
+        db.execute("INSERT INTO evidence VALUES (?, ?, ?, ?, ?, ?)",
+                   (eid, pid, kind, h, json.dumps(data, sort_keys=True), now()))
+        if track is not None:
+            track(db, eid)
         return eid, h
 
     def evidence_list(self, pid: str, kind: str | None = None) -> list[dict]:
@@ -269,6 +302,98 @@ class Store:
         if row is None:
             raise NotFound(eid)
         return {**dict(row), "body": json.loads(row["body"])}
+
+    # ------------------------------------------------------------ MLflow mirror
+    TRACKING_COLUMNS = ("id, project_id, job_id, evidence_id, kind, parent_id, status, attempts, last_error, "
+                        "mlflow_run_id, created_at, updated_at")
+
+    def track(self, pid: str, kind: str, payload: dict, job_id: str | None = None,
+              evidence_id: str | None = None, *, db: sqlite3.Connection | None = None) -> int:
+        """Queue a run to mirror. `payload["parent"]` is the row it nests under (None: the workflow run)."""
+        if db is None:
+            with self._tx() as db:
+                return self.track(pid, kind, payload, job_id, evidence_id, db=db)
+        parent = payload.get("parent")
+        return db.execute(
+            "INSERT INTO tracking (project_id, job_id, evidence_id, kind, parent_id, payload, status, created_at, "
+            "updated_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
+            (pid, job_id, evidence_id, kind, parent if isinstance(parent, int) else None, json.dumps(payload),
+             now(), now())).lastrowid
+
+    def tracking(self, pid: str) -> list[dict]:
+        with self._tx() as db:
+            self.state(pid, db)
+            rows = db.execute(f"SELECT {self.TRACKING_COLUMNS} FROM tracking WHERE project_id = ? ORDER BY id",
+                              (pid,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def pending_tracking(self) -> list[dict]:
+        with self._tx() as db:
+            rows = db.execute("SELECT * FROM tracking WHERE status = 'pending' ORDER BY id").fetchall()
+        return [{**dict(r), "payload": json.loads(r["payload"])} for r in rows]
+
+    def tracking_run_ids(self, ids: list[int]) -> dict[int, str]:
+        """The MLflow run ids of those of `ids` that are mirrored."""
+        if not ids:
+            return {}
+        with self._tx() as db:
+            rows = db.execute("SELECT id, mlflow_run_id FROM tracking WHERE status = 'done' AND id IN "
+                              f"({', '.join('?' * len(ids))})", ids).fetchall()
+        return {r["id"]: r["mlflow_run_id"] for r in rows}
+
+    def tracking_row(self, evidence_id: str) -> int | None:
+        """The row that mirrors a piece of evidence."""
+        with self._tx() as db:
+            row = db.execute("SELECT id FROM tracking WHERE evidence_id = ? ORDER BY id DESC LIMIT 1",
+                             (evidence_id,)).fetchone()
+        return row["id"] if row else None
+
+    def mirrored(self, pid: str) -> dict[str, list[str]]:
+        """Evidence id or job id -> the MLflow run ids of its mirrored step runs (not their nested runs)."""
+        with self._tx() as db:
+            rows = db.execute("SELECT evidence_id, job_id, mlflow_run_id FROM tracking WHERE project_id = ? AND "
+                              "status = 'done' AND mlflow_run_id IS NOT NULL AND parent_id IS NULL ORDER BY id",
+                              (pid,)).fetchall()
+        out: dict[str, list[str]] = {}
+        for r in rows:
+            for key in (r["evidence_id"], r["job_id"]):
+                if key is not None:
+                    out.setdefault(key, []).append(r["mlflow_run_id"])
+        return out
+
+    def _set_tracking(self, rid: int, assignments: str, *args) -> None:
+        with self._tx() as db:
+            db.execute(f"UPDATE tracking SET {assignments}, updated_at = ? WHERE id = ?", (*args, now(), rid))
+
+    def tracking_attempt(self, rid: int) -> None:
+        self._set_tracking(rid, "attempts = attempts + 1")
+
+    def tracking_run(self, rid: int, run_id: str) -> None:
+        """The run an attempt created, recorded before it is filled in so that a retry can supersede it."""
+        self._set_tracking(rid, "mlflow_run_id = ?", run_id)
+
+    def tracking_done(self, rid: int, run_id: str | None) -> None:
+        self._set_tracking(rid, "status = 'done', last_error = '', mlflow_run_id = ?", run_id)
+
+    def tracking_failed(self, rid: int, error: str) -> None:
+        self._set_tracking(rid, "status = 'failed', last_error = ?", error)
+
+    def retry_tracking(self, pid: str, rid: int | None = None) -> list[int]:
+        """Queue the project's failed rows, or the failed row `rid`, again. Returns the ids queued."""
+        with self._tx() as db:
+            self.state(pid, db)
+            if rid is not None:
+                row = db.execute("SELECT status FROM tracking WHERE project_id = ? AND id = ?", (pid, rid)).fetchone()
+                if row is None:
+                    raise NotFound(f"tracking row {rid}")
+                if row["status"] != "failed":
+                    raise ValueError(f"tracking row {rid} is {row['status']}, not failed")
+            ids = [r["id"] for r in db.execute(
+                "SELECT id FROM tracking WHERE project_id = ? AND status = 'failed' AND (? IS NULL OR id = ?) "
+                "ORDER BY id", (pid, rid, rid)).fetchall()]
+            db.executemany("UPDATE tracking SET status = 'pending', updated_at = ? WHERE id = ?",
+                           [(now(), i) for i in ids])
+        return ids
 
     # ------------------------------------------------------------ jobs
     def start_job(self, pid: str, kind: str) -> str:
@@ -342,8 +467,8 @@ class Store:
                                                              detail="interrupted by a restart", interrupted=True), db)
         return [j["id"] for j in jobs]
 
-    def get_job(self, jid: str) -> dict:
-        return self._row_job(jid)
+    def get_job(self, jid: str, db: sqlite3.Connection | None = None) -> dict:
+        return self._job(db, jid) if db is not None else self._row_job(jid)
 
     def _row_job(self, jid: str) -> dict:
         with self._tx() as db:

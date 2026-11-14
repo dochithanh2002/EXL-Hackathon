@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { type ChatMessage, CONDITIONAL_STEP, get, p, post, type Project, RETRYABLE, type Step, STEPS } from "@/lib/api";
 import { statusText, statusVariant, TITLE } from "@/lib/format";
-import { type Activity, rev, useJobEvents, useProject } from "@/lib/hooks";
+import { type ActivityItem, rev, useJobEvents, useProject } from "@/lib/hooks";
 import { href } from "@/lib/route";
 import { cn } from "@/lib/utils";
 import { Alignment } from "@/steps/Alignment";
@@ -58,8 +58,8 @@ export function ProjectPage({ pid, step }: { pid: string; step?: number }) {
       <Stepper project={pr} shown={shown} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Header project={pr} />
-        <div className="flex min-h-0 flex-1">
-          <div className="min-w-0 flex-1 overflow-y-auto p-6">
+        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 lg:p-6">
             <div className="mx-auto flex max-w-6xl flex-col gap-5">
               {s.step === shown && <JobBar project={pr} />}
               {views[shown]}
@@ -78,7 +78,7 @@ function Stepper({ project, shown }: { project: Project; shown: Step }) {
   const looped = s.step === CONDITIONAL_STEP || s.repairs > 0 || s.diagnosis_id !== null;
   const steps = Object.keys(STEPS).map(Number) as Step[];
   return (
-    <nav className="w-64 shrink-0 overflow-y-auto border-r bg-card p-3">
+    <nav className="w-14 shrink-0 overflow-y-auto border-r bg-card p-2 lg:w-64 lg:p-3">
       <ol className="flex flex-col">
         {steps.map((n, i) => {
           const loop = n === CONDITIONAL_STEP;
@@ -90,7 +90,7 @@ function Stepper({ project, shown }: { project: Project; shown: Step }) {
           const item = (
             <span
               className={cn("flex items-start gap-3 rounded-md px-2 py-2 text-sm leading-6", reached && "hover:bg-muted/60", shown === n && "bg-muted font-medium", !reached && "text-muted-foreground/70")}
-              title={loop ? "Runs only when parity checks fail or the migration is rejected, then returns to step 4" : undefined}
+              title={loop ? "Runs only when parity checks fail or the migration is rejected, then returns to step 4" : STEPS[n]}
             >
               <span
                 className={cn(
@@ -105,7 +105,7 @@ function Stepper({ project, shown }: { project: Project; shown: Step }) {
               >
                 {skipped ? <Minus /> : done ? <Check /> : current && s.status === "working" ? <LoaderCircle className="animate-spin" /> : loop ? <Repeat /> : n < CONDITIONAL_STEP ? n : n - 1}
               </span>
-              <span className="min-w-0">
+              <span className="hidden min-w-0 lg:block">
                 {STEPS[n]}
                 {current && <span className={cn("block text-xs leading-4 font-normal", tone === "fail" ? "text-destructive" : tone === "warn" ? "text-warn-foreground" : tone === "pass" ? "text-pass" : "text-muted-foreground")}>{statusText(s)}</span>}
               </span>
@@ -194,11 +194,11 @@ function Chat({ project, rev, history }: StepProps & { history: boolean }) {
   }, [messages.data?.length]);
   useEffect(() => {
     if (agent) end.current?.scrollIntoView({ block: "end" });
-  }, [agent, live.text, live.tools.length]);
+  }, [agent, live]);
   const shownMessages = history ? messages.data ?? [] : [];
   const open = s.status === "awaiting_ds" && [2, 3, 5].includes(s.step);
   return (
-    <aside className="flex w-[26rem] shrink-0 flex-col border-l bg-card">
+    <aside className="flex h-72 shrink-0 flex-col border-t bg-card lg:h-auto lg:w-[22rem] lg:border-t-0 lg:border-l 2xl:w-[26rem]">
       <div className="flex h-10 shrink-0 items-center border-b px-4 text-sm font-medium">{agent ?? "Analyst"}</div>
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
         {shownMessages.map((m, i) => (
@@ -206,8 +206,8 @@ function Chat({ project, rev, history }: StepProps & { history: boolean }) {
         ))}
         {agent && (
           <>
-            <Tools tools={live.tools} />
-            <Bubble author="analyst" text={live.text || "…"} pending />
+            {live.map((i) => (i.kind === "text" ? <Bubble key={`t${i.id}`} author="analyst" text={i.text} /> : <ToolRow key={i.id} tool={i} />))}
+            {!live.length && <Bubble author="analyst" text="…" pending />}
           </>
         )}
         <div ref={end} />
@@ -238,29 +238,12 @@ function Chat({ project, rev, history }: StepProps & { history: boolean }) {
   );
 }
 
-const RECENT_TOOLS = 5;
-
-function Tools({ tools }: { tools: Activity["tools"] }) {
-  if (!tools.length) return null;
-  const row = (t: Activity["tools"][number]) => {
-    const Icon = t.error ? X : t.done ? Check : LoaderCircle;
-    return (
-      <li key={t.id} className="flex items-center gap-2">
-        <Icon className={cn("size-3 shrink-0", t.error ? "text-destructive" : t.done ? "text-pass" : "animate-spin")} />
-        <span className="truncate font-mono">{t.name}</span>
-      </li>
-    );
-  };
-  const earlier = tools.slice(0, -RECENT_TOOLS);
+function ToolRow({ tool: t }: { tool: Extract<ActivityItem, { kind: "tool" }> }) {
+  const Icon = t.error ? X : t.done ? Check : LoaderCircle;
   return (
-    <div className="flex flex-col gap-1 px-1 text-xs text-muted-foreground">
-      {earlier.length > 0 && (
-        <details>
-          <summary className="cursor-pointer select-none hover:text-foreground">{earlier.length} earlier tool calls</summary>
-          <ol className="mt-1 flex flex-col gap-1">{earlier.map(row)}</ol>
-        </details>
-      )}
-      <ol className="flex flex-col gap-1">{tools.slice(-RECENT_TOOLS).map(row)}</ol>
+    <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
+      <Icon className={cn("size-3 shrink-0", t.error ? "text-destructive" : t.done ? "text-pass" : "animate-spin")} />
+      <span className="truncate font-mono">{t.name}</span>
     </div>
   );
 }

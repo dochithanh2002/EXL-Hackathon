@@ -12,7 +12,7 @@ from controlplane.endpoints import Endpoints
 from controlplane.environments import ENVS_DIR, EnvironmentNotReady, Environments
 from controlplane.jobs import Jobs
 from controlplane.settings import Settings
-from controlplane.tracking import Tracker
+from controlplane.tracking import Mirror, Tracker
 from controlplane.workflow import Store
 
 MLFLOW = ENVS_DIR / "mlflow" / ".venv" / "bin" / "mlflow"
@@ -65,7 +65,9 @@ def tracker(mlflow_uri):
 
 
 def make_jobs(tmp_path, envs, tracker, agents_url="http://127.0.0.1:9", url="http://127.0.0.1:9") -> Jobs:
+    """Jobs whose mirror does not run on its own: a test calls `jobs.mirror.sync()`."""
     settings = Settings(data_dir=tmp_path / "var", agents_url=agents_url, url=url)
     store = Store(tmp_path / "db.sqlite")
-    return Jobs(store, settings, envs, tracker, Endpoints(tmp_path / "db.sqlite", Fernet(Fernet.generate_key())),
-                AgentService(agents_url), support.load())
+    return Jobs(store, settings, envs, Endpoints(tmp_path / "db.sqlite", Fernet(Fernet.generate_key())),
+                AgentService(agents_url), support.load(),
+                Mirror(store, tracker, settings.data_dir, settings.mlflow_max_file_mb))

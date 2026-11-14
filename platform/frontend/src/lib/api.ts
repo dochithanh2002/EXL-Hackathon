@@ -78,41 +78,48 @@ export interface Check {
   atol: number | null; rtol: number | null; max_abs_diff: number | null; compared: number | null;
   missing_both: number | null; missing_one_side: number | null; nonfinite_mismatch: number | null; total: number | null;
 }
-export type AssessmentStatus = "assessed" | "partially assessed" | "not assessed";
-export interface AssessmentAnswer { status: AssessmentStatus; needs: string[]; criterion: string | null; meets: boolean | null; results: Record<string, any> }
 export interface ValidationBody {
   passed: boolean; stage: "runtime" | "parity"; error: Record<string, any> | null; checks: Check[];
   metrics: Record<string, Record<string, { r: number | null; python: number | null }>>;
   differences: Record<string, any>; notes: string[]; candidate_id: string; candidate_hash: string; job_id: string;
-  assessment: { r?: Record<string, AssessmentAnswer>; python?: Record<string, AssessmentAnswer> };
   design: Record<string, any>;
-  evaluation?: Evaluation; plots?: PlotRef[]; mlflow_runs?: Record<string, string>;
-  spec_version: number; baseline_id: string; mlflow_run_id: string;
+  evaluation?: Evaluation; plots?: PlotRef[]; dir?: string;
+  spec_version: number; baseline_id: string; mlflow_run_id: string | null;
 }
-export type CheckStatus = "executed" | "partially executed" | "not executed" | "not planned";
-export interface EvaluationCheck { status: CheckStatus; rationale: string; needs: string[]; notes: string[]; results: Record<string, any> }
-export interface Evaluation { checks: Record<string, EvaluationCheck>; missing_evidence: string[]; primary_metric: string; notes: string[] }
+export type CheckStatus = "executed" | "partially executed" | "not executed" | "not planned" | "not applicable";
+export type Outcome = "met" | "not met" | "no criterion" | "not judged";
+export interface Criterion {
+  rule: string | null; limit: Record<string, number>; value: Record<string, number | null>; outcome: Outcome; judged_on: string[];
+}
+export interface EvaluationCheck {
+  status: CheckStatus; rationale: string; needs: string[]; notes: string[]; results: Record<string, any>; criterion?: Criterion | null;
+}
+export type Verdict = "criteria met" | "criteria not met" | "not established";
+export interface Evaluation {
+  checks: Record<string, EvaluationCheck>; missing_evidence: string[]; primary_metric: string; notes: string[];
+  business_fitness?: { verdict: Verdict; basis: string[] };
+}
 export interface PlotRef { name: string; title: string; section: string }
 export interface CandidateBody {
   attempt: number; diagnosis_id: string | null; hash: string; module: string; notes: string[]; limitations?: string[]; changes: string;
-  reply: string; model: string; mlflow_run_id: string; spec_version: number; baseline_id: string; job_id: string;
+  reply: string; model: string; mlflow_run_id: string | null; spec_version: number; baseline_id: string; job_id: string;
 }
 export interface DiagnosisBody {
   category?: "migration_defect" | "specification" | "not_reproducible" | "model_fitness";
   root_cause: string; evidence: string[]; repair_instructions: string[]; spec_change_needed: boolean;
   assessment_findings?: string[]; limitation?: string | null; proposed_spec_change: string | null; ds_comment: string | null; failed_checks: string[]; reply: string;
-  candidate_id: string; validation_id: string; spec_version: number; baseline_id: string; mlflow_run_id: string;
+  candidate_id: string; validation_id: string; spec_version: number; baseline_id: string; mlflow_run_id: string | null;
 }
 export interface BaselineBody {
   spec_version: number; job_id: string; hash: string; files: Record<string, string>; environment_version: string;
-  fit: Record<string, unknown>; meta: Record<string, unknown>; mlflow_run_id: string;
+  fit: Record<string, unknown>; meta: Record<string, unknown>; mlflow_run_id: string | null;
 }
 export interface CoefficientRow {
   term: string; r_estimate?: number | null; r_std_error?: number | null; python_estimate?: number | null;
   python_std_error?: number | null; estimate_ratio?: number | null; std_error_ratio?: number | null;
 }
 export interface Bundle {
-  dir: string; archive: string; archive_sha256: string; report_id: string; job_id: string; mlflow_run_id: string;
+  dir: string; archive: string; archive_sha256: string; report_id: string; job_id: string; mlflow_run_id: string | null;
   manifest: { files: Record<string, string>; environment_version: string; spec_hash: string; dataset: Record<string, string> };
 }
 

@@ -34,7 +34,7 @@ export function Deliverables({ project }: StepProps) {
         title="Code & reproducibility package"
         actions={
           <>
-            <RunLink pid={project.id} runId={b.mlflow_run_id} />
+            <RunLink pid={project.id} runId={b.mlflow_run_id} evidenceId={s.bundle_id} />
             <LinkButton size="sm" href={p(project.id, "/deliverables/bundle.zip")}><Download />Package (.zip)</LinkButton>
           </>
         }

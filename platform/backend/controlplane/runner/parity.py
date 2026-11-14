@@ -266,7 +266,11 @@ def python_fit_stats(raw: dict, rank: int, r_class: list[str], family: str | Non
     return stats
 
 
-def compare(baseline: Path, candidate: Path, spec: dict) -> dict:
+def compare(baseline: Path, candidate: Path, spec: dict,
+            predictions: tuple[dict[Key, tuple[float, float, float]], dict[Key, tuple[float, float, float]]]
+            | None = None) -> dict:
+    """The parity checks of a candidate's output against R's. `predictions` holds both sides' predictions.csv as
+    `_predictions` reads them, when the caller has already read them."""
     tol = spec["tolerances"]
     meta = json.loads((baseline / "meta.json").read_text())
     family, link, r_class = meta.get("family"), meta.get("link"), meta.get("class") or []
@@ -320,7 +324,7 @@ def compare(baseline: Path, candidate: Path, spec: dict) -> dict:
                                     for t in worst]
 
     # ---- alignment, observed values and predictions
-    rp, pp = _predictions(baseline / "predictions.csv"), _predictions(candidate / "predictions.csv")
+    rp, pp = predictions or (_predictions(baseline / "predictions.csv"), _predictions(candidate / "predictions.csv"))
     only_r, only_py = rp.keys() - pp.keys(), pp.keys() - rp.keys()
     checks.append(count_check("alignment keys only on one side", "alignment", len(only_r) + len(only_py)))
     if only_r or only_py:

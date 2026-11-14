@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import logging
 import math
 import re
 import shutil
@@ -24,12 +23,11 @@ from ..jobs import Jobs
 from ..runner.parity import _coefs, score
 from ..schemas import ROLES, canonical_hash, sha256_file
 from ..settings import Settings
-from ..tracking import Tracker
+from ..tracking import Mirror, Tracker
 from ..workflow import GateError, NotFound, Status, Store
 from ..workflow.machine import (Bindings, CandidateApproved, CandidateRejected, FilesUploaded, InputFile,
                                 ResumeRepair, RetryStep, SpecConfirmed)
 
-log = logging.getLogger(__name__)
 LOG_TAIL = 1 << 20
 SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._ -]{0,127}$")
 EXTENSIONS = {"dataset": {".csv"}, "data": {".csv"}, "r_code": {".r", ".rmd", ".qmd"}, "document": {".md", ".txt", ".pdf", ".docx"}}
@@ -56,6 +54,10 @@ class Rejection(BaseModel):
     comment: str = Field(min_length=1, max_length=20_000)
 
 
+class TrackingRetry(BaseModel):
+    id: int | None = None
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
 
@@ -65,18 +67,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         st = app.state.store = Store(settings.db_path)
         app.state.endpoints = Endpoints(settings.db_path, load_cipher(settings.data_dir))
         app.state.agents = AgentService(settings.agents_url)
-        app.state.jobs = Jobs(st, settings, Environments(), Tracker(settings.mlflow_uri), app.state.endpoints,
-                              app.state.agents, support.load())
-        interrupted = [st.get_job(j) for j in st.recover()]
-        try:
-            app.state.jobs.tracker.close_interrupted(interrupted)
-        except Exception:
-            log.exception("could not close the MLflow runs of interrupted jobs")
+        mirror = app.state.mirror = Mirror(st, Tracker(settings.mlflow_uri), settings.data_dir,
+                                           settings.mlflow_max_file_mb)
+        app.state.jobs = Jobs(st, settings, Environments(), app.state.endpoints, app.state.agents, support.load(),
+                              mirror)
+        app.state.jobs.track_interrupted(st.recover())
+        mirror.start()
         if settings.autostart:
             for p in st.projects():
                 if p["state"].status == Status.WORKING and st.running_job(p["id"]) is None:
                     app.state.jobs.advance(p["id"])
         yield
+        mirror.stop()
 
     app = FastAPI(title="controlplane", lifespan=lifespan)
 
@@ -181,14 +183,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """Where the browser finds the project's MLflow experiment; run pages are `{url}/#/experiments/{id}/runs/{run}`."""
         store(request).state(pid)
         try:
-            exp = jobs(request).tracker.experiment(pid)
+            exp = request.app.state.mirror.tracker.experiment(pid)
         except Exception as e:
             raise HTTPException(503, f"MLflow is not reachable: {e}")
         return {"url": (settings.mlflow_public_url or settings.mlflow_uri).rstrip("/"), "experiment_id": exp}
 
+    @app.get("/api/projects/{pid}/tracking")
+    def tracking(request: Request, pid: str):
+        """The project's runs queued for MLflow and how mirroring them went."""
+        return store(request).tracking(pid)
+
+    @app.post("/api/projects/{pid}/tracking/retry")
+    def retry_tracking(request: Request, pid: str, r: TrackingRetry = Body(default_factory=TrackingRetry)):
+        """Mirror the failed rows again, or only row `id`."""
+        try:
+            ids = store(request).retry_tracking(pid, r.id)
+        except ValueError as e:
+            raise HTTPException(409, str(e))
+        request.app.state.mirror.wake()
+        return {"queued": ids}
+
+    def with_run(request: Request, pid: str, evidence: dict) -> dict:
+        """Evidence with the MLflow run mirroring it, or null while it is not mirrored."""
+        runs = store(request).mirrored(pid).get(evidence["id"])
+        body = evidence["body"] | {"mlflow_run_id": runs[-1] if runs else evidence["body"].get("mlflow_run_id")}
+        return evidence | {"body": body}
+
     @app.get("/api/projects/{pid}/jobs")
     def project_jobs(request: Request, pid: str):
-        return store(request).jobs(pid)
+        runs = store(request).mirrored(pid)
+        return [j | {"mlflow_run_ids": runs.get(j["id"], [])} for j in store(request).jobs(pid)]
 
     @app.get("/api/projects/{pid}/jobs/{jid}/log", response_class=PlainTextResponse)
     def job_log(request: Request, pid: str, jid: str):
@@ -261,7 +285,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/projects/{pid}/evidence/{eid}")
     def evidence(request: Request, pid: str, eid: str):
-        return store(request).evidence(pid, eid)
+        return with_run(request, pid, store(request).evidence(pid, eid))
 
     @app.get("/api/projects/{pid}/evidence/{eid}/coefficients")
     def coefficients(request: Request, pid: str, eid: str):
@@ -304,25 +328,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/projects/{pid}/evidence/{eid}/plots/{name}")
     def validation_plot(request: Request, pid: str, eid: str, name: str):
-        """A plot of a validation, as logged to its MLflow run."""
+        """A plot of a validation, from its work directory."""
         e = store(request).evidence(pid, eid)
         if e["kind"] != "validation" or name not in {p["name"] for p in e["body"].get("plots", [])}:
             raise HTTPException(404, f"{eid} has no plot {name}")
-        return FileResponse(settings.project_dir(pid) / "runs" / e["body"]["job_id"] / "plots" / name,
-                            media_type="image/svg+xml")
+        return FileResponse(jobs(request).run_dir(pid, e["body"]) / "plots" / name, media_type="image/svg+xml")
 
     @app.post("/api/projects/{pid}/approve")
     def approve(request: Request, pid: str, bindings: Bindings):
         """The DS approves the candidate and validation they reviewed; `bindings` must name exactly those."""
-        state = store(request).apply(pid, CandidateApproved(bindings=bindings))
-        jobs(request).tag_decision(pid, bindings, "approved")
+        state = jobs(request).decide(pid, CandidateApproved(bindings=bindings))
         advance(request, pid)
         return {"state": state}
 
     @app.post("/api/projects/{pid}/reject")
     def reject(request: Request, pid: str, r: Rejection):
-        state = store(request).apply(pid, CandidateRejected(bindings=r.bindings, comment=r.comment))
-        jobs(request).tag_decision(pid, r.bindings, "rejected", r.comment)
+        state = jobs(request).decide(pid, CandidateRejected(bindings=r.bindings, comment=r.comment))
         advance(request, pid)
         return {"state": state}
 
@@ -341,11 +362,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         rid = store(request).state(pid).report_id
         if rid is None:
             raise HTTPException(404, "the report is not built")
-        return store(request).evidence(pid, rid)
+        return with_run(request, pid, store(request).evidence(pid, rid))
 
     @app.get("/api/projects/{pid}/report/files/{path:path}")
     def report_file(request: Request, pid: str, path: str):
-        """A plot the report embeds: its local copy of the validation run's MLflow artifact."""
+        """A plot the report embeds, from the report's directory."""
         rid = store(request).state(pid).report_id
         body = store(request).evidence(pid, rid)["body"] if rid else {}
         if path not in {f["path"] for f in body.get("figures", [])}:          # only listed figures, never a traversal
@@ -356,21 +377,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         bid = store(request).state(pid).bundle_id
         if bid is None:
             raise HTTPException(404, "the deliverables are not built")
-        return store(request).evidence(pid, bid)["body"]
+        return store(request).evidence(pid, bid)
 
     @app.get("/api/projects/{pid}/deliverables")
     def deliverables(request: Request, pid: str):
-        return bundle(request, pid)
+        return with_run(request, pid, bundle(request, pid))["body"]
 
     @app.get("/api/projects/{pid}/deliverables/bundle.zip")
     def deliverables_archive(request: Request, pid: str):
-        b = bundle(request, pid)
+        b = bundle(request, pid)["body"]
         return FileResponse(settings.data_dir / b["archive"], media_type="application/zip",
                             filename=f"{pid}-deliverables.zip")
 
     @app.get("/api/projects/{pid}/deliverables/files/{path:path}")
     def deliverable(request: Request, pid: str, path: str):
-        b = bundle(request, pid)
+        b = bundle(request, pid)["body"]
         if path != "manifest.json" and path not in b["manifest"]["files"]:     # only bundle paths, never a traversal
             raise HTTPException(404, f"no deliverable {path}")
         return FileResponse(settings.data_dir / b["dir"] / path, filename=Path(path).name)

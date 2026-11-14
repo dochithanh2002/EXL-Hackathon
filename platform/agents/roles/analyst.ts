@@ -32,7 +32,7 @@ The spec states, explicitly:
   missing_information.
 - the evaluation metrics and tolerances, as atol and rtol per quantity in that quantity's units. Requested metrics
   are required on every set. Use optional_metrics only for explicitly agreed per-set exceptions, never to hide
-  an unsuccessful calculation. Decision assessment also needs independent data and min_events_captured at the
+  an unsuccessful calculation. Decision performance also needs independent data and min_events_captured at the
   stated threshold; do not invent either criterion.
 - the validation plan: model validation beyond migration parity. For each of baseline comparison, calibration,
   subgroup performance, stability, sensitivity and assumptions, set run and give the rationale for this
@@ -40,7 +40,8 @@ The spec states, explicitly:
   about (segments, products, regions, bands) from R's set frames, sensitivity columns among the numeric
   predictors the model reads, the cross-validation folds, and only the assumptions of this model's family (for
   example overdispersion for a Poisson count, separation for a binary logit). The platform runs every check; you
-  only propose them. A missing column or failed check is recorded as missing evidence, not fixed by guessing.
+  only propose them. Sample suitability and decision performance always run, and a check left out still runs when
+  a criterion applies to it. A missing column or failed check is recorded as missing evidence, not fixed by guessing.
 - convergence: auto uses the estimator's usual status. For another estimator, supply an expression r_check
   grounded in its solver's documented success signals (model and fit_warnings are available), with a rationale.
   Never return a constant true. Use not_applicable only with a justified non-iterative method; a missing flag

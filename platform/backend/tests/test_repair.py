@@ -7,7 +7,7 @@ import pytest
 
 from controlplane.tracking import Tracker
 from tests.fake_llm import text, tool
-from tests.test_analyst import agent_service, configure, cp, llm, settle  # noqa: F401
+from tests.test_analyst import agent_service, configure, cp, llm, settle, synced  # noqa: F401
 from tests.test_baseline import poisson_spec
 from tests.test_translation import POISSON_PY
 from tests.test_translator import DRIFTED, submit, translate
@@ -88,6 +88,7 @@ def test_a_failed_candidate_is_diagnosed_and_the_repair_passes(cp, llm):
     c = body(cp, pid, cands[-1]["id"])
     assert (c["attempt"], c["diagnosis_id"], c["changes"]) == (1, d["id"], "Removed the offset scaling.")
 
+    synced(cp, pid)
     tracker = Tracker(cp.settings.mlflow_uri)
     [run] = tracker.client.search_runs([tracker.experiment(pid)], "tags.kind = 'diagnosis'")
     assert run.info.status == "FINISHED" and run.data.tags["spec_change_needed"] == "False"

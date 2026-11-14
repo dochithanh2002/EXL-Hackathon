@@ -21,7 +21,7 @@ export function Baseline({ project, rev }: StepProps) {
   const files = (name: string) => p(project.id, `/evidence/${b.data.id}/files/${name}`);
   return (
     <>
-      <Panel title={`R Reference Results · Model Specification v${body.spec_version}`} actions={<RunLink pid={project.id} runId={body.mlflow_run_id} />}>
+      <Panel title={`R Reference Results · Model Specification v${body.spec_version}`} actions={<RunLink pid={project.id} runId={body.mlflow_run_id} evidenceId={b.data.id} />}>
         <div className="flex flex-col gap-4">
           <div className="grid gap-6 md:grid-cols-2">
             <Fields rows={[

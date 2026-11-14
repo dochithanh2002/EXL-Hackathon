@@ -14,7 +14,7 @@ from controlplane.settings import Settings
 from controlplane.tracking import Tracker
 from controlplane.workflow import Store
 from tests.fake_llm import hang, text, tool
-from tests.test_analyst import (agent_service, configure, cp, free_port, llm, settle, upload,  # noqa: F401
+from tests.test_analyst import (agent_service, configure, cp, free_port, llm, settle, synced, upload,  # noqa: F401
                                 wait_for)
 from tests.test_baseline import CLAIMS, POISSON_R, poisson_spec, project_at_baseline
 from tests.test_report import assign_reporter, bindings, report
@@ -84,6 +84,7 @@ def test_a_killed_control_plane_leaves_nothing_running_and_the_step_reruns(envs,
             assert body["running_job"] is None and s["detail"] == "interrupted by a restart"
             assert [(j["id"], j["status"]) for j in c.get(f"/api/projects/{pid}/jobs").json()] == [
                 (job["id"], "interrupted")]
+            synced(c, pid)
             tracker = Tracker(mlflow_uri)
             [run] = tracker.client.search_runs([tracker.experiment(pid)], "tags.kind = 'baseline'")
             assert (run.info.status, run.data.tags["error"]) == ("KILLED", "interrupted by a restart")
@@ -126,6 +127,7 @@ def test_cancelling_a_running_candidate_kills_it_and_the_retry_passes(cp, llm):
     assert (s["step"], s["status"], s["reason"]) == (4, "awaiting_ds", "cancelled") and time.monotonic() - started < 15
     assert cp.post(f"/api/projects/{pid}/cancel").status_code == 409
 
+    synced(cp, pid)
     tracker = Tracker(cp.settings.mlflow_uri)
     [run] = tracker.client.search_runs([tracker.experiment(pid)], "tags.kind = 'validation'")
     assert run.info.status == "KILLED"

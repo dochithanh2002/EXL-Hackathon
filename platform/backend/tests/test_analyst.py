@@ -109,6 +109,17 @@ def settle(c, pid, until=lambda s: s["status"] != "working", timeout=60) -> dict
     pytest.fail(f"project did not settle: {body}")
 
 
+def synced(c, pid, timeout=60) -> list[dict]:
+    """The project's tracking rows once the mirror has nothing left pending."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        rows = c.get(f"/api/projects/{pid}/tracking").json()
+        if not any(r["status"] == "pending" for r in rows):
+            return rows
+        time.sleep(0.05)
+    pytest.fail(f"tracking rows still pending: {rows}")
+
+
 def test_analyst_drafts_the_spec_answers_the_ds_and_the_confirmed_spec_runs_the_baseline(cp, llm, envs, tmp_path):
     key = f"!touch {tmp_path / 'pwned'}"                        # Pi would run a `!command` given as a provider key
     configure(cp, llm, key)
@@ -131,6 +142,7 @@ def test_analyst_drafts_the_spec_answers_the_ds_and_the_confirmed_spec_runs_the_
 
     chat = cp.get(f"/api/projects/{pid}/chat").json()
     assert [(m["author"], m["spec_version"]) for m in chat] == [("analyst", 1)]
+    assert {r["status"] for r in synced(cp, pid)} == {"done"}
     tracker = Tracker(cp.settings.mlflow_uri)
     [run] = tracker.client.search_runs([tracker.experiment(pid)], "tags.kind = 'analyst'")
     assert run.info.status == "FINISHED" and run.data.params["model"] == "fake / fake-1"

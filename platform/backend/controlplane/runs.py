@@ -10,9 +10,11 @@
 
 Every model run (the R fit, the Python fit, the challenger) logs the same keys: `model/<set>/<metric>` for its
 actual performance, the spec and the data split as parameters, and the splits as dataset inputs, so MLflow's run
-comparison lines them up. CV folds log `model/held_out/<metric>`. Lineage is in tags: `reference_run_id` (R's
-fit), `candidate_run_id` (the translation), `validation_run_id`, `fit_run_id`, plus the evidence ids. Parity
-differences live only on the validation run, under `parity/`."""
+comparison lines them up; both fits log `train/deviance` by IRLS iteration where the estimator records it. CV
+folds log `model/held_out/<metric>`. Lineage is in tags: `reference_run_id` (R's fit), `candidate_run_id` (the
+translation), `validation_run_id`, `fit_run_id`, plus the evidence ids. Parity differences live only on the
+validation run, under `parity/`. The runs are described from the recorded files and queued for the mirror
+(`tracking.py`)."""
 from __future__ import annotations
 
 import csv
@@ -20,10 +22,11 @@ import hashlib
 import json
 from collections import defaultdict
 from pathlib import Path
+from typing import Callable
 
 from .evaluation import Inputs, evaluated_metrics, scores
 from .schemas import ModelSpec
-from .tracking import StepRun, Tracker
+from .tracking import Ref, Run
 
 FIT_STATS = {"r": ("deviance", "null_deviance", "log_lik", "aic", "bic", "dispersion", "pearson_chi2", "nobs"),
              "python": ("deviance", "null_deviance", "llf", "aic", "bic", "scale", "pearson_chi2", "nobs")}
@@ -77,63 +80,77 @@ def fit_metrics(fit: dict, side: str) -> dict[str, float]:
             and not isinstance(fit.get(k), bool)}
 
 
-def log_reference(run: StepRun, spec: ModelSpec, baseline_dir: Path, dataset: str, sha256: str) -> None:
+def log_reference(run: Run, spec: ModelSpec, baseline_dir: Path, dataset: str, sha256: str) -> None:
     """The R fit's model run: the same keys a Python fit logs."""
     body = spec.model_dump(mode="json")
     by_model, _ = scores(Inputs(baseline_dir, None, None, body))
     fit = json.loads((baseline_dir / "fit.json").read_text())
     run.params(**spec_params(spec), **split_params(spec, baseline_dir))
     run.metrics(**model_metrics(by_model["r"]), **fit_metrics(fit, "r"))
+    if (history := baseline_dir / "fit_history.json").is_file():   # step = IRLS iteration, as the Python fit's
+        values = json.loads(history.read_text())["deviance"]
+        run.series("train/deviance", values, list(range(1, len(values) + 1)))
     run.tags(model="r")
     run.datasets(split_inputs(spec, baseline_dir, dataset, sha256))
     run.artifact_text(spec.model_dump_json(indent=2), "spec.json")
 
 
-def log_comparison(tracker: Tracker, pid: str, validation: StepRun, *, spec: ModelSpec, baseline_dir: Path,
-                   output_dir: Path, evaluation: dict, dataset: str, sha256: str, lineage: dict) -> dict[str, str]:
-    """The Python fit, its CV folds and the constant challenger under the validation run. Returns their run ids."""
+def prepare_comparison(*, spec: ModelSpec, baseline_dir: Path, output_dir: Path, evaluation: dict, dataset: str,
+                       sha256: str, tags: dict, links: dict[str, Ref | None]) -> Callable[[int, Callable[[Run], int]], None]:
+    """Build run descriptions from files before opening the transaction that queues the validation and its children."""
     body = spec.model_dump(mode="json")
     by_model, constants = scores(Inputs(baseline_dir, output_dir, None, body))
-    lineage = lineage | {"validation_run_id": validation.run_id}
     params = spec_params(spec) | split_params(spec, baseline_dir)
-    ids = {}
-    job = {"job_id": lineage["job_id"]}
-    tags = {k: v for k, v in lineage.items() if k != "job_id"}
+    job = {"job_id": tags["job_id"]}
+    tags = {k: v for k, v in tags.items() if k != "job_id"}
     results = evaluation.get("checks", {}).get("stability", {}).get("results") or {}
     cv, history = results.get("cross_validation"), results.get("training_curve")
     primary = evaluated_metrics(body)[0]
 
-    with tracker.step(pid, "model_fit", "python fit", parent=validation.run_id) as fit:
-        ids["python_fit"] = fit.run_id
-        fit.params(**job, **params)
-        fit.metrics(**model_metrics(by_model.get("python", {})),
-                    **fit_metrics(json.loads((output_dir / "fit.json").read_text()), "python"))
-        fit.tags(model="python", **tags)
-        fit.datasets(split_inputs(spec, baseline_dir, dataset, sha256))
-        if history:                                               # step = IRLS iteration
-            fit.series(f"train/{history['metric']}", history["values"], list(range(1, len(history["values"]) + 1)))
-        if cv:                                                    # step = fold
-            done = [f for f in cv["folds"] if f.get(primary) is not None]
-            fit.series(f"cv/held_out/{primary}", [f[primary] for f in done], [f["fold"] for f in done])
-        for name in ("coefficients.csv", "fit.json", "fit_history.json"):
-            if (output_dir / name).is_file():
-                fit.artifact(output_dir / name)
+    fit = Run("model_fit", "python fit")
+    fit.params(**job, **params)
+    fit.metrics(**model_metrics(by_model.get("python", {})),
+                **fit_metrics(json.loads((output_dir / "fit.json").read_text()), "python"))
+    fit.tags(model="python", **tags)
+    fit.datasets(split_inputs(spec, baseline_dir, dataset, sha256))
+    if history:                                                   # step = IRLS iteration
+        fit.series(f"train/{history['metric']}", history["values"], list(range(1, len(history["values"]) + 1)))
+    if cv:                                                        # step = fold
+        done = [f for f in cv["folds"] if f.get(primary) is not None]
+        fit.series(f"cv/held_out/{primary}", [f[primary] for f in done], [f["fold"] for f in done])
+    for name in ("coefficients.csv", "fit.json", "fit_history.json"):
+        if (output_dir / name).is_file():
+            fit.artifact(output_dir / name)
 
-    if cv:
-        names = list(cv["summary"])
-        for f in cv["folds"]:
-            with tracker.step(pid, "cv_fold", f"cv fold {f['fold']}", parent=ids["python_fit"]) as run:
-                ids[f"cv_fold_{f['fold']}"] = run.run_id
-                run.params(**job, fold=f["fold"], folds=len(cv["folds"]), fit_rows=f["fit_rows"],
-                           held_out_rows=f["held_out_rows"], fold_assignment="hash of the data-row number")
-                run.metrics(**{f"model/held_out/{m}": f[m] for m in names if f.get(m) is not None})
-                run.tags(model="python", fit_run_id=ids["python_fit"], converged=f["converged"], **tags)
+    folds = []
+    for f in (cv or {}).get("folds", []):
+        run = Run("cv_fold", f"cv fold {f['fold']}")
+        run.params(**job, fold=f["fold"], folds=len(cv["folds"]), fit_rows=f["fit_rows"],
+                   held_out_rows=f["held_out_rows"], fold_assignment="hash of the data-row number")
+        run.metrics(**{f"model/held_out/{m}": f[m] for m in cv["summary"] if f.get(m) is not None})
+        run.tags(model="python", converged=f["converged"], **tags)
+        folds.append(run)
 
+    challenger = None
     if by_model.get("constant"):
-        with tracker.step(pid, "challenger", "challenger constant", parent=validation.run_id) as run:
-            ids["challenger_constant"] = run.run_id
-            run.params(**job, **split_params(spec, baseline_dir), comparator="constant fitted on the development set",
-                       **{f"constant.{k or 'value'}": v for k, v in constants.items()})
-            run.metrics(**model_metrics(by_model["constant"]))
-            run.tags(model="constant", **tags)
-    return ids
+        challenger = Run("challenger", "challenger constant")
+        challenger.params(**job, **split_params(spec, baseline_dir), comparator="constant fitted on the development "
+                          "set", **{f"constant.{k or 'value'}": v for k, v in constants.items()})
+        challenger.metrics(**model_metrics(by_model["constant"]))
+        challenger.tags(model="constant", **tags)
+
+    def enqueue(validation: int, queue: Callable[[Run], int]) -> None:
+        lineage = links | {"validation_run_id": validation}
+        fit.parent = validation
+        fit.links(**lineage)
+        fit_row = queue(fit)
+        for run in folds:
+            run.parent = fit_row
+            run.links(fit_run_id=fit_row, **lineage)
+            queue(run)
+        if challenger:
+            challenger.parent = validation
+            challenger.links(**lineage)
+            queue(challenger)
+
+    return enqueue

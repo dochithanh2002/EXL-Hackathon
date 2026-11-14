@@ -1,6 +1,9 @@
-"""Steps run as jobs: open the job, run the step under a tracked MLflow run, then apply its result event, or fail or
-cancel the job. One job per project at a time (enforced by the store). `advance` starts whatever job a project's
-state calls for, on a background thread; each finished job advances the project again."""
+"""Steps run as jobs: open the job, run the step, record its evidence and apply its result event, or fail or cancel
+the job. One job per project at a time (enforced by the store). `advance` starts whatever job a project's state
+calls for, on a background thread; each finished job advances the project again.
+
+A step describes the MLflow runs it would log and queues them with its evidence (or once it failed);
+the mirror logs them later (`tracking.py`). Nothing a job does waits for or depends on MLflow."""
 from __future__ import annotations
 
 import hashlib
@@ -9,8 +12,10 @@ import logging
 import secrets
 import sqlite3
 import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Callable
+from pathlib import Path
+from typing import Callable, Iterator
 
 from pydantic import BaseModel
 
@@ -22,18 +27,18 @@ from .environments import Environments
 from .runner import StepCancelled
 from .deliverables import build_bundle
 from .diagnosis import Diagnostician, failed_checks
-from .report import Reporter, gather, retrieve_plots
+from .report import Reporter, copy_plots, gather
 from .schemas import Candidate, Diagnosis, ModelSpec, ReportNarrative, canonical_hash, sha256_file
 from .settings import Settings
 from .support import SupportMatrix
 from .evaluation import write_tables
 from .plots import render as render_plots
-from .runs import log_comparison, log_reference
-from .tracking import StepRun, Tracker
+from .runs import log_reference, prepare_comparison
+from .tracking import Mirror, Ref, Run
 from .translation import Translator, rulebook, run_candidate
 from .workflow import Status, Step, Store
-from .workflow.machine import (AnalystReplied, BaselineSucceeded, Bindings, CandidateValidated, DeliverablesBuilt,
-                               DiagnosisSubmitted, ReportBuilt, StepFailed)
+from .workflow.machine import (AnalystReplied, BaselineSucceeded, Bindings, CandidateApproved, CandidateRejected,
+                               CandidateValidated, DeliverablesBuilt, DiagnosisSubmitted, ReportBuilt, StepFailed)
 
 log = logging.getLogger(__name__)
 
@@ -75,9 +80,9 @@ class Turn:
 
 
 class Jobs:
-    def __init__(self, store: Store, settings: Settings, envs: Environments, tracker: Tracker, endpoints: Endpoints,
-                 agents: AgentService, matrix: SupportMatrix):
-        self.store, self.settings, self.envs, self.tracker = store, settings, envs, tracker
+    def __init__(self, store: Store, settings: Settings, envs: Environments, endpoints: Endpoints,
+                 agents: AgentService, matrix: SupportMatrix, mirror: Mirror | None = None):
+        self.store, self.settings, self.envs, self.mirror = store, settings, envs, mirror
         self.endpoints, self.agents, self.matrix = endpoints, agents, matrix
         self._cancellers: dict[str, Callable[[], None]] = {}
         self._cancel_requested: set[str] = set()
@@ -135,6 +140,74 @@ class Jobs:
         stream = self._streams.pop(jid, None)
         if stream:
             stream.close()
+
+    # ------------------------------------------------------------ MLflow mirror
+    @contextmanager
+    def _tracked(self, pid: str, jid: str, kind: str, name: str, log_path: Path | None = None) -> Iterator[Run]:
+        """The step's run. If the step raises before queueing it, it is queued as FAILED (or KILLED) with the error
+        and the step log."""
+        run = Run(kind, name)
+        try:
+            yield run
+        except BaseException as e:
+            run.failed(e, log_path)
+            try:
+                self._insert(pid, jid, run)
+            except Exception:
+                log.exception("could not queue the failed %s run of job %s for MLflow", kind, jid)
+            self._wake()
+            raise
+
+    def _insert(self, pid: str, jid: str, run: Run, evidence_id: str | None = None,
+                *, db: sqlite3.Connection | None = None) -> int:
+        start = self.store.get_job(jid, db)["started_at"]
+        return self.store.track(pid, run.kind, run.payload(self.settings.data_dir, start), jid, evidence_id, db=db)
+
+    def _record_run(self, pid: str, jid: str, kind: str, body: dict, run: Run, db: sqlite3.Connection | None = None,
+                    children: Callable[[int, Callable[[Run], int]], None] | None = None) -> str:
+        """Record evidence and its tracking intent together; a failed insert rolls back both."""
+        def track(conn: sqlite3.Connection, eid: str) -> None:
+            row = self._insert(pid, jid, run, eid, db=conn)
+            if children:
+                children(row, lambda child: self._insert(pid, jid, child, db=conn))
+
+        return self.store.record(pid, kind, body, db, track=track)[0]
+
+    def _wake(self) -> None:
+        if self.mirror is not None:
+            self.mirror.wake()
+
+    def _ref(self, pid: str, eid: str) -> Ref | None:
+        """The row mirroring a piece of evidence, or the run recorded with evidence from before the mirror."""
+        return self.store.tracking_row(eid) or self.store.evidence(pid, eid)["body"].get("mlflow_run_id")
+
+    def run_dir(self, pid: str, validation: dict) -> Path:
+        """A validation's work directory: candidate code, output, plots, tables and step log."""
+        if "dir" in validation:
+            return self.settings.data_dir / validation["dir"]
+        return self.settings.project_dir(pid) / "runs" / validation["job_id"]
+
+    def track_interrupted(self, jids: list[str]) -> None:
+        """Queue a KILLED run for each job a restart cut off. What such a job queued before stays queued."""
+        for jid in jids:
+            try:
+                job = self.store.get_job(jid)
+                pid = job["project_id"]
+                kind = {"r_baseline": "baseline"}.get(job["kind"], job["kind"])
+                if kind == "translation" and any(r["job_id"] == jid and r["kind"] == "translation"
+                                                 for r in self.store.tracking(pid)):
+                    kind = "validation"                     # the candidate was recorded; its validation was cut off
+                run = Run(kind, "analyst" if kind == "analyst" else f"{kind} v{job['spec_version']}")
+                run.status = "KILLED"
+                run.params(job_id=jid)
+                run.tags(error="interrupted by a restart")
+                step_log = self.settings.project_dir(pid) / "runs" / jid / "step.log"
+                if step_log.is_file():
+                    run.artifact(step_log)
+                self._insert(pid, jid, run)
+            except Exception:
+                log.exception("could not queue the interrupted job %s for MLflow", jid)
+        self._wake()
 
     # ------------------------------------------------------------ agents
     def _agent(self, jid: str, role: str, model_ref: dict, history: list, prompt: str, schema: type[BaseModel],
@@ -199,7 +272,7 @@ class Jobs:
             raise ValueError(f"project is at step {s.step.value} ({s.status.value}), not waiting for the Analyst")
         jid, stream = self._open(pid, "analyst")
         try:
-            with self.tracker.step(pid, "analyst", "analyst") as run:
+            with self._tracked(pid, jid, "analyst", "analyst") as run:
                 model_ref, model_label = self.endpoints.for_role("analyst")
                 run.params(job_id=jid, model=model_label)
                 analyst = self._analyst_inputs(pid, s.files)
@@ -216,12 +289,14 @@ class Jobs:
                 if spec is not None:
                     run.artifact_text(spec.model_dump_json(indent=2), "spec.json")
 
-            def commit(db):
-                self.store.save_transcript(db, pid, "analyst", result["messages"])
-                event = self.store.draft_spec(db, pid, spec, self.matrix) if spec else AnalystReplied()
-                self.store.add_chat(db, pid, "analyst", result["text"], jid, getattr(event, "version", None))
-                return event
-            self.store.finish_job(jid, commit)
+                def commit(db):
+                    self.store.save_transcript(db, pid, "analyst", result["messages"])
+                    event = self.store.draft_spec(db, pid, spec, self.matrix) if spec else AnalystReplied()
+                    self.store.add_chat(db, pid, "analyst", result["text"], jid, getattr(event, "version", None))
+                    self._insert(pid, jid, run, db=db)
+                    return event
+                self.store.finish_job(jid, commit)
+            self._wake()
         except StepCancelled:
             self.store.cancel_job(jid)
         except Exception as e:
@@ -252,25 +327,35 @@ class Jobs:
         jid, _ = self._open(pid, "r_baseline")
         workdir = self.settings.project_dir(pid) / "runs" / jid
         try:
-            with self.tracker.step(pid, "baseline", f"baseline v{s.spec_version}", workdir / "step.log") as run:
+            with self._tracked(pid, jid, "baseline", f"baseline v{s.spec_version}", workdir / "step.log") as run:
                 run.params(job_id=jid, spec_version=s.spec_version, spec_hash=canonical_hash(spec),
                            baseline_key=canonical_hash(spec.baseline_key()), environment_version=self.envs.version())
                 b = run_baseline(workdir, spec, s.files, self.settings.project_dir(pid) / "inputs", self.envs,
                                  self.settings.limits, lambda p: self._started(jid, p.cancel))
                 run.params(baseline_hash=b.hash, r_version=b.meta["r_version"])
                 run.metrics(runtime_s=b.runtime_s)
-                dataset = next(f for f in s.files if f.role == "dataset")
-                log_reference(run, spec, b.dir, dataset.name, dataset.sha256)
                 run.artifact(workdir / "baseline.R", "code")
                 run.artifact(b.dir, "capture")
                 run.artifact(workdir / "step.log")
-                for lockfile in self.envs.lockfiles.values():
-                    run.artifact(lockfile, "environment")
-            eid, _ = self.store.record(pid, "baseline", {
-                "spec_version": s.spec_version, "job_id": jid, "hash": b.hash, "files": b.files,
-                "environment_version": b.environment_version, "dir": str(b.dir.relative_to(self.settings.data_dir)),
-                "fit": b.fit, "meta": b.meta, "mlflow_run_id": run.run_id})
-            self.store.finish_job(jid, BaselineSucceeded(spec_version=s.spec_version, baseline_id=eid))
+                evidence = {
+                    "spec_version": s.spec_version, "job_id": jid, "hash": b.hash, "files": b.files,
+                    "environment_version": b.environment_version, "dir": str(b.dir.relative_to(self.settings.data_dir)),
+                    "fit": b.fit, "meta": b.meta}
+                dataset = next(f for f in s.files if f.role == "dataset")
+
+                try:
+                    log_reference(run, spec, b.dir, dataset.name, dataset.sha256)
+                    for lockfile in self.envs.lockfiles.values():         # as they were when the baseline ran
+                        run.artifact_text(lockfile.read_text(), f"environment/{lockfile.name}")
+                except Exception as e:
+                    log.exception("could not describe the baseline run of job %s", jid)
+                    run.tags(mirror_error=str(e))
+
+                def commit(db):
+                    eid = self._record_run(pid, jid, "baseline", evidence, run, db)
+                    return BaselineSucceeded(spec_version=s.spec_version, baseline_id=eid)
+                self.store.finish_job(jid, commit)
+            self._wake()
         except StepCancelled:
             self.store.cancel_job(jid)
         except BaselineFailed as e:
@@ -291,7 +376,7 @@ class Jobs:
     # ------------------------------------------------------------ step 4: translation and validation
     def translation(self, pid: str) -> str:
         """The Translator writes a candidate; the candidate runs against R's sets and is validated against the
-        baseline. Each is its own MLflow run; together they are one job."""
+        baseline. Each is its own run in MLflow; together they are one job."""
         s = self.store.state(pid)
         if (s.step, s.status) != (Step.TRANSLATION, Status.WORKING):
             raise ValueError(f"project is at step {s.step.value} ({s.status.value}), not translating")
@@ -303,7 +388,7 @@ class Jobs:
         common = dict(job_id=jid, spec_version=s.spec_version, baseline_id=s.baseline_id)
         attempt = dict(attempt=s.repairs, diagnosis_id=s.diagnosis_id)
         try:
-            with self.tracker.step(pid, "translation", f"translation v{s.spec_version}") as run:
+            with self._tracked(pid, jid, "translation", f"translation v{s.spec_version}") as run:
                 model_ref, model_label = self.endpoints.for_role("translator")
                 run.params(model=model_label, **common, **attempt)
                 analyst = self._analyst_inputs(pid, s.files)
@@ -327,18 +412,17 @@ class Jobs:
                 h = hashlib.sha256(cand.module.encode()).hexdigest()
                 run.params(candidate_hash=h)
                 run.artifact_text(cand.module, "candidate.py")
-                candidate_run = run.run_id
-                cid, _ = self.store.record(pid, "candidate", {
+                cid = self._record_run(pid, jid, "candidate", {
                     **common, **attempt, "hash": h, "module": cand.module, "notes": cand.notes,
                     "limitations": cand.limitations, "changes": cand.changes,
-                    "reply": result["text"], "model": model_label, "mlflow_run_id": run.run_id})
+                    "reply": result["text"], "model": model_label}, run)
+            self._wake()
 
-            lineage = {"job_id": jid, "spec_version": s.spec_version, "baseline_id": s.baseline_id,
-                       "candidate_id": cid, "reference_run_id": baseline["mlflow_run_id"],
-                       "candidate_run_id": candidate_run}
-            with self.tracker.step(pid, "validation", f"validation v{s.spec_version}", workdir / "step.log") as run:
+            tags = {"job_id": jid, "spec_version": s.spec_version, "baseline_id": s.baseline_id, "candidate_id": cid}
+            links = {"reference_run_id": self._ref(pid, s.baseline_id), "candidate_run_id": self._ref(pid, cid)}
+            with self._tracked(pid, jid, "validation", f"validation v{s.spec_version}", workdir / "step.log") as run:
                 run.params(candidate_id=cid, candidate_hash=h, environment_version=self.envs.version(), **common)
-                run.tags(**{k: v for k, v in lineage.items() if k.endswith("_run_id")})
+                run.links(**links)
                 v = run_candidate(workdir, cand.module, spec, baseline_dir, s.files,
                                   self.settings.project_dir(pid) / "inputs", self.envs, self.settings.limits,
                                   lambda p: self._started(jid, p.cancel))
@@ -353,18 +437,27 @@ class Jobs:
                     if (workdir / folder).is_dir():
                         run.artifact(workdir / folder, folder)
                 run.artifact(workdir / "step.log")
-                runs = {}
+                evidence = {
+                    **common, "candidate_id": cid, "candidate_hash": h, "environment_version": self.envs.version(),
+                    **body, "plots": plots, "dir": str(workdir.relative_to(self.settings.data_dir))}
+                children = None
                 if v.stage == "parity":
                     dataset = next(f for f in s.files if f.role == "dataset")
-                    runs = log_comparison(self.tracker, pid, run, spec=spec, baseline_dir=baseline_dir,
-                                          output_dir=workdir / "output", evaluation=v.evaluation,
-                                          dataset=dataset.name, sha256=dataset.sha256, lineage=lineage)
-                vid, _ = self.store.record(pid, "validation", {
-                    **common, "candidate_id": cid, "candidate_hash": h, "environment_version": self.envs.version(),
-                    **body, "plots": plots, "mlflow_runs": runs, "mlflow_run_id": run.run_id})
-            self.store.finish_job(jid, CandidateValidated(
-                bindings=Bindings(spec_version=s.spec_version, baseline_id=s.baseline_id, candidate_hash=h,
-                                  validation_id=vid), passed=v.passed))
+                    try:
+                        children = prepare_comparison(
+                            spec=spec, baseline_dir=baseline_dir, output_dir=workdir / "output",
+                            evaluation=v.evaluation, dataset=dataset.name, sha256=dataset.sha256, tags=tags, links=links)
+                    except Exception as e:
+                        log.exception("could not describe the model runs of job %s", jid)
+                        run.tags(mirror_error=str(e))
+
+                def commit(db):
+                    vid = self._record_run(pid, jid, "validation", evidence, run, db, children)
+                    return CandidateValidated(
+                        bindings=Bindings(spec_version=s.spec_version, baseline_id=s.baseline_id, candidate_hash=h,
+                                          validation_id=vid), passed=v.passed)
+                self.store.finish_job(jid, commit)
+            self._wake()
         except StepCancelled:
             self.store.cancel_job(jid)
         except Exception as e:
@@ -397,7 +490,7 @@ class Jobs:
                       candidate_id=validation["candidate_id"], candidate_hash=s.candidate_hash,
                       validation_id=s.validation_id)
         try:
-            with self.tracker.step(pid, "diagnosis", f"diagnosis v{s.spec_version}") as run:
+            with self._tracked(pid, jid, "diagnosis", f"diagnosis v{s.spec_version}") as run:
                 model_ref, model_label = self.endpoints.for_role("diagnostician")
                 run.params(model=model_label, repairs=s.repairs, retry_limit=s.retry_limit, **common)
                 analyst = self._analyst_inputs(pid, s.files)
@@ -418,25 +511,25 @@ class Jobs:
                                             + (result["text"].strip()[:500] or "(no reply)"))
                 run.tags(spec_change_needed=d.spec_change_needed)
                 run.artifact_text(d.model_dump_json(indent=2), "diagnosis.json")
-                did, _ = self.store.record(pid, "diagnosis", {
+                evidence = {
                     **common, **d.model_dump(mode="json"), "ds_comment": s.ds_comment,
-                    "failed_checks": failed_checks(validation), "reply": result["text"], "model": model_label,
-                    "mlflow_run_id": run.run_id})
-            event = DiagnosisSubmitted(spec_version=s.spec_version, candidate_hash=s.candidate_hash, diagnosis_id=did,
-                                       spec_change_needed=d.spec_change_needed)
+                    "failed_checks": failed_checks(validation), "reply": result["text"], "model": model_label}
 
-            def commit(db):
-                if d.spec_change_needed:
-                    finding = {"specification": "the spec needs to change before the migration can match R",
-                               "not_reproducible": "no faithful Python implementation can reproduce R",
-                               "model_fitness": "the migration is faithful; the concern is the model itself"}[d.category]
-                    self.store.add_chat(db, pid, "platform", (
-                        f"The Diagnostician found that {finding} (spec v{s.spec_version}).\nRoot cause: "
-                        f"{d.root_cause}\n" + (f"Limitation: {d.limitation}\n" if d.limitation else "")
-                        + f"Proposed change: {d.proposed_spec_change}\nWrite to the Analyst to draft a new spec "
-                        "version, or resume the repair to keep the current spec."), jid, s.spec_version)
-                return event
-            self.store.finish_job(jid, commit)
+                def commit(db):
+                    did = self._record_run(pid, jid, "diagnosis", evidence, run, db)
+                    if d.spec_change_needed:
+                        finding = {"specification": "the spec needs to change before the migration can match R",
+                                   "not_reproducible": "no faithful Python implementation can reproduce R",
+                                   "model_fitness": "the migration is faithful; the concern is the model itself"}[d.category]
+                        self.store.add_chat(db, pid, "platform", (
+                            f"The Diagnostician found that {finding} (spec v{s.spec_version}).\nRoot cause: "
+                            f"{d.root_cause}\n" + (f"Limitation: {d.limitation}\n" if d.limitation else "")
+                            + f"Proposed change: {d.proposed_spec_change}\nWrite to the Analyst to draft a new spec "
+                            "version, or resume the repair to keep the current spec."), jid, s.spec_version)
+                    return DiagnosisSubmitted(spec_version=s.spec_version, candidate_hash=s.candidate_hash,
+                                               diagnosis_id=did, spec_change_needed=d.spec_change_needed)
+                self.store.finish_job(jid, commit)
+            self._wake()
         except StepCancelled:
             self.store.cancel_job(jid)
         except Exception as e:
@@ -460,13 +553,13 @@ class Jobs:
         jid, stream = self._open(pid, "report")
         common = dict(job_id=jid, **s.approval.model_dump())
         try:
-            with self.tracker.step(pid, "report", f"report v{s.spec_version}") as run:
+            with self._tracked(pid, jid, "report", f"report v{s.spec_version}") as run:
                 model_ref, model_label = self.endpoints.for_role("reporter")
                 run.params(model=model_label, **common)
                 record = gather(self.store, self.settings, pid)
                 report_dir = self.settings.project_dir(pid) / "reports" / jid
-                figures = retrieve_plots(self.tracker, record.approved.validation["body"], report_dir,
-                                         self.settings.mlflow_public_url or self.settings.mlflow_uri)
+                validation = record.approved.validation["body"]
+                figures = copy_plots(validation, self.run_dir(pid, validation), report_dir)
                 reporter = Reporter(record, figures)
                 turn = Turn("submit_report", reporter.check,
                             "Accepted. The platform fills in the numbers and adds the evidence tables when you end "
@@ -483,12 +576,16 @@ class Jobs:
                 run.artifact_text(narrative.model_dump_json(indent=2), "narrative.json")
                 (report_dir / "report.md").write_text(markdown)
                 run.artifact(report_dir, "report")
-                rid, _ = self.store.record(pid, "report", {
+                evidence = {
                     **common, "spec_version": s.spec_version, "narrative": narrative.model_dump(mode="json"),
                     "catalog": reporter.entries, "markdown": markdown, "model": model_label,
-                    "dir": str(report_dir.relative_to(self.settings.data_dir)), "figures": figures,
-                    "mlflow_run_id": run.run_id})
-            self.store.finish_job(jid, ReportBuilt(spec_version=s.spec_version, report_id=rid))
+                    "dir": str(report_dir.relative_to(self.settings.data_dir)), "figures": figures}
+
+                def commit(db):
+                    rid = self._record_run(pid, jid, "report", evidence, run, db)
+                    return ReportBuilt(spec_version=s.spec_version, report_id=rid)
+                self.store.finish_job(jid, commit)
+            self._wake()
         except StepCancelled:
             self.store.cancel_job(jid)
         except Exception as e:
@@ -506,7 +603,7 @@ class Jobs:
         dest = self.settings.project_dir(pid) / "deliverables" / jid
         common = dict(job_id=jid, report_id=s.report_id, **s.approval.model_dump())
         try:
-            with self.tracker.step(pid, "deliverables", f"deliverables v{s.spec_version}") as run:
+            with self._tracked(pid, jid, "deliverables", f"deliverables v{s.spec_version}") as run:
                 run.params(environment_version=self.envs.version(), **common)
                 record = gather(self.store, self.settings, pid)
                 report = self.store.evidence(pid, s.report_id)["body"]
@@ -515,11 +612,16 @@ class Jobs:
                 archive = dest.with_suffix(".zip")
                 run.artifact(dest, "bundle")
                 run.artifact(archive)
-                bid, _ = self.store.record(pid, "bundle", {
+                evidence = {
                     **common, "spec_version": s.spec_version, "dir": str(dest.relative_to(self.settings.data_dir)),
                     "archive": str(archive.relative_to(self.settings.data_dir)), "archive_sha256": sha256_file(archive),
-                    "manifest": manifest, "mlflow_run_id": run.run_id})
-            self.store.finish_job(jid, DeliverablesBuilt(spec_version=s.spec_version, bundle_id=bid))
+                    "manifest": manifest}
+
+                def commit(db):
+                    bid = self._record_run(pid, jid, "bundle", evidence, run, db)
+                    return DeliverablesBuilt(spec_version=s.spec_version, bundle_id=bid)
+                self.store.finish_job(jid, commit)
+            self._wake()
         except StepCancelled:
             self.store.cancel_job(jid)
         except Exception as e:
@@ -528,14 +630,15 @@ class Jobs:
             self._close(jid)
         return jid
 
-    def tag_decision(self, pid: str, bindings: Bindings, decision: str, comment: str | None = None) -> None:
-        """Mirror a DS approval or rejection onto the candidate's and validation's MLflow runs. The transition row
-        is the record; a tracking failure is logged, not raised."""
-        try:
-            v = self.store.evidence(pid, bindings.validation_id)["body"]
-            c = self.store.evidence(pid, v["candidate_id"])["body"]
-            tags = {"decision": decision} | ({"ds_comment": comment[:5000]} if comment else {})
-            for run_id in (c["mlflow_run_id"], v["mlflow_run_id"]):
-                StepRun(self.tracker.client, run_id).tags(**tags)
-        except Exception:
-            log.exception("could not tag the %s decision for project %s in MLflow", decision, pid)
+    def decide(self, pid: str, event: CandidateApproved | CandidateRejected):
+        """Record the decision and queue its tags on the candidate's and validation's MLflow runs."""
+        vid = event.bindings.validation_id
+        # Read the current validation so an invalid input still gets the state machine's gate error.
+        state = self.store.state(pid)
+        targets = []
+        if vid == state.validation_id:
+            v = self.store.evidence(pid, vid)["body"]
+            targets = [r for r in (self._ref(pid, v["candidate_id"]), self._ref(pid, vid)) if r is not None]
+        state = self.store.decide(pid, event, targets)
+        self._wake()
+        return state

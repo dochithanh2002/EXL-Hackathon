@@ -20,6 +20,9 @@ from .translation import HARNESS
 
 VERIFY = Path(__file__).parent / "runner" / "bundle_verify.py"
 PARITY = VERIFY.with_name("parity.py")
+# validation fields that point into this installation (its work directory; MLflow runs of evidence recorded before
+# MLflow became a mirror), not part of the delivered record
+LOCAL = ("dir", "mlflow_run_id", "mlflow_runs")
 
 README = """# {project}
 
@@ -30,7 +33,7 @@ migration.
 |---|---|
 | `model.py` | The model: `prepare`, `fit` and `predict` |
 | `report.md`, `plots/` | Model validation report and its plots |
-| `validation.json` | The accepted parity checks against the R reference, with the model evaluation and assessment |
+| `validation.json` | The accepted parity checks against the R reference, with the model validation checks and business fitness verdict |
 | `spec.json` | The confirmed model specification, v{spec_version} |
 | `baseline.R` | The R code the reference ran |
 | `reference/` | The R reference results: coefficients, predictions, R's train and test rows, subgroup values, fit statistics, design summary |
@@ -59,7 +62,7 @@ The R baseline used R {r_version} with the packages in `environment/renv.lock`
 def build_bundle(dest: Path, record: Record, report_md: str, envs: Environments, report_dir: Path | None = None
                  ) -> dict:
     """Write the bundle to `dest` and its archive to `dest`.zip. Returns the manifest. `report_dir` holds the
-    report's plots, local copies of the validation run's MLflow artifacts, which go to `plots/` beside report.md."""
+    report's plots, copied from the validation's work directory, which go to `plots/` beside report.md."""
     r, a = record, record.approved
     # Capture bytes once: the files hashed here are exactly the ones written to the bundle, even if the shared
     # environments are updated during packaging. An older approval must never silently acquire newer lockfiles.
@@ -76,7 +79,8 @@ def build_bundle(dest: Path, record: Record, report_md: str, envs: Environments,
     (dest / "report.md").write_text(report_md)
     if report_dir is not None and (report_dir / "plots").is_dir():
         shutil.copytree(report_dir / "plots", dest / "plots")
-    (dest / "validation.json").write_text(json.dumps(a.validation["body"], indent=1, sort_keys=True))
+    validation = {k: v for k, v in a.validation["body"].items() if k not in LOCAL}
+    (dest / "validation.json").write_text(json.dumps(validation, indent=1, sort_keys=True))
     (dest / "spec.json").write_text(r.spec.model_dump_json(indent=2))
     (dest / "baseline.R").write_text(r.spec.baseline_r)
     shutil.copy(HARNESS, dest / "harness.py")

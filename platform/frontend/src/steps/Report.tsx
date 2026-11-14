@@ -9,7 +9,7 @@ export function Report({ project }: StepProps) {
   const s = project.state;
   const report = useQuery({
     queryKey: ["report", project.id, s.report_id],
-    queryFn: () => get<Evidence<{ markdown: string; mlflow_run_id: string; model: string }>>(p(project.id, "/report")),
+    queryFn: () => get<Evidence<{ markdown: string; mlflow_run_id: string | null; model: string }>>(p(project.id, "/report")),
     enabled: !!s.report_id,
     staleTime: Infinity,
   });
@@ -21,7 +21,7 @@ export function Report({ project }: StepProps) {
     <Panel
       actions={
         <>
-          <RunLink pid={project.id} runId={report.data.body.mlflow_run_id} />
+          <RunLink pid={project.id} runId={report.data.body.mlflow_run_id} evidenceId={report.data.id} />
           <LinkButton size="sm" variant="outline" href={download} download="report.md"><Download />report.md</LinkButton>
         </>
       }
