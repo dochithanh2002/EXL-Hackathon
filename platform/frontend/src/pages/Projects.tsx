@@ -47,6 +47,8 @@ export function Projects() {
 }
 
 function NewProject({ onCancel }: { onCancel: () => void }) {
+  const [csvs, setCsvs] = useState<File[]>([]);
+  const [dataset, setDataset] = useState(0);
   const create = useMutation({
     mutationFn: (form: FormData) => post<{ id: string }>("/api/projects", form),
     onSuccess: (r) => navigate(href.project(r.id)),
@@ -58,11 +60,13 @@ function NewProject({ onCancel }: { onCancel: () => void }) {
         onSubmit={(e) => {
           e.preventDefault();
           const form = new FormData(e.currentTarget);
-          for (const field of ["data", "documents"]) {     // an empty file input still sends a nameless part
-            const files = form.getAll(field).filter((f) => f instanceof File && f.name);
-            form.delete(field);
-            files.forEach((f) => form.append(field, f));
-          }
+          form.delete("csv");
+          form.delete("dataset_choice");
+          csvs.forEach((f, i) => form.append(i === dataset ? "dataset" : "data", f));
+          // an empty file input still sends a nameless part
+          const documents = form.getAll("documents").filter((f) => f instanceof File && f.name);
+          form.delete("documents");
+          documents.forEach((f) => form.append("documents", f));
           create.mutate(form);
         }}
       >
@@ -70,14 +74,35 @@ function NewProject({ onCancel }: { onCancel: () => void }) {
           Name
           <Input name="name" required maxLength={200} />
         </Label>
-        <Label>
-          Model dataset (.csv)
-          <Input name="dataset" type="file" accept=".csv" required />
-        </Label>
-        <Label>
-          Other data (.csv)
-          <Input name="data" type="file" accept=".csv" multiple />
-        </Label>
+        <div className="flex flex-col gap-1.5">
+          <Label>
+            Data (.csv)
+            <Input
+              name="csv"
+              type="file"
+              accept=".csv"
+              multiple
+              required
+              onChange={(e) => {
+                const files = Array.from(e.currentTarget.files ?? []);
+                setCsvs(files);
+                // the model's dataset is usually the largest file
+                setDataset(files.reduce((best, f, i) => (f.size > files[best].size ? i : best), 0));
+              }}
+            />
+          </Label>
+          {csvs.length > 1 && (
+            <fieldset className="flex flex-col gap-1 text-sm">
+              <legend className="mb-1 font-medium">Model dataset</legend>
+              {csvs.map((f, i) => (
+                <label key={f.name} className="flex items-center gap-2">
+                  <input type="radio" name="dataset_choice" checked={i === dataset} onChange={() => setDataset(i)} />
+                  {f.name}
+                </label>
+              ))}
+            </fieldset>
+          )}
+        </div>
         <Label>
           R code
           <Input name="r_code" type="file" accept=".r,.R,.rmd,.Rmd,.qmd" multiple required />
