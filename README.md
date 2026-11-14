@@ -4,24 +4,26 @@ An agentic platform that takes a data scientist's dataset and R model code, esta
 translates the model to Python (statsmodels), validates it against the baseline within agreed tolerances, and
 delivers the code, environments, validation results and a final report.
 
-Status: build steps 1–5 of [`PLAN.md`](PLAN.md) (skeleton, schemas, workflow state machine; stable
-environments, step runner, R capture harness, MLflow tracking; agent service, model endpoints, Analyst and the
-step 2 chat API; Translator, candidate guardrails and harness, validator and the approval gate; Diagnostician,
-repair loop, retry limit and escalation), and step 6 (Reporter, final report from recorded evidence, deliverables
-bundle). There is no UI yet.
+Status: all seven build steps of [`PLAN.md`](PLAN.md) are built: the workflow, stable R and Python environments,
+the four agents, validation, repair, the final report and deliverables, the React UI, restart recovery and
+cancellation, and a Dockerfile and compose file for Linux.
 
 ```sh
-./platform/bootstrap.sh                  # build the R and Python environments from their lockfiles (once)
+./platform/bootstrap.sh                  # build the environments, the agent service and the UI (once)
 cd platform/backend && uv run pytest     # tests; the M4 tests read M4_DIR
-./platform/dev.sh                        # MLflow on :5000, agent service on :8100, control plane on :8000
+./platform/dev.sh                        # UI on :5173; MLflow :5000, agent service :8100, control plane :8000
 ```
 
-Before the agents can run, add a model endpoint (`POST /api/settings/endpoints`) and assign it to each role
-(`PUT /api/settings/roles/{analyst,translator,diagnostician,reporter}`); keys are encrypted with `platform/var/secret.key`, or with
-`CONTROLPLANE_SECRET_KEY` if set.
+In the UI, open Settings, add a model endpoint and assign a model to each agent role. Keys are encrypted with
+`platform/var/secret.key`, or with `CONTROLPLANE_SECRET_KEY` if set. The control plane also serves the built UI
+(`platform/frontend/dist`) on :8000.
 
 Bootstrap needs R 4.6.2, uv, Node 22.19 or later and a C, C++ and Fortran toolchain. R packages come from the Posit Package
 Manager snapshot recorded in `platform/envs/r/renv.lock`; `./platform/bootstrap.sh relock <date>` re-resolves it.
+
+On Linux, `docker compose -f deploy/compose.yaml up --build` (from `platform/`) runs the same stack in one image,
+with steps executed as a separate unprivileged user. Ports are published on 127.0.0.1 only: the API has no
+authentication.
 
 The previous Agentic Model Risk Factory is in [`legacy/`](legacy/README.md) as read-only reference; its working
 layout is at git tag `legacy-v2.1`.

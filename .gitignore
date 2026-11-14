@@ -8,5 +8,6 @@ __pycache__/
 legacy/output/mlflow/
 legacy/input/*/data/
 platform/var/
+platform/frontend/dist/
 platform/envs/r/library/
 platform/envs/*/.venv/

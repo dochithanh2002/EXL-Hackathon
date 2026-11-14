@@ -311,6 +311,19 @@ class Store:
         job = self._row_job(jid)
         self.finish_job(jid, Cancelled(step=Step(job["step"])), "cancelled")
 
+    def jobs(self, pid: str) -> list[dict]:
+        with self._tx() as db:
+            self.state(pid, db)
+            rows = db.execute("SELECT * FROM jobs WHERE project_id = ? ORDER BY started_at, rowid", (pid,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def job(self, pid: str, jid: str) -> dict:
+        with self._tx() as db:
+            job = self._job(db, jid)
+        if job["project_id"] != pid:
+            raise NotFound(jid)
+        return job
+
     def running_job(self, pid: str) -> dict | None:
         with self._tx() as db:
             row = db.execute("SELECT * FROM jobs WHERE project_id = ? AND status = 'running'", (pid,)).fetchone()
@@ -328,6 +341,9 @@ class Store:
                     self.apply(job["project_id"], StepFailed(step=Step(job["step"]), spec_version=job["spec_version"],
                                                              detail="interrupted by a restart", interrupted=True), db)
         return [j["id"] for j in jobs]
+
+    def get_job(self, jid: str) -> dict:
+        return self._row_job(jid)
 
     def _row_job(self, jid: str) -> dict:
         with self._tx() as db:

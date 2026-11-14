@@ -74,6 +74,17 @@ class Tracker:
             raise
         self.client.set_terminated(run.run_id, "FINISHED")
 
+    def close_interrupted(self, jobs: list[dict]) -> None:
+        """Runs of jobs cut off by a restart are still RUNNING in MLflow; end them as KILLED."""
+        for job in jobs:
+            e = self.client.get_experiment_by_name(f"project-{job['project_id']}")
+            if e is None:
+                continue
+            for r in self.client.search_runs([e.experiment_id], f"params.job_id = '{job['id']}' "
+                                             "and attributes.status = 'RUNNING'"):
+                self.client.set_tag(r.info.run_id, "error", "interrupted by a restart")
+                self.client.set_terminated(r.info.run_id, "KILLED")
+
     def url(self, run_id: str) -> str:
         r = self.client.get_run(run_id)
         return f"{self.uri.rstrip('/')}/#/experiments/{r.info.experiment_id}/runs/{run_id}"

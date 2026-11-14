@@ -1,6 +1,6 @@
 # Plan: agentic R → Python ML transformation platform
 
-Status: build steps 1–6 done, including the live Reporter smoke test (sections 12, 13). Date: 2026-11-14.
+Status: build steps 1–7 built; step 7's Docker image is written but not yet built on a Linux host (sections 12, 13). Date: 2026-11-14.
 
 A Python control plane owns all workflow, execution and approval logic. A small Node service hosts Pi for the
 four agents. A React UI is the data scientist's (DS) workspace. Everything runs locally as plain processes; a
@@ -15,7 +15,7 @@ Dockerfile is provided for Linux server deployment.
 | Environments | One stable, pinned R environment and one stable, pinned Python environment, built once and shared by all projects (section 6) |
 | Supported scope | Any R model with a statsmodels counterpart; scikit-learn is not included (section 7) |
 | Where it runs | Local processes on macOS/Linux, no Docker needed. One Dockerfile + compose file for Linux deployment |
-| Web UI libraries | No Pi web UI package: `@earendil-works/pi-web-ui` is stale (0.75.3, May 2026, pinned to pi-ai 0.75) and community ones are full coding cockpits. `@assistant-ui/react` is the candidate for the chat panel only |
+| Web UI libraries | No Pi web UI package: `@earendil-works/pi-web-ui` is stale (0.75.3, May 2026, pinned to pi-ai 0.75) and community ones are full coding cockpits. The chat panel is a plain component: the Analyst chat is request/reply over the control plane, which `@assistant-ui/react` would only wrap. shadcn/ui components are vendored in `frontend/src/components/ui` without Radix, as the UI needs no menus or dialogs |
 | Network | Treated as working. Python dependency versions are pinned when the lockfile is first generated |
 
 ## 2. Research facts the design relies on
@@ -184,6 +184,11 @@ React, Vite, TypeScript, Tailwind, shadcn/ui, TanStack Query, SSE for streaming.
   individual downloads and one bundle.
 - **Settings**: endpoints, per-role models, environment versions.
 
+The spec is changed through the Analyst chat, not edited in a form, so every version passes the Analyst's checks
+and the support matrix. Hash routes (`#/projects/<id>/<step>`) let the control plane serve the build as static
+files; in development Vite proxies `/api` to it. Agent jobs stream their reply text and tool calls over SSE;
+everything else polls the project, every second while a job runs.
+
 ## 10. Reuse and retirement
 
 - Reused from this repo: capture harness, guardrails, parity logic, candidate interface contract, subprocess
@@ -215,6 +220,26 @@ platform/
 7. UI polish, recovery and cancellation tests, Dockerfile and compose for Linux.
 
 ## 13. Verification
+
+Step 7 built on 2026-11-14: 165 tests passed, two skipped (macOS address-space limits; the step-user test, which
+needs root), and both TypeScript projects typecheck.
+- Recovery: a step process now runs under a supervising launcher that kills its process group when the control
+  plane dies. Before this, a killed control plane left R running (a `Sys.sleep` loop never hits the CPU limit)
+  behind a job that restart recovery marked interrupted. `test_recovery.py` SIGKILLs a real control-plane process
+  mid-baseline, checks that R exits, restarts, and checks that the job is interrupted, its MLflow run is KILLED (now
+  closed on startup) and a retry succeeds. The test fails against the old launcher.
+- Cancellation: through the API, a spinning candidate is killed within seconds (validation run KILLED, no
+  validation recorded) and the retry passes; a cancelled Reporter reruns with the approval intact.
+- After approval the spec cannot change: chat and confirm return 409 until the project is done; the state-machine
+  test covers voiding when a new spec is confirmed.
+- UI: built and rendered with headless Chrome against a live stack with scripted agents on M4 (a seeded `ddof`
+  failure, diagnosis, repair, approval, report, deliverables). The interactive paths call endpoints covered by
+  the tests above; clicking through them in a browser is still to do.
+- Docker: one image (`deploy/Dockerfile`, pinned base images by digest, R packages from the same dated Posit
+  snapshot's Linux binaries) runs the control plane, agent service and MLflow (`deploy/compose.yaml`). Steps run as
+  user `step`: the control plane hands each step its working directory and gives ancestors traverse-only access,
+  then takes the directory back so frozen outputs cannot be changed by later steps. Not yet built: no container
+  runtime is set up on this Mac.
 
 Step 6 verified on 2026-11-14: 159 tests passed, one skipped, and TypeScript typechecking passed. Scripted-model tests
 cover rejected Reporter submissions (literal numbers, unknown ids and fields, uncited placeholders, unknown names in
@@ -258,14 +283,14 @@ relative differences: coefficients 1.104e-12, standard errors 1.107e-12; maximum
 - Robustness: kill the backend mid-run and resume; cancel a running step; change the spec after approval and
   confirm the approval is voided.
 - Guardrails: a candidate that imports a disallowed package or opens a socket is rejected before it runs.
-- Docker image: build and run the M4 flow once on a Linux host. This cannot be checked on this Mac.
+- Docker image: build and run the M4 flow once on a Linux host, including `test_runner.py` as root in the image.
 
 ## 14. Known risks
 
 - M1's notebook is large and loads many heavy packages; the plan depends on the Analyst's `baseline.R` slice
   isolating the GLM cleanly.
 - Approximate-tier pairs may not reach tolerances a DS expects; the UI must show the tier before work starts.
-- Local mode is not a sandbox (section 6).
+- Local mode is not a sandbox (section 6). In Docker, step code still has network access.
 - Pi is moving quickly (1.5.2 on 10 Nov 2026); the version stays pinned and upgrades are deliberate.
 - Error-message redaction (section 5) is heuristic: it keeps integers, which are mostly row ids and counts but
   could be integer data values.

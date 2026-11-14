@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
+import math
 import re
 import shutil
 from contextlib import asynccontextmanager
@@ -10,6 +12,7 @@ from typing import Annotated
 
 from fastapi import Body, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .. import support
@@ -18,6 +21,7 @@ from ..analyst import Analyst, ToolError
 from ..endpoints import EndpointIn, Endpoints, InvalidSetting, RoleModel, load_cipher
 from ..environments import EnvironmentNotReady, Environments
 from ..jobs import Jobs
+from ..runner.parity import _coefs, _rel
 from ..schemas import ROLES, canonical_hash, sha256_file
 from ..settings import Settings
 from ..tracking import Tracker
@@ -25,6 +29,8 @@ from ..workflow import GateError, NotFound, Status, Store
 from ..workflow.machine import (Bindings, CandidateApproved, CandidateRejected, FilesUploaded, InputFile,
                                 ResumeRepair, RetryStep, SpecConfirmed)
 
+log = logging.getLogger(__name__)
+LOG_TAIL = 1 << 20
 SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._ -]{0,127}$")
 EXTENSIONS = {"dataset": {".csv"}, "r_code": {".r", ".rmd", ".qmd"}, "document": {".md", ".txt", ".pdf", ".docx"}}
 
@@ -61,7 +67,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.agents = AgentService(settings.agents_url)
         app.state.jobs = Jobs(st, settings, Environments(), Tracker(settings.mlflow_uri), app.state.endpoints,
                               app.state.agents, support.load())
-        st.recover()
+        interrupted = [st.get_job(j) for j in st.recover()]
+        try:
+            app.state.jobs.tracker.close_interrupted(interrupted)
+        except Exception:
+            log.exception("could not close the MLflow runs of interrupted jobs")
         if settings.autostart:
             for p in st.projects():
                 if p["state"].status == Status.WORKING and st.running_job(p["id"]) is None:
@@ -160,8 +170,33 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/projects/{pid}")
     def get_project(request: Request, pid: str):
         st = store(request)
-        return {"id": pid, "state": st.state(pid), "running_job": st.running_job(pid),
+        return {"id": pid, "name": st.name(pid), "state": st.state(pid), "running_job": st.running_job(pid),
                 "decisions": st.decisions(pid)}
+
+    @app.get("/api/projects/{pid}/mlflow")
+    def mlflow(request: Request, pid: str):
+        """Where the browser finds the project's MLflow experiment; run pages are `{url}/#/experiments/{id}/runs/{run}`."""
+        store(request).state(pid)
+        try:
+            exp = jobs(request).tracker.experiment(pid)
+        except Exception as e:
+            raise HTTPException(503, f"MLflow is not reachable: {e}")
+        return {"url": (settings.mlflow_public_url or settings.mlflow_uri).rstrip("/"), "experiment_id": exp}
+
+    @app.get("/api/projects/{pid}/jobs")
+    def project_jobs(request: Request, pid: str):
+        return store(request).jobs(pid)
+
+    @app.get("/api/projects/{pid}/jobs/{jid}/log", response_class=PlainTextResponse)
+    def job_log(request: Request, pid: str, jid: str):
+        """The step log of a job that ran a process (R baseline, candidate), its last megabyte if longer."""
+        store(request).job(pid, jid)
+        path = settings.project_dir(pid) / "runs" / jid / "step.log"
+        if not path.is_file():
+            raise HTTPException(404, "this job has no step log")
+        with path.open("rb") as f:
+            f.seek(max(0, path.stat().st_size - LOG_TAIL))
+            return f.read().decode("utf-8", errors="replace")
 
     @app.get("/api/projects/{pid}/transitions")
     def transitions(request: Request, pid: str):
@@ -223,6 +258,41 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/projects/{pid}/evidence/{eid}")
     def evidence(request: Request, pid: str, eid: str):
         return store(request).evidence(pid, eid)
+
+    @app.get("/api/projects/{pid}/evidence/{eid}/coefficients")
+    def coefficients(request: Request, pid: str, eid: str):
+        """Every term of a baseline (R only) or a validated candidate (R and Python, with relative differences).
+        Non-finite values are null."""
+        e = store(request).evidence(pid, eid)
+        if e["kind"] == "baseline":
+            r_dir, py_dir = settings.data_dir / e["body"]["dir"], None
+        elif e["kind"] == "validation":
+            r_dir = settings.data_dir / store(request).evidence(pid, e["body"]["baseline_id"])["body"]["dir"]
+            py_dir = settings.project_dir(pid) / "runs" / e["body"]["job_id"] / "output"
+        else:
+            raise HTTPException(404, f"{eid} has no coefficients")
+        rc = _coefs(r_dir / "coefficients.csv")
+        pc = _coefs(py_dir / "coefficients.csv") if py_dir and (py_dir / "coefficients.csv").is_file() else {}
+        rows = []
+        for term in list(rc) + [t for t in pc if t not in rc]:
+            row = {"term": term}
+            if term in rc:
+                row |= {"r_estimate": _finite(rc[term][0]), "r_std_error": _finite(rc[term][1])}
+            if term in pc:
+                row |= {"python_estimate": _finite(pc[term][0]), "python_std_error": _finite(pc[term][1])}
+            if term in rc and term in pc:
+                row |= {"estimate_rel": _finite(_rel(rc[term][0], pc[term][0])),
+                        "std_error_rel": _finite(_rel(rc[term][1], pc[term][1]))}
+            rows.append(row)
+        return {"python": bool(pc), "terms": rows}
+
+    @app.get("/api/projects/{pid}/evidence/{eid}/files/{name}")
+    def captured(request: Request, pid: str, eid: str, name: str):
+        """A file the R capture harness exported for a baseline (coefficients, fit statistics, sessionInfo, ...)."""
+        e = store(request).evidence(pid, eid)
+        if e["kind"] != "baseline" or name not in e["body"]["files"]:
+            raise HTTPException(404, f"{eid} has no file {name}")
+        return FileResponse(settings.data_dir / e["body"]["dir"] / name, filename=name)
 
     @app.post("/api/projects/{pid}/approve")
     def approve(request: Request, pid: str, bindings: Bindings):
@@ -351,7 +421,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         endpoints(request).assign(role, m)
         return m
 
+    if (settings.static_dir / "index.html").is_file():
+        app.mount("/", StaticFiles(directory=settings.static_dir, html=True), name="ui")
     return app
+
+
+def _finite(x: float) -> float | None:
+    return x if math.isfinite(x) else None
 
 
 def _check_name(role: str, name: str | None) -> None:

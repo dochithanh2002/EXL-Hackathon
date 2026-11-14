@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build the stable environments from their lockfiles (run once, and again after a lockfile changes).
-#   ./bootstrap.sh                  restore envs/r, envs/python, envs/mlflow, the backend and the agent service
+#   ./bootstrap.sh                  restore envs/r, envs/python, envs/mlflow, the backend, the agent service and the UI
 #   ./bootstrap.sh relock <date>    re-resolve envs/r/renv.lock against the Posit Package Manager snapshot of <date>
 # Needs R (the version in renv.lock), uv, Node and a C/C++/Fortran toolchain; CMake is pinned and fetched by uv.
 set -euo pipefail
@@ -30,7 +30,8 @@ r_have=$(Rscript --vanilla -e 'cat(as.character(getRversion()))')
 echo "== R environment (R $r_have)"
 if [[ "$(cat envs/r/library/.lock-sha256 2>/dev/null)" != "$(sha256 envs/r/renv.lock)" ]]; then
   rm -f envs/r/library/.lock-sha256
-  REPO=$(json envs/r/renv.lock "d['R']['Repositories'][0]['URL']") Rscript --vanilla - <<'R'
+  # R_REPO may point at the same dated snapshot's Linux binaries (the Dockerfile does); versions still come from the lock
+  REPO=${R_REPO:-$(json envs/r/renv.lock "d['R']['Repositories'][0]['URL']")} Rscript --vanilla - <<'R'
 lockfile <- "envs/r/renv.lock"; lib <- "envs/r/library"
 dir.create(lib, showWarnings = FALSE)
 .libPaths(lib)
@@ -56,3 +57,6 @@ echo "== Agent service"
 node -e 'const [a, b] = process.versions.node.split(".").map(Number); if (a < 22 || (a === 22 && b < 19)) {
   console.error(`Node ${process.versions.node} found; the agent service needs 22.19 or later`); process.exit(1); }'
 (cd agents && npm ci --ignore-scripts --no-audit --no-fund)
+
+echo "== UI"
+(cd frontend && npm ci --ignore-scripts --no-audit --no-fund && npm run build)

@@ -67,3 +67,13 @@ def test_environment_reports_version_and_readiness(client):
     body = client.get("/api/environment").json()
     assert len(body["version"]) == 64 and set(body["lockfiles"]) == {"renv.lock", "uv.lock"}
     assert all(body[e] == "ready" or "bootstrap.sh" in body[e] for e in ("r", "python"))
+
+
+def test_the_built_ui_is_served_next_to_the_api(tmp_path):
+    ui = tmp_path / "dist"
+    ui.mkdir()
+    (ui / "index.html").write_text("<div id=root></div>")
+    with TestClient(create_app(Settings(data_dir=tmp_path / "var", autostart=False, static_dir=ui))) as c:
+        assert c.get("/").text == "<div id=root></div>"
+        assert c.get("/api/projects").json() == []
+        assert c.get("/api/nope").status_code == 404
