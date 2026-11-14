@@ -1,6 +1,6 @@
 # Plan: agentic R → Python ML transformation platform
 
-Status: build steps 1–4 done (section 12). Date: 2026-11-14.
+Status: build steps 1–5 done (section 12). Date: 2026-11-14.
 
 A Python control plane owns all workflow, execution and approval logic. A small Node service hosts Pi for the
 four agents. A React UI is the data scientist's (DS) workspace. Everything runs locally as plain processes; a
@@ -89,12 +89,20 @@ is returned to the agent with the validation error, for a bounded number of retr
 |---|---|---|
 | Analyst | R code, column names, dtypes, level sets, summary statistics (no data rows) | `ModelSpec`: target model, R function, statsmodels counterpart and support tier, family, link, formula, offset, weights, preprocessing steps, split definition, KPIs, tolerances, unsupported items, proposed substitutions, and a minimal `baseline.R` slice |
 | Translator | `ModelSpec`, `baseline.R`, baseline metadata, repair instructions if any | `Candidate`: one Python module against a fixed interface, plus notes |
-| Diagnostician | validation differences, candidate, spec, DS comment | `Diagnosis`: root cause, evidence, repair instructions, and whether a spec change is needed (routes to the DS) |
+| Diagnostician | filtered validation (checks, relative differences, row ids, KPIs, redacted errors), candidate, spec, DS comment, earlier attempts | `Diagnosis`: root cause, evidence, repair instructions, and whether a spec change is needed (routes to the DS) |
 | Reporter | recorded runs, validation results, approvals | `ReportNarrative`: every claim cites an evidence id; numbers are injected by code |
 
 The `baseline.R` slice is the minimal part of the uploaded code that produces the target model. The DS sees it
 as a diff against the original before confirming. It is what keeps unrelated code (keras, xgboost, plotting)
 out of the baseline run.
+
+The Diagnostician never sees R's or the candidate's estimates and fit statistics (its instructions go to the
+Translator, which must not be able to copy R's numbers), row-level predictions, the step log, or data values in error
+messages (quoted text and decimals are redacted unless they are known names or literals in the candidate's code). A
+repair attempt's Translator gets the previous candidate, the diagnosis and the DS's comment, and must submit a changed
+module with `changes` filled in. When a diagnosis needs a spec change, the DS either resumes the repair on the
+current spec or writes to the Analyst, which returns the project to step 2; after the retry limit the DS can raise it
+and resume.
 
 The candidate interface is fixed (`controlplane/candidate.py`): `prepare(path, sets)` returns one frame per set,
 indexed by R's data-row numbers; `fit(train)` returns statsmodels results, whose `params` and `bse` are the
@@ -208,6 +216,18 @@ platform/
 
 ## 13. Verification
 
+Step 5 verified on 2026-11-14: 148 tests passed, one skipped, and TypeScript typechecking passed. The live M4 smoke
+test (`platform/var/live-smoke/verify_step5.py`) passed both scenarios using `gpt-6.1-sol` through the configured
+Responses endpoint. The Diagnostician identified the seeded `ddof=0` standardisation error (coefficient and
+standard-error relative differences of 3.3e-6 against 1e-6 tolerances), and the Translator corrected it to `ddof=1`.
+After a DS rejection of a passing candidate, the second repair switched to `smf.glm` while preserving R's coefficient
+names. Each project used one diagnosis and one repair, kept spec v1 and its frozen baseline, and stopped awaiting DS
+approval with all 19 checks passing. Both final candidates had maximum relative differences of 1.107e-12 for
+coefficients and 1.115e-12 for standard errors; maximum prediction absolute difference was 1.995e-13. All child MLflow
+runs finished, including the diagnoses. Local evidence: `platform/var/live-smoke/20261114-010319/report.json` and
+`verification.json` in the same directory (ignored). Retry-limit and spec-change escalation remain covered by the
+scripted tests; the live prerequisite for step 6 is complete.
+
 Step 4 verified on 2026-11-14: 136 tests passed, one skipped (macOS address-space limits), and TypeScript
 typechecking passed. Two live M4 Translator runs using `gpt-6.1-sol` through the configured Responses endpoint
 passed on the first submission, including one after tightening the guardrails. Each started from the confirmed
@@ -231,8 +251,8 @@ relative differences: coefficients 1.104e-12, standard errors 1.107e-12; maximum
 - Approximate-tier pairs may not reach tolerances a DS expects; the UI must show the tier before work starts.
 - Local mode is not a sandbox (section 6).
 - Pi is moving quickly (1.5.2 on 10 Nov 2026); the version stays pinned and upgrades are deliberate.
-- Candidate runtime errors are retained for the DS and may contain data values. Before step 5 sends evidence to
-  the Diagnostician, it must filter error messages and omit row-level prediction values.
+- Error-message redaction (section 5) is heuristic: it keeps integers, which are mostly row ids and counts but
+  could be integer data values.
 - Gamma, inverse Gaussian and quasi-family likelihood statistics are excluded from fit-statistic parity because
   R and statsmodels handle scale differently; validation records the exclusion. An explicitly requested AIC KPI
   is still checked when R supplies it.

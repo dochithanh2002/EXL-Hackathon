@@ -20,13 +20,15 @@ from .baseline import BaselineFailed, run_baseline
 from .endpoints import Endpoints
 from .environments import Environments
 from .runner import StepCancelled
-from .schemas import Candidate, ModelSpec, canonical_hash
+from .diagnosis import Diagnostician, failed_checks
+from .schemas import Candidate, Diagnosis, ModelSpec, canonical_hash
 from .settings import Settings
 from .support import SupportMatrix
 from .tracking import StepRun, Tracker
-from .translation import Translator, run_candidate
+from .translation import Translator, rulebook, run_candidate
 from .workflow import Status, Step, Store
-from .workflow.machine import AnalystReplied, BaselineSucceeded, Bindings, CandidateValidated, StepFailed
+from .workflow.machine import (AnalystReplied, BaselineSucceeded, Bindings, CandidateValidated, DiagnosisSubmitted,
+                               StepFailed)
 
 log = logging.getLogger(__name__)
 
@@ -81,8 +83,8 @@ class Jobs:
     # ------------------------------------------------------------ dispatch
     def advance(self, pid: str) -> threading.Thread | None:
         s = self.store.state(pid)
-        step = {Step.ALIGNMENT: self.analyst, Step.BASELINE: self.baseline,
-                Step.TRANSLATION: self.translation}.get(s.step)
+        step = {Step.ALIGNMENT: self.analyst, Step.BASELINE: self.baseline, Step.TRANSLATION: self.translation,
+                Step.REPAIR: self.diagnosis}.get(s.step)
         if s.status != Status.WORKING or step is None:
             return None
         t = threading.Thread(target=self._run, args=(step, pid), daemon=True, name=f"job-{pid}")
@@ -292,18 +294,20 @@ class Jobs:
         jid, stream = self._open(pid, "translation")
         workdir = self.settings.project_dir(pid) / "runs" / jid
         common = dict(job_id=jid, spec_version=s.spec_version, baseline_id=s.baseline_id)
+        attempt = dict(attempt=s.repairs, diagnosis_id=s.diagnosis_id)
         try:
             with self.tracker.step(pid, "translation", f"translation v{s.spec_version}") as run:
                 model_ref, model_label = self.endpoints.for_role("translator")
-                run.params(model=model_label, **common)
+                run.params(model=model_label, **common, **attempt)
                 analyst = self._analyst_inputs(pid, s.files)
                 dataset = next(f.name for f in s.files if f.role == "dataset")
-                translator = Translator(spec, baseline_dir, dataset, self.envs, analyst.profile)
+                translator = Translator(spec, baseline_dir, dataset, self.envs, analyst.profile,
+                                        self._repair(pid, s.diagnosis_id, s.repairs, s.retry_limit))
                 turn = Turn("submit_candidate", translator.check,
                             "Accepted. It runs against R's sets when you end your turn; now summarise it in a few "
                             "sentences.",
                             {"dataset_profile": lambda a: json.dumps(translator.profile(), indent=1),
-                             "read_rulebook": lambda a: translator.rulebook()})
+                             "read_rulebook": lambda a: rulebook()})
                 result = self._agent(jid, "translator", model_ref, [], translator.kickoff(), Candidate, turn, stream)
                 run.metrics(tool_calls=turn.tool_calls, invalid_submissions=turn.invalid)
                 run.artifact_text(result["text"], "reply.md")
@@ -316,7 +320,7 @@ class Jobs:
                 run.params(candidate_hash=h)
                 run.artifact_text(cand.module, "candidate.py")
                 cid, _ = self.store.record(pid, "candidate", {
-                    **common, "hash": h, "module": cand.module, "notes": cand.notes, "changes": cand.changes,
+                    **common, **attempt, "hash": h, "module": cand.module, "notes": cand.notes, "changes": cand.changes,
                     "reply": result["text"], "model": model_label, "mlflow_run_id": run.run_id})
 
             with self.tracker.step(pid, "validation", f"validation v{s.spec_version}", workdir / "step.log") as run:
@@ -345,6 +349,80 @@ class Jobs:
         finally:
             self._close(jid)
         return jid
+
+    def _repair(self, pid: str, diagnosis_id: str | None, attempt: int, limit: int) -> dict | None:
+        """What a repair attempt's Translator gets: the previous candidate and the diagnosis of it."""
+        if diagnosis_id is None:
+            return None
+        d = self.store.evidence(pid, diagnosis_id)["body"]
+        module = self.store.evidence(pid, d["candidate_id"])["body"]["module"]
+        return {"attempt": attempt, "limit": limit, "module": module, "diagnosis": d}
+
+    # ------------------------------------------------------------ step 5: diagnosis
+    def diagnosis(self, pid: str) -> str:
+        """The Diagnostician explains why the candidate failed validation or was rejected and tells the Translator
+        what to change, or says the fix needs a new spec version, which goes to the DS."""
+        s = self.store.state(pid)
+        if (s.step, s.status) != (Step.REPAIR, Status.WORKING):
+            raise ValueError(f"project is at step {s.step.value} ({s.status.value}), not diagnosing")
+        spec = self.store.spec(pid, s.spec_version)
+        baseline_dir = self.settings.data_dir / self.store.evidence(pid, s.baseline_id)["body"]["dir"]
+        validation = self.store.evidence(pid, s.validation_id)["body"]
+        cand = self.store.evidence(pid, validation["candidate_id"])["body"]
+        jid, stream = self._open(pid, "diagnosis")
+        common = dict(job_id=jid, spec_version=s.spec_version, baseline_id=s.baseline_id,
+                      candidate_id=validation["candidate_id"], candidate_hash=s.candidate_hash,
+                      validation_id=s.validation_id)
+        try:
+            with self.tracker.step(pid, "diagnosis", f"diagnosis v{s.spec_version}") as run:
+                model_ref, model_label = self.endpoints.for_role("diagnostician")
+                run.params(model=model_label, repairs=s.repairs, retry_limit=s.retry_limit, **common)
+                analyst = self._analyst_inputs(pid, s.files)
+                diag = Diagnostician(spec, baseline_dir, analyst.profile, cand, validation, s.ds_comment,
+                                     self._earlier(pid, s.spec_version, s.baseline_id), s.repairs, s.retry_limit)
+                turn = Turn("submit_diagnosis", diag.check,
+                            "Accepted. When you end your turn it goes to the Translator, or to the DS if it needs a "
+                            "spec change; now summarise it in a few sentences.",
+                            {"dataset_profile": lambda a: json.dumps(analyst.profile(), indent=1),
+                             "read_rulebook": lambda a: rulebook()})
+                result = self._agent(jid, "diagnostician", model_ref, [], diag.kickoff(), Diagnosis, turn, stream)
+                run.metrics(tool_calls=turn.tool_calls, invalid_submissions=turn.invalid)
+                run.artifact_text(result["text"], "reply.md")
+                run.artifact_text(json.dumps(result["messages"], indent=1), "transcript.json")
+                d: Diagnosis | None = turn.result
+                if d is None:
+                    raise AgentServiceError("the Diagnostician ended its turn without an accepted diagnosis: "
+                                            + (result["text"].strip()[:500] or "(no reply)"))
+                run.tags(spec_change_needed=d.spec_change_needed)
+                run.artifact_text(d.model_dump_json(indent=2), "diagnosis.json")
+                did, _ = self.store.record(pid, "diagnosis", {
+                    **common, **d.model_dump(mode="json"), "ds_comment": s.ds_comment,
+                    "failed_checks": failed_checks(validation), "reply": result["text"], "model": model_label,
+                    "mlflow_run_id": run.run_id})
+            event = DiagnosisSubmitted(spec_version=s.spec_version, candidate_hash=s.candidate_hash, diagnosis_id=did,
+                                       spec_change_needed=d.spec_change_needed)
+
+            def commit(db):
+                if d.spec_change_needed:
+                    self.store.add_chat(db, pid, "platform", (
+                        f"The Diagnostician found that the candidate cannot reproduce R under spec v{s.spec_version} "
+                        f"without a spec change.\nRoot cause: {d.root_cause}\nProposed change: "
+                        f"{d.proposed_spec_change}\nWrite to the Analyst to draft a new spec version, or resume the "
+                        "repair to keep the current spec."), jid, s.spec_version)
+                return event
+            self.store.finish_job(jid, commit)
+        except StepCancelled:
+            self.store.cancel_job(jid)
+        except Exception as e:
+            self.store.fail_job(jid, str(e))
+        finally:
+            self._close(jid)
+        return jid
+
+    def _earlier(self, pid: str, spec_version: int, baseline_id: str) -> list[dict]:
+        """The diagnoses already made for this spec and baseline, oldest first."""
+        bodies = (self.store.evidence(pid, e["id"])["body"] for e in self.store.evidence_list(pid, "diagnosis"))
+        return [d for d in bodies if (d["spec_version"], d["baseline_id"]) == (spec_version, baseline_id)]
 
     def tag_decision(self, pid: str, bindings: Bindings, decision: str, comment: str | None = None) -> None:
         """Mirror a DS approval or rejection onto the candidate's and validation's MLflow runs. The transition row

@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Tier = Literal["exact", "approximate", "unsupported"]
 QualifiedName = Field(pattern=r"^[A-Za-z][A-Za-z0-9.]*::[A-Za-z.][A-Za-z0-9._]*$",
@@ -96,9 +96,17 @@ class Diagnosis(Contract):
     schema_version: Literal["1"] = "1"
     root_cause: str
     evidence: list[str] = Field(min_length=1, description="Observed differences or errors supporting the root cause")
-    repair_instructions: list[str]
+    repair_instructions: list[str] = Field(description="What the Translator must change in the candidate")
     spec_change_needed: bool = Field(description="True if the fix needs a new ModelSpec rather than new code")
-    proposed_spec_change: str | None = None
+    proposed_spec_change: str | None = Field(default=None, description="Required when spec_change_needed is true")
+
+    @model_validator(mode="after")
+    def _actionable(self) -> Diagnosis:
+        if self.spec_change_needed and not (self.proposed_spec_change or "").strip():
+            raise ValueError("proposed_spec_change is required when spec_change_needed is true")
+        if not self.spec_change_needed and not self.repair_instructions:
+            raise ValueError("repair_instructions must not be empty unless spec_change_needed is true")
+        return self
 
 
 # ---------------------------------------------------------------- Reporter

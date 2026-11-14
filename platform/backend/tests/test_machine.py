@@ -175,6 +175,18 @@ def test_diagnosis_needing_spec_change_routes_to_ds():
     assert where(s) == (Step.TRANSLATION, Status.WORKING, None) and s.baseline_id == "b1"
 
 
+def test_from_a_stopped_repair_the_ds_can_return_to_the_analyst():
+    s, _ = validated(at_translation(), passed=False)
+    with pytest.raises(GateError):
+        apply(s, DsMessaged())                                  # not while the Diagnostician works
+    s = apply(s, DiagnosisSubmitted(spec_version=1, candidate_hash=cand(1), diagnosis_id="d1",
+                                    spec_change_needed=True))
+    s = apply(s, DsMessaged())
+    assert where(s) == (Step.ALIGNMENT, Status.WORKING, None) and s.spec_version == 1
+    s = run(s, AnalystReplied(), *confirmed(2, KEY1))
+    assert where(s) == (Step.TRANSLATION, Status.WORKING, None) and (s.repairs, s.diagnosis_id) == (0, None)
+
+
 def test_spec_change_after_approval_voids_it():
     s, b = validated(at_translation())
     s = apply(s, CandidateApproved(bindings=b))

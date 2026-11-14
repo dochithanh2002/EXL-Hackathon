@@ -2,8 +2,9 @@
     python -I candidate_harness.py <config.json>
     config: candidate, dataset, split (R's split.csv), response, out
 Imports the candidate, hands it R's sets, checks it returns exactly R's rows, fits, and exports the coefficients,
-predictions and fit statistics the validator compares with R's capture. A failure writes the stage, exception type
-and message to error.json, like capture.R; the traceback goes only to the step log."""
+predictions and fit statistics the validator compares with R's capture. A failure writes the stage, exception type,
+message and the candidate's own frames (line and function) to error.json, like capture.R; the full traceback goes
+only to the step log."""
 import csv
 import importlib.util
 import json
@@ -125,7 +126,10 @@ try:
     (out / "timing.json").write_text(json.dumps({"fit_s": runtime}))
 except Exception as e:
     traceback.print_exc()
+    source = Path(cfg["candidate"]).resolve()
+    frames = [{"line": f.lineno, "function": f.name} for f in traceback.extract_tb(e.__traceback__)
+              if Path(f.filename).resolve() == source]
     (out / "error.json").write_text(json.dumps({"stage": stage, "type": type(e).__name__,
-                                                "message": str(e)[:1000]}))
+                                                "message": str(e)[:1000], "candidate_frames": frames}))
     sys.exit(1)
 print(f"exported {len(rows)} predictions")

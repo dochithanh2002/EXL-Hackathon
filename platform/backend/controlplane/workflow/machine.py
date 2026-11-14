@@ -115,8 +115,8 @@ class SpecDrafted(Frozen):
 
 
 class DsMessaged(Frozen):
-    """The DS wrote to the Analyst; the Analyst takes the turn. After a failed or cancelled baseline this returns the
-    project to step 2, where a corrected spec version can be drafted and confirmed."""
+    """The DS wrote to the Analyst; the Analyst takes the turn. From a stopped baseline or a stopped repair this
+    returns the project to step 2, where a corrected spec version can be drafted and confirmed."""
     type: Literal["ds_messaged"] = "ds_messaged"
 
 
@@ -250,7 +250,7 @@ def apply(s: ProjectState, e: Event) -> ProjectState:
             return _move(s, Step.ALIGNMENT, files=files)
 
         case DsMessaged():
-            if (s.step, s.status) != (Step.BASELINE, Status.AWAITING_DS):
+            if (s.step, s.status) not in ((Step.BASELINE, Status.AWAITING_DS), (Step.REPAIR, Status.AWAITING_DS)):
                 _at(s, Step.ALIGNMENT, Status.AWAITING_DS)
             return _move(s, Step.ALIGNMENT)
 

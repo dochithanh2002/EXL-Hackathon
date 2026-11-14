@@ -22,8 +22,8 @@ from ..schemas import ROLES, canonical_hash, sha256_file
 from ..settings import Settings
 from ..tracking import Tracker
 from ..workflow import GateError, NotFound, Status, Store
-from ..workflow.machine import (Bindings, CandidateApproved, CandidateRejected, FilesUploaded, InputFile, RetryStep,
-                                SpecConfirmed)
+from ..workflow.machine import (Bindings, CandidateApproved, CandidateRejected, FilesUploaded, InputFile,
+                                ResumeRepair, RetryStep, SpecConfirmed)
 
 SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._ -]{0,127}$")
 EXTENSIONS = {"dataset": {".csv"}, "r_code": {".r", ".rmd", ".qmd"}, "document": {".md", ".txt", ".pdf", ".docx"}}
@@ -39,6 +39,10 @@ class Confirmation(BaseModel):
 
 class ModelChoice(BaseModel):
     model: str
+
+
+class Resume(BaseModel):
+    additional_attempts: int = Field(default=0, ge=0, le=20)
 
 
 class Rejection(BaseModel):
@@ -232,6 +236,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def reject(request: Request, pid: str, r: Rejection):
         state = store(request).apply(pid, CandidateRejected(bindings=r.bindings, comment=r.comment))
         jobs(request).tag_decision(pid, r.bindings, "rejected", r.comment)
+        advance(request, pid)
+        return {"state": state}
+
+    # ------------------------------------------------------------ step 5
+    @app.post("/api/projects/{pid}/resume")
+    def resume(request: Request, pid: str, r: Resume = Body(default_factory=Resume)):
+        """Resume the repair after the retry limit (raising it by `additional_attempts`), or after a diagnosis that
+        asked for a spec change, keeping the current spec. To change the spec instead, write to the Analyst."""
+        state = store(request).apply(pid, ResumeRepair(additional_attempts=r.additional_attempts))
         advance(request, pid)
         return {"state": state}
 

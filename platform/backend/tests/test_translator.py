@@ -21,8 +21,7 @@ def translate(cp, llm, translator_script: list, eid: str | None = None) -> str:
     pid = upload(cp)
     settle(cp, pid)
     assert cp.post(f"/api/projects/{pid}/specs/1/confirm", json={"parity_risk_accepted": True}).status_code == 200
-    # step 5 has no job yet, so a project waiting there for the Diagnostician is settled
-    settle(cp, pid, until=lambda s: s["step"] == 5 or (s["step"] != 3 and s["status"] != "working"), timeout=180)
+    settle(cp, pid, until=lambda s: s["step"] != 3 and s["status"] != "working", timeout=180)
     return pid
 
 
@@ -81,7 +80,8 @@ def test_a_failing_candidate_goes_to_repair_and_a_rejected_one_carries_the_comme
     eid = configure(cp, llm)
     pid = translate(cp, llm, [submit(DRIFTED), text("Done.")], eid)
     s = cp.get(f"/api/projects/{pid}").json()["state"]
-    assert (s["step"], s["status"], s["validation_passed"]) == (5, "working", False), s
+    assert (s["step"], s["status"], s["validation_passed"]) == (5, "awaiting_ds", False), s
+    assert s["detail"] == "no model is assigned to the diagnostician role; assign one in settings"
     v = cp.get(f"/api/projects/{pid}/evidence/{s['validation_id']}").json()["body"]
     assert not v["passed"] and "coefficient max rel diff" in {c["name"] for c in v["checks"] if not c["passed"]}
     bindings = {k: s[k] for k in ("spec_version", "baseline_id", "candidate_hash", "validation_id")}
@@ -94,6 +94,7 @@ def test_a_failing_candidate_goes_to_repair_and_a_rejected_one_carries_the_comme
     r = cp.post(f"/api/projects/{pid}/reject", json={"bindings": bindings, "comment": "Use exposure in years."})
     s = r.json()["state"]
     assert (s["step"], s["status"], s["ds_comment"]) == (5, "working", "Use exposure in years.")
+    settle(cp, pid)
     [d] = cp.get(f"/api/projects/{pid}").json()["decisions"]
     assert d["decision"] == "rejected" and d["comment"] == "Use exposure in years."
     tracker = Tracker(cp.settings.mlflow_uri)

@@ -36,18 +36,34 @@ def environment_packages(envs: Environments) -> dict[str, str]:
     return {p["name"]: p["version"] for p in lock["package"] if p["name"] in contract.ENV_PACKAGES}
 
 
+def baseline_context(spec: ModelSpec, baseline_dir: Path) -> list[str]:
+    """The confirmed spec, baseline.R, the baseline's metadata and R's coefficient names: what the Translator and
+    the Diagnostician both start from. R's estimates are never part of it."""
+    meta = json.loads((baseline_dir / "meta.json").read_text())
+    return [
+        "Confirmed ModelSpec:", json.dumps(spec.model_dump(mode="json", exclude={"baseline_r"}), indent=1), "",
+        "baseline.R, the R code the baseline ran:", "```r", spec.baseline_r.rstrip(), "```", "",
+        "R baseline metadata:", json.dumps({k: meta.get(k) for k in META_KEYS}, indent=1), "",
+        "R's coefficient names, in order: " + json.dumps(coefficient_names(baseline_dir))]
+
+
+def coefficient_names(baseline_dir: Path) -> list[str]:
+    with open(baseline_dir / "coefficients.csv", newline="") as f:
+        return [r["term"] for r in csv.DictReader(f)]
+
+
+def rulebook() -> str:
+    return RULEBOOK.read_text()
+
+
 class Translator:
-    """One translation attempt's inputs and checks."""
+    """One translation attempt's inputs and checks. A repair attempt also gets the previous candidate and the
+    Diagnostician's findings (`repair`: attempt, limit, module, diagnosis)."""
 
     def __init__(self, spec: ModelSpec, baseline_dir: Path, dataset: str, envs: Environments,
-                 profile: Callable[[], dict]):
+                 profile: Callable[[], dict], repair: dict | None = None):
         self.spec, self.baseline_dir, self.dataset, self.envs = spec, baseline_dir, dataset, envs
-        self.profile = profile
-
-    # ------------------------------------------------------------ tools
-    @staticmethod
-    def rulebook() -> str:
-        return RULEBOOK.read_text()
+        self.profile, self.repair = profile, repair
 
     def check(self, raw: dict) -> tuple[Candidate | None, list[str]]:
         try:
@@ -55,27 +71,39 @@ class Translator:
         except ValidationError as e:
             return None, [f"{'.'.join(map(str, err['loc'])) or '(root)'}: {err['msg']}" for err in e.errors()]
         errors = [f"guardrail: {v}" for v in contract.check(cand.module)]
+        if self.repair:
+            if cand.module.strip() == self.repair["module"].strip():
+                errors.append("module: identical to the previous candidate; apply the repair instructions")
+            if not cand.changes.strip():
+                errors.append("changes: describe what changed from the previous candidate and why")
         return (None if errors else cand), errors
 
     # ------------------------------------------------------------ prompt
     def kickoff(self) -> str:
-        meta = json.loads((self.baseline_dir / "meta.json").read_text())
-        with open(self.baseline_dir / "coefficients.csv", newline="") as f:
-            terms = [r["term"] for r in csv.DictReader(f)]
-        spec = self.spec.model_dump(mode="json", exclude={"baseline_r"})
         packages = ", ".join(f"{n}=={v}" for n, v in sorted(environment_packages(self.envs).items()))
-        return "\n".join([
-            "Confirmed ModelSpec:", json.dumps(spec, indent=1), "",
-            "baseline.R, the R code the baseline ran:", "```r", self.spec.baseline_r.rstrip(), "```", "",
-            "R baseline metadata:", json.dumps({k: meta.get(k) for k in META_KEYS}, indent=1), "",
-            "R's coefficient names, in order: " + json.dumps(terms), "",
+        lines = baseline_context(self.spec, self.baseline_dir) + [
+            "",
             f"prepare() is called with the path of {self.dataset}. RESPONSE is '{self.spec.response}'.", "",
             contract.INTERFACE, "",
             f"Python environment: {packages}. Standard-library imports allowed: "
             + ", ".join(sorted(contract.STDLIB - {"__future__"})) + ".",
             "The module must not read any file other than the dataset, write files, use the network, run shell "
-            "commands, use randomness, or use eval, exec, getattr or dunder attributes.", "",
-            "Read the dataset profile and, where useful, the rulebook, then submit the candidate."])
+            "commands, use randomness, or use eval, exec, getattr or dunder attributes.", ""]
+        if not self.repair:
+            return "\n".join(lines + ["Read the dataset profile and, where useful, the rulebook, then submit the "
+                                       "candidate."])
+        r, d = self.repair, self.repair["diagnosis"]
+        lines += [f"This is repair attempt {r['attempt']} of {r['limit']}. The previous candidate:",
+                  "```python", r["module"].rstrip(), "```", ""]
+        if d.get("ds_comment"):
+            lines += ["The DS rejected it with this comment:", d["ds_comment"], ""]
+        lines += ["The Diagnostician's findings:", json.dumps(
+            {k: d[k] for k in ("root_cause", "evidence", "repair_instructions")}, indent=1), ""]
+        if d["spec_change_needed"]:
+            lines += [f"The Diagnostician proposed a spec change ({d['proposed_spec_change']}); the DS kept the "
+                      "confirmed spec, so repair the code within it.", ""]
+        return "\n".join(lines + ["Apply the repair instructions and submit the complete module, with `changes` "
+                                   "saying what changed and why."])
 
 
 # ---------------------------------------------------------------- run

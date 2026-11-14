@@ -4,10 +4,10 @@ An agentic platform that takes a data scientist's dataset and R model code, esta
 translates the model to Python (statsmodels), validates it against the baseline within agreed tolerances, and
 delivers the code, environments, validation results and a final report.
 
-Status: build steps 1–4 of [`PLAN.md`](PLAN.md) (skeleton, schemas, workflow state machine; stable
+Status: build steps 1–5 of [`PLAN.md`](PLAN.md) (skeleton, schemas, workflow state machine; stable
 environments, step runner, R capture harness, MLflow tracking; agent service, model endpoints, Analyst and the
-step 2 chat API; Translator, candidate guardrails and harness, validator and the approval gate). There is no UI
-yet.
+step 2 chat API; Translator, candidate guardrails and harness, validator and the approval gate; Diagnostician,
+repair loop, retry limit and escalation). There is no UI yet.
 
 ```sh
 ./platform/bootstrap.sh                  # build the R and Python environments from their lockfiles (once)
@@ -16,7 +16,7 @@ cd platform/backend && uv run pytest     # tests; the M4 tests read M4_DIR
 ```
 
 Before the agents can run, add a model endpoint (`POST /api/settings/endpoints`) and assign it to each role
-(`PUT /api/settings/roles/analyst`, `PUT /api/settings/roles/translator`); keys are encrypted with `platform/var/secret.key`, or with
+(`PUT /api/settings/roles/{analyst,translator,diagnostician}`); keys are encrypted with `platform/var/secret.key`, or with
 `CONTROLPLANE_SECRET_KEY` if set.
 
 Bootstrap needs R 4.6.2, uv, Node 22.19 or later and a C, C++ and Fortran toolchain. R packages come from the Posit Package
