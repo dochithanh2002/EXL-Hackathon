@@ -302,6 +302,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(404, f"{eid} has no file {name}")
         return FileResponse(settings.data_dir / e["body"]["dir"] / name, filename=name)
 
+    @app.get("/api/projects/{pid}/evidence/{eid}/plots/{name}")
+    def validation_plot(request: Request, pid: str, eid: str, name: str):
+        """A plot of a validation, as logged to its MLflow run."""
+        e = store(request).evidence(pid, eid)
+        if e["kind"] != "validation" or name not in {p["name"] for p in e["body"].get("plots", [])}:
+            raise HTTPException(404, f"{eid} has no plot {name}")
+        return FileResponse(settings.project_dir(pid) / "runs" / e["body"]["job_id"] / "plots" / name,
+                            media_type="image/svg+xml")
+
     @app.post("/api/projects/{pid}/approve")
     def approve(request: Request, pid: str, bindings: Bindings):
         """The DS approves the candidate and validation they reviewed; `bindings` must name exactly those."""
@@ -333,6 +342,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if rid is None:
             raise HTTPException(404, "the report is not built")
         return store(request).evidence(pid, rid)
+
+    @app.get("/api/projects/{pid}/report/files/{path:path}")
+    def report_file(request: Request, pid: str, path: str):
+        """A plot the report embeds: its local copy of the validation run's MLflow artifact."""
+        rid = store(request).state(pid).report_id
+        body = store(request).evidence(pid, rid)["body"] if rid else {}
+        if path not in {f["path"] for f in body.get("figures", [])}:          # only listed figures, never a traversal
+            raise HTTPException(404, f"the report has no file {path}")
+        return FileResponse(settings.data_dir / body["dir"] / path, media_type="image/svg+xml")
 
     def bundle(request: Request, pid: str) -> dict:
         bid = store(request).state(pid).bundle_id

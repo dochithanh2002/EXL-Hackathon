@@ -13,6 +13,7 @@ from controlplane.schemas import ModelSpec, canonical_hash, sha256_file
 from controlplane.workflow import Reason, Status, Step
 from controlplane.workflow.machine import FilesUploaded, InputFile, SpecConfirmed
 from tests.conftest import make_jobs
+from tests.test_schemas import plan
 from tests.test_schemas import spec as make_spec
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -31,12 +32,22 @@ fit <- glm(claims ~ area + age + offset(log(exposure)), family = poisson, data =
 """
 
 
+POISSON_PLAN = plan(
+    subgroup_performance={"run": True, "rationale": "claims frequency by area and age band", "columns": ["area", "age"],
+                          "min_rows": 20},
+    sensitivity={"run": True, "rationale": "pricing responds to age", "columns": ["age", "area"], "shift_sd": 0.5},
+    assumptions={"run": True, "rationale": "a Poisson count model", "assumptions": ["overdispersion",
+                                                                                  "zero_inflation",
+                                                                                  "multicollinearity"]})
+
+
 def poisson_spec(**overrides) -> ModelSpec:
     return make_spec(**{
         "family": "poisson", "link": "log", "formula": "claims ~ area + age + offset(log(exposure))",
         "response": "claims", "offset": "log(exposure)", "baseline_r": POISSON_R,
         "split": {"method": "sample", "r_code": "idx <- sample(nrow(df), 140)", "seed": 42},
         "metrics": ["rmse", "deviance", "actual_expected"],
+        "validation_plan": POISSON_PLAN,
         "baseline_objects": {"model": "fit", "train": "train", "test": "test"}} | overrides)
 
 
@@ -97,7 +108,13 @@ def test_baseline_is_captured_frozen_tracked_and_reproducible(jobs):
     run = jobs.tracker.client.get_run(ev["mlflow_run_id"])
     assert run.info.status == "FINISHED" and run.data.params["spec_version"] == "1"
     assert run.data.tags["mlflow.parentRunId"] == jobs.tracker.workflow_run(pid)
-    assert float(run.data.metrics["deviance"]) == ev["fit"]["deviance"]
+    assert float(run.data.metrics["fit/deviance"]) == ev["fit"]["deviance"]
+    assert {"model/train/mean_deviance", "model/test/rmse"} <= run.data.metrics.keys()
+    assert run.data.tags["model"] == "r" and run.data.params["split.train.rows"] == "140"
+    assert {d.dataset.name for d in run.inputs.dataset_inputs} == {"claims.csv:train", "claims.csv:test"}
+    segments = read_csv(out / "segments.csv")
+    assert {r["column"] for r in segments} == {"area", "age"} and len(segments) == 400
+    assert meta["segments"] == {"area": "categorical", "age": "numeric"}
     logged = {a.path for a in jobs.tracker.client.list_artifacts(run.info.run_id)}
     assert {"code", "capture", "environment", "step.log"} <= logged
 
@@ -200,7 +217,9 @@ def test_lm_is_captured(jobs):
     spec = poisson_spec(r_function="stats::lm", python_implementation="statsmodels.api.OLS", family=None,
                         link=None, offset=None, formula="claims ~ area + age", baseline_r=lm_r,
                         response_type="continuous", prediction={"kind": "scalar", "quantity": "continuous",
-                                                                "units": "claims", "alignment_keys": ["row"]})
+                                                                "units": "claims", "alignment_keys": ["row"]},
+                        validation_plan=plan(assumptions={"run": True, "rationale": "least squares", "assumptions": [
+                            "residual_distribution", "heteroscedasticity"]}))
     pid = project_at_baseline(jobs.store, jobs.settings, spec, {"claims.csv": CLAIMS.encode(), "m.R": b""})
     jobs.baseline(pid)
     s = jobs.store.state(pid)

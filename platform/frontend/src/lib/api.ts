@@ -86,8 +86,13 @@ export interface ValidationBody {
   differences: Record<string, any>; notes: string[]; candidate_id: string; candidate_hash: string; job_id: string;
   assessment: { r?: Record<string, AssessmentAnswer>; python?: Record<string, AssessmentAnswer> };
   design: Record<string, any>;
+  evaluation?: Evaluation; plots?: PlotRef[]; mlflow_runs?: Record<string, string>;
   spec_version: number; baseline_id: string; mlflow_run_id: string;
 }
+export type CheckStatus = "executed" | "partially executed" | "not executed" | "not planned";
+export interface EvaluationCheck { status: CheckStatus; rationale: string; needs: string[]; notes: string[]; results: Record<string, any> }
+export interface Evaluation { checks: Record<string, EvaluationCheck>; missing_evidence: string[]; primary_metric: string; notes: string[] }
+export interface PlotRef { name: string; title: string; section: string }
 export interface CandidateBody {
   attempt: number; diagnosis_id: string | null; hash: string; module: string; notes: string[]; limitations?: string[]; changes: string;
   reply: string; model: string; mlflow_run_id: string; spec_version: number; baseline_id: string; job_id: string;

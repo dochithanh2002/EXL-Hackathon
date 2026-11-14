@@ -11,7 +11,8 @@ import zipfile
 import pytest
 from pydantic import ValidationError
 
-from controlplane.report import _words, known
+from controlplane.assessment import QUESTIONS
+from controlplane.report import _words, business_fitness, known
 from controlplane.schemas import canonical_hash
 from controlplane.schemas.agents import Claim
 from controlplane.tracking import Tracker
@@ -24,29 +25,38 @@ from tests.test_translator import DRIFTED, submit, translate
 REPAIRED = POISSON_PY.replace("RPoisson", "Poisson2")
 
 
-QUESTIONS = ("sample_suitability", "stability", "calibration", "decision_performance")
+MIGRATION = ("parity_results", "skipped_checks", "acceptance_decision")
+ASSESSED = ("sample_suitability", "decision_performance")        # cite the assessment; the rest the evaluation
+VALIDATION = ("performance", "calibration", "subgroup_performance", "stability", "sensitivity", "assumptions",
+              *ASSESSED)
 
 
 def report(validation: str, decision: str, spec: str = "spec-v1", **sections) -> dict:
-    """A complete narrative citing what each section must; `sections` replaces any section's claims."""
+    """A complete narrative citing what each section must; `sections` replaces any section's claims, by its name."""
     def c(*claims):
         return [{"text": t, "evidence_ids": ids} for t, ids in claims]
+
+    def question(q):
+        if q in ASSESSED:
+            return c(("This question is {{assessment." + q + ".status}}.", ["assessment"]))
+        check = "baseline_comparison" if q == "performance" else q
+        return c(("This check was {{evaluation." + check + ".status}}.", ["evaluation"]))
     body = {
         "scope": c(("The migration covers `{{" + spec + ".r_function}}`.", [spec])),
         "model_and_data_semantics": c(("The response is {{" + spec + ".response_type}}, predicted as "
                                        "{{" + spec + ".prediction.units}}.", [spec])),
-        "parity_results": c(("The validation passed.", [validation])),
-        "financial_assessment": {q: c(("This question is {{assessment." + q + ".status}}.", ["assessment"]))
-                                 for q in QUESTIONS},
-        "skipped_checks": c(("{{" + validation + ".checks_unavailable}} checks were unavailable.", [validation])),
+        "migration": {"parity_results": c(("The validation passed.", [validation])),
+                      "skipped_checks": c(("{{" + validation + ".checks_unavailable}} checks were unavailable.",
+                                           [validation])),
+                      "acceptance_decision": c(("The DS accepted the migration.", [decision]))},
+        "validation": {q: question(q) for q in VALIDATION},
+        "missing_evidence": c(("{{evaluation.missing_evidence_count}} items are missing.", ["evaluation"])),
         "limitations": c(("The spec records the limits of the migration.", [spec])),
-        "acceptance_decision": c(("The DS accepted the migration.", [decision])),
+        "business_fitness": c(("Fitness is not established.", ["evaluation"])),
     }
     for name, claims in sections.items():
-        if name in QUESTIONS:
-            body["financial_assessment"][name] = c(*claims)
-        else:
-            body[name] = c(*claims)
+        group = "migration" if name in MIGRATION else "validation" if name in VALIDATION else None
+        (body[group] if group else body)[name] = c(*claims)
     return tool("submit_report", body)
 
 
@@ -58,6 +68,18 @@ def assign_reporter(cp) -> None:
 
 def bindings(s: dict) -> dict:
     return {k: s[k] for k in ("spec_version", "baseline_id", "candidate_hash", "validation_id")}
+
+
+@pytest.mark.parametrize(("meets", "verdict", "basis"), [
+    (True, "criteria met", []),
+    (False, "criteria not met", ["sample suitability"]),
+    (None, "not established", ["sample suitability"]),
+])
+def test_business_fitness_requires_a_result_for_each_criterion(meets, verdict, basis):
+    evaluation = {"checks": {"calibration": {"status": "executed"}}}
+    assessment = {q: {"status": "assessed", "meets": True} for q in QUESTIONS}
+    assessment["sample_suitability"]["meets"] = meets
+    assert business_fitness(evaluation, assessment) == (verdict, basis)
 
 
 def test_the_report_cites_recorded_evidence_and_the_bundle_reruns(cp, llm, envs, tmp_path):
@@ -73,6 +95,10 @@ def test_the_report_cites_recorded_evidence_and_the_bundle_reruns(cp, llm, envs,
         ("The R reference in `baseline.R` fit `{{spec-v1.r_function}}` with a {{spec-v1.family}} family on {{" + b
          + ".n_fit}} training rows.", ["spec-v1", b]),
         ("The first candidate failed the {{" + v1 + ".failed_checks}} check; {{" + d + ".root_cause}}", [v1, d])],
+        performance=[
+        ("The Python model's test deviance per unit exposure was {{evaluation.baseline_comparison.sets.test."
+         "mean_deviance.python}} against {{evaluation.baseline_comparison.sets.test.mean_deviance.constant}} for "
+         "the constant comparator.", ["evaluation"])],
         parity_results=[
         ("The repaired candidate, with its `Poisson2` family, passed {{" + v2 + ".checks_passed}} of {{" + v2
          + ".checks_required}} required checks; the largest coefficient difference was {{" + v2
@@ -95,10 +121,11 @@ def test_the_report_cites_recorded_evidence_and_the_bundle_reruns(cp, llm, envs,
                   "cites spec-v1, which is not in the claim's evidence_ids", "`x9` is not a known project name",
                   "`InventedEstimator` is not a known project name", "`９９９` is not a known project name",
                   "`Poisson2.age` is not a known project name",
-                  "financial_assessment.stability: cite assessment, the evidence this section reports",
-                  f"acceptance_decision: cite {decision}", f"the report must cite {decision}"):
+                  "validation.stability: cite evaluation, the evidence this section reports",
+                  f"migration.acceptance_decision: cite {decision}", f"the report must cite {decision}"):
         assert error in sent, error
     assert '"coefficient_estimates.rtol"' in sent and '"sample_suitability.status"' in sent and "secret-" not in sent
+    assert '"baseline_comparison.sets.test.mean_deviance.python"' in sent and "business fitness verdict" in sent
 
     rep = cp.get(f"/api/projects/{pid}/report").json()
     assert rep["id"] == s["report_id"]
@@ -108,25 +135,47 @@ def test_the_report_cites_recorded_evidence_and_the_bundle_reruns(cp, llm, envs,
     assert "{{" not in md and f"passed {n_checks} of {n_checks} required checks" in md
     assert "with a poisson family on 140 training rows. [spec-v1, " + b + "]" in md
     assert "against an rtol of 1.000e-06." in md and f"[{decision}]" in md
-    assert "### Coefficients" in md and "| `areaB` |" in md
+    assert "#### Coefficients" in md and "| `areaB` |" in md
     assert "The offset is scaled by a constant." in md                            # the attempts table
     assert "| 0 |" in md and "| 1 |" in md and "accepted" in md
-    # the fixed template, with parity kept apart from business fitness
+    # the fixed template: migration acceptance and business fitness are separate parts with separate conclusions
     headings = [line for line in md.splitlines() if line.startswith("## ")]
-    assert headings == ["## Scope", "## Model and data semantics", "## Parity results",
-                        "## Financial model assessment", "## Skipped or unavailable checks", "## Limitations",
-                        "## Acceptance decision", "## Appendix: reproducibility"]
-    assert "### Decision performance\n\n**Not assessed.** Needs: a binary event" in md     # a count model
-    assert "### Stability\n\n**Partially assessed.** Needs: a PSI threshold." in md
-    assert "This question is partially assessed. [assessment]" in md
+    assert headings == ["## Scope", "## Model and data semantics", "## Migration acceptance", "## Model validation",
+                        "## Missing evidence", "## Limitations", "## Business fitness",
+                        "## Appendix: reproducibility"]
+    assert [line for line in md.splitlines() if line.startswith("### ")][:13] == [
+        "### Validation plan", "### Parity results", "### Skipped or unavailable checks", "### Acceptance decision",
+        "### Performance", "### Calibration", "### Subgroup performance", "### Stability", "### Sensitivity",
+        "### Model assumptions", "### Sample suitability", "### Decision performance", "### Attempts"]
+    assert "### Decision performance\n\nAssessment: **Not assessed.** Needs: a binary event" in md   # a count model
+    assert "Assessment: **Partially assessed.** Needs: a PSI threshold." in md
+    assert "This question is partially assessed. [assessment]" in md and "This check was executed. [evaluation]" in md
     assert "It is not a statement that the model is fit for business use" in md
+    assert "| Business fitness | not established: " in md and "**Not established**: " in md
     assert "| Prediction | scalar, count: claims per policy; aligned on row |" in md
+    assert "| test | mean deviance |" in md and "against " in md and "for the constant comparator." in md
+    assert "- Sensitivity: sensitivity of area (the column is not numeric)" in md          # missing evidence
+    assert "| Subgroup performance | yes | claims frequency by area and age band |" in md
+
+    # ---- plots: retrieved from the validation run's MLflow artifacts, linked to it, served from local copies
+    figures = rep["body"]["figures"]
+    v_run = v["mlflow_run_id"]
+    assert {f["run_id"] for f in figures} == {v_run} and len(figures) >= 8
+    for f in figures:
+        assert f"![{f['title']}]({f['path']})" in md and f["url"].endswith(f"/runs/{v_run}")
+        assert f"[MLflow run `{v_run[:12]}`]({f['url']})" in md
+        served = cp.get(f"/api/projects/{pid}/report/files/{f['path']}")
+        assert served.status_code == 200 and served.headers["content-type"] == "image/svg+xml"
+        assert hashlib.sha256(served.content).hexdigest() == f["sha256"]
+    assert md.index("plots/parity.svg") < md.index("## Model validation") < md.index("plots/calibration-test.svg")
+    assert cp.get(f"/api/projects/{pid}/report/files/..%2F..%2Fdb.sqlite").status_code == 404
 
     # ---- deliverables
     bundle = cp.get(f"/api/projects/{pid}/deliverables").json()
     files = bundle["manifest"]["files"]
     assert {"model.py", "report.md", "verify.py", "parity.py", "harness.py", "README.md", "environment/uv.lock",
-            "environment/renv.lock", "environment/pyproject.toml", "reference/coefficients.csv"} <= files.keys()
+            "environment/renv.lock", "environment/pyproject.toml", "reference/coefficients.csv",
+            "reference/segments.csv", *(f["path"] for f in figures)} <= files.keys()
     assert bundle["manifest"]["bindings"] == {**bindings(s)}
     assert cp.get(f"/api/projects/{pid}/deliverables/files/model.py").text == REPAIRED
     assert cp.get(f"/api/projects/{pid}/deliverables/files/report.md").text == md
@@ -161,7 +210,9 @@ def test_the_report_cites_recorded_evidence_and_the_bundle_reruns(cp, llm, envs,
     [d_run] = tracker.client.search_runs([exp], "tags.kind = 'deliverables'")
     assert r_run.info.status == d_run.info.status == "FINISHED"
     assert r_run.data.metrics == {"tool_calls": 3.0, "invalid_submissions": 2.0}
-    assert {a.path for a in tracker.client.list_artifacts(r_run.info.run_id)} >= {"report.md", "narrative.json"}
+    assert {a.path for a in tracker.client.list_artifacts(r_run.info.run_id)} >= {"report", "narrative.json"}
+    assert {a.path for a in tracker.client.list_artifacts(r_run.info.run_id, "report/plots")} == {
+        f"report/{f['path']}" for f in figures}
     assert {a.path for a in tracker.client.list_artifacts(d_run.info.run_id)} >= {"bundle", f"{bundle['job_id']}.zip"}
     assert cp.post(f"/api/projects/{pid}/retry").status_code == 409
 

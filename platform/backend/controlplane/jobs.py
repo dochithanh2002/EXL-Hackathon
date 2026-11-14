@@ -22,10 +22,13 @@ from .environments import Environments
 from .runner import StepCancelled
 from .deliverables import build_bundle
 from .diagnosis import Diagnostician, failed_checks
-from .report import Reporter, gather
+from .report import Reporter, gather, retrieve_plots
 from .schemas import Candidate, Diagnosis, ModelSpec, ReportNarrative, canonical_hash, sha256_file
 from .settings import Settings
 from .support import SupportMatrix
+from .evaluation import write_tables
+from .plots import render as render_plots
+from .runs import log_comparison, log_reference
 from .tracking import StepRun, Tracker
 from .translation import Translator, rulebook, run_candidate
 from .workflow import Status, Step, Store
@@ -255,8 +258,9 @@ class Jobs:
                 b = run_baseline(workdir, spec, s.files, self.settings.project_dir(pid) / "inputs", self.envs,
                                  self.settings.limits, lambda p: self._started(jid, p.cancel))
                 run.params(baseline_hash=b.hash, r_version=b.meta["r_version"])
-                run.metrics(runtime_s=b.runtime_s, **{k: v for k, v in b.fit.items()
-                                                      if isinstance(v, (int, float)) and not isinstance(v, bool)})
+                run.metrics(runtime_s=b.runtime_s)
+                dataset = next(f for f in s.files if f.role == "dataset")
+                log_reference(run, spec, b.dir, dataset.name, dataset.sha256)
                 run.artifact(workdir / "baseline.R", "code")
                 run.artifact(b.dir, "capture")
                 run.artifact(workdir / "step.log")
@@ -323,27 +327,41 @@ class Jobs:
                 h = hashlib.sha256(cand.module.encode()).hexdigest()
                 run.params(candidate_hash=h)
                 run.artifact_text(cand.module, "candidate.py")
+                candidate_run = run.run_id
                 cid, _ = self.store.record(pid, "candidate", {
                     **common, **attempt, "hash": h, "module": cand.module, "notes": cand.notes,
                     "limitations": cand.limitations, "changes": cand.changes,
                     "reply": result["text"], "model": model_label, "mlflow_run_id": run.run_id})
 
+            lineage = {"job_id": jid, "spec_version": s.spec_version, "baseline_id": s.baseline_id,
+                       "candidate_id": cid, "reference_run_id": baseline["mlflow_run_id"],
+                       "candidate_run_id": candidate_run}
             with self.tracker.step(pid, "validation", f"validation v{s.spec_version}", workdir / "step.log") as run:
                 run.params(candidate_id=cid, candidate_hash=h, environment_version=self.envs.version(), **common)
+                run.tags(**{k: v for k, v in lineage.items() if k.endswith("_run_id")})
                 v = run_candidate(workdir, cand.module, spec, baseline_dir, s.files,
                                   self.settings.project_dir(pid) / "inputs", self.envs, self.settings.limits,
                                   lambda p: self._started(jid, p.cancel))
                 body = json.loads(v.model_dump_json())
                 run.metrics(**v.metrics_for_mlflow())
                 run.tags(passed=v.passed, stage=v.stage)
+                plots = render_plots(body, workdir / "plots")
+                write_tables(body, workdir / "tables")
                 run.artifact_text(json.dumps(body, indent=1), "validation.json")
                 run.artifact(workdir / "candidate.py", "code")
-                if (workdir / "output").is_dir():
-                    run.artifact(workdir / "output", "output")
+                for folder in ("output", "diagnostics", "plots", "tables"):
+                    if (workdir / folder).is_dir():
+                        run.artifact(workdir / folder, folder)
                 run.artifact(workdir / "step.log")
+                runs = {}
+                if v.stage == "parity":
+                    dataset = next(f for f in s.files if f.role == "dataset")
+                    runs = log_comparison(self.tracker, pid, run, spec=spec, baseline_dir=baseline_dir,
+                                          output_dir=workdir / "output", evaluation=v.evaluation,
+                                          dataset=dataset.name, sha256=dataset.sha256, lineage=lineage)
                 vid, _ = self.store.record(pid, "validation", {
                     **common, "candidate_id": cid, "candidate_hash": h, "environment_version": self.envs.version(),
-                    **body, "mlflow_run_id": run.run_id})
+                    **body, "plots": plots, "mlflow_runs": runs, "mlflow_run_id": run.run_id})
             self.store.finish_job(jid, CandidateValidated(
                 bindings=Bindings(spec_version=s.spec_version, baseline_id=s.baseline_id, candidate_hash=h,
                                   validation_id=vid), passed=v.passed))
@@ -445,7 +463,11 @@ class Jobs:
             with self.tracker.step(pid, "report", f"report v{s.spec_version}") as run:
                 model_ref, model_label = self.endpoints.for_role("reporter")
                 run.params(model=model_label, **common)
-                reporter = Reporter(gather(self.store, self.settings, pid))
+                record = gather(self.store, self.settings, pid)
+                report_dir = self.settings.project_dir(pid) / "reports" / jid
+                figures = retrieve_plots(self.tracker, record.approved.validation["body"], report_dir,
+                                         self.settings.mlflow_public_url or self.settings.mlflow_uri)
+                reporter = Reporter(record, figures)
                 turn = Turn("submit_report", reporter.check,
                             "Accepted. The platform fills in the numbers and adds the evidence tables when you end "
                             "your turn; now end it with one sentence.")
@@ -459,10 +481,12 @@ class Jobs:
                                             + (result["text"].strip()[:500] or "(no reply)"))
                 markdown = reporter.render(narrative)
                 run.artifact_text(narrative.model_dump_json(indent=2), "narrative.json")
-                run.artifact_text(markdown, "report.md")
+                (report_dir / "report.md").write_text(markdown)
+                run.artifact(report_dir, "report")
                 rid, _ = self.store.record(pid, "report", {
                     **common, "spec_version": s.spec_version, "narrative": narrative.model_dump(mode="json"),
                     "catalog": reporter.entries, "markdown": markdown, "model": model_label,
+                    "dir": str(report_dir.relative_to(self.settings.data_dir)), "figures": figures,
                     "mlflow_run_id": run.run_id})
             self.store.finish_job(jid, ReportBuilt(spec_version=s.spec_version, report_id=rid))
         except StepCancelled:
@@ -485,8 +509,9 @@ class Jobs:
             with self.tracker.step(pid, "deliverables", f"deliverables v{s.spec_version}") as run:
                 run.params(environment_version=self.envs.version(), **common)
                 record = gather(self.store, self.settings, pid)
-                manifest = build_bundle(dest, record, self.store.evidence(pid, s.report_id)["body"]["markdown"],
-                                        self.envs)
+                report = self.store.evidence(pid, s.report_id)["body"]
+                manifest = build_bundle(dest, record, report["markdown"], self.envs,
+                                        self.settings.data_dir / report["dir"] if report.get("dir") else None)
                 archive = dest.with_suffix(".zip")
                 run.artifact(dest, "bundle")
                 run.artifact(archive)

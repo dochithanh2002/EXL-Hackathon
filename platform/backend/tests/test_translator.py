@@ -2,6 +2,8 @@
 baseline, the Translator, the candidate run and validation, to the DS's approval or rejection."""
 import hashlib
 
+import pytest
+
 from controlplane.tracking import Tracker
 from tests.fake_llm import text, tool
 from tests.test_analyst import agent_service, configure, cp, llm, settle, upload  # noqa: F401
@@ -61,9 +63,45 @@ def test_translator_candidate_passes_validation_and_the_ds_approves_it(cp, llm):
     [v_run] = tracker.client.search_runs([exp], "tags.kind = 'validation'")
     assert t_run.info.status == v_run.info.status == "FINISHED"
     assert t_run.data.metrics == {"tool_calls": 4.0, "invalid_submissions": 1.0}
-    assert v_run.data.tags["passed"] == "True" and v_run.data.metrics["coefficient_estimates"] < 1e-3
-    assert {a.path for a in tracker.client.list_artifacts(v_run.info.run_id)} >= {"code", "output", "step.log",
-                                                                                     "validation.json"}
+    m = v_run.data.metrics
+    assert v_run.data.tags["passed"] == "True" and m["parity/coefficient_estimates/ratio"] < 1e-3
+    # actual model performance under r/ and python/, migration differences only under parity/
+    assert m["r/test/rmse"] == pytest.approx(m["python/test/rmse"]) and "parity/predictions/max_abs_diff" in m
+    assert not [k for k in m if not k.startswith(("r/", "python/", "parity/"))]
+    assert {a.path for a in tracker.client.list_artifacts(v_run.info.run_id)} >= {
+        "code", "output", "diagnostics", "plots", "tables", "step.log", "validation.json"}
+    plots = {a.path for a in tracker.client.list_artifacts(v_run.info.run_id, "plots")}
+    assert {"plots/parity.svg", "plots/performance.svg", "plots/calibration-test.svg", "plots/training-curve.svg",
+            "plots/cross-validation.svg", "plots/subgroups-area-test.svg", "plots/sensitivity-train.svg",
+            "plots/vif.svg"} <= plots
+    tables = {a.path for a in tracker.client.list_artifacts(v_run.info.run_id, "tables")}
+    assert {"tables/performance.csv", "tables/subgroups.csv", "tables/cv_folds.csv",
+            "tables/missing_evidence.csv"} <= tables
+
+    # model fits, folds and the challenger are comparable runs with lineage
+    [b_run] = tracker.client.search_runs([exp], "tags.kind = 'baseline'")
+    [fit] = tracker.client.search_runs([exp], "tags.kind = 'model_fit'")
+    folds = tracker.client.search_runs([exp], "tags.kind = 'cv_fold'")
+    [challenger] = tracker.client.search_runs([exp], "tags.kind = 'challenger'")
+    assert fit.data.tags["mlflow.parentRunId"] == challenger.data.tags["mlflow.parentRunId"] == v_run.info.run_id
+    assert fit.data.tags["reference_run_id"] == b_run.info.run_id == v_run.data.tags["reference_run_id"]
+    assert fit.data.tags["candidate_run_id"] == t_run.info.run_id
+    assert len(folds) == 3 and {f.data.tags["mlflow.parentRunId"] for f in folds} == {fit.info.run_id}
+    shared = {k for k in b_run.data.metrics if k.startswith("model/")}
+    assert shared and shared == {k for k in fit.data.metrics if k.startswith("model/")} \
+        == {k for k in challenger.data.metrics if k.startswith("model/")}
+    assert fit.data.metrics["model/test/rmse"] == pytest.approx(b_run.data.metrics["model/test/rmse"])
+    assert all("model/held_out/mean_deviance" in f.data.metrics for f in folds)
+    curve = tracker.client.get_metric_history(fit.info.run_id, "train/deviance")
+    assert len(curve) > 1 and [c.step for c in curve] == list(range(1, len(curve) + 1))
+    assert [c.step for c in tracker.client.get_metric_history(fit.info.run_id, "cv/held_out/mean_deviance")] == [
+        1, 2, 3]
+    assert fit.data.params["spec.family"] == "poisson" and fit.data.params["split.test.rows"] == "60"
+    assert {d.dataset.name for d in fit.inputs.dataset_inputs} == {"claims.csv:train", "claims.csv:test"}
+    v = cp.get(f"/api/projects/{pid}/evidence/{s['validation_id']}").json()["body"]
+    assert v["mlflow_runs"]["python_fit"] == fit.info.run_id
+    assert cp.get(f"/api/projects/{pid}/evidence/{s['validation_id']}/plots/parity.svg").text.startswith("<svg")
+    assert cp.get(f"/api/projects/{pid}/evidence/{s['validation_id']}/plots/..%2Fcandidate.py").status_code == 404
 
     bindings = {k: s[k] for k in ("spec_version", "baseline_id", "candidate_hash", "validation_id")}
     stale = bindings | {"validation_id": "validation-0000000000"}

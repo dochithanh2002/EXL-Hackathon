@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import type * as React from "react";
-import { ErrorText, Panel } from "@/components/common";
+import { ErrorText, Panel, RunLink } from "@/components/common";
 import { Badge } from "@/components/ui/badge";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { type AssessmentAnswer, type Check, type CoefficientRow, get, p, type ValidationBody } from "@/lib/api";
+import { type AssessmentAnswer, type Check, type CoefficientRow, type Evidence, get, p, type ValidationBody } from "@/lib/api";
 import { num } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -167,6 +167,57 @@ export function FinancialAssessment({ v }: { v: ValidationBody }) {
             </div>
           );
         })}
+      </div>
+    </Panel>
+  );
+}
+
+const CHECKS = [
+  ["baseline_comparison", "Baseline comparison"], ["calibration", "Calibration"],
+  ["subgroup_performance", "Subgroup performance"], ["stability", "Stability"], ["sensitivity", "Sensitivity"],
+  ["assumptions", "Model assumptions"],
+] as const;
+const CHECK_BADGE = { executed: "pass", "partially executed": "warn", "not executed": "fail", "not planned": "secondary" } as const;
+
+/** The validation plan's checks as the platform ran them, with their plots; business fitness, apart from parity. */
+export function ModelValidation({ pid, v }: { pid: string; v: Evidence<ValidationBody> }) {
+  const ev = v.body.evaluation;
+  if (!ev?.checks) return null;
+  const plots = (v.body.plots ?? []).filter((x) => x.section.startsWith("validation."));
+  return (
+    <Panel title="Model validation" actions={<RunLink pid={pid} runId={v.body.mlflow_run_id} />}>
+      <div className="flex flex-col gap-5">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {CHECKS.map(([k, title]) => {
+            const c = ev.checks[k];
+            if (!c) return null;
+            return (
+              <div key={k} className="flex flex-col gap-1.5 rounded-md border p-3 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{title}</span>
+                  <Badge variant={CHECK_BADGE[c.status]}>{c.status[0].toUpperCase() + c.status.slice(1)}</Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">{c.rationale}</p>
+                {c.needs.length > 0 && <p className="text-xs">Needs {c.needs.join("; ")}.</p>}
+              </div>
+            );
+          })}
+        </div>
+        {plots.length > 0 && (
+          <div className="grid gap-4 xl:grid-cols-2">
+            {plots.map((x) => (
+              <figure key={x.name} className="min-w-0">
+                <img src={p(pid, `/evidence/${v.id}/plots/${x.name}`)} alt={x.title} className="w-full rounded-md border" loading="lazy" />
+              </figure>
+            ))}
+          </div>
+        )}
+        {ev.missing_evidence.length > 0 && (
+          <div className="rounded-md border border-warn/50 bg-warn/5 px-3 py-2 text-sm">
+            <p className="mb-1 font-medium">Missing evidence</p>
+            <ul className="list-disc pl-5 text-xs">{ev.missing_evidence.map((m) => <li key={m}>{m}</li>)}</ul>
+          </div>
+        )}
       </div>
     </Panel>
   );

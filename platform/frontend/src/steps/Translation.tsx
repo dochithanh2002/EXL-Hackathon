@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleCheck } from "lucide-react";
 import { useState } from "react";
 import { ActionBar, Code, Details, ErrorText, Fields, Mono, Muted, Panel, RunLink } from "@/components/common";
-import { Checks, Coefficients, EvaluationMetrics, FinancialAssessment } from "@/components/validation";
+import { Checks, Coefficients, EvaluationMetrics, FinancialAssessment, ModelValidation } from "@/components/validation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { type Bindings, get, p, post, type SpecVersion } from "@/lib/api";
@@ -85,6 +85,7 @@ export function Translation({ project, rev }: StepProps) {
       {v?.body.stage === "parity" && (
         <>
           <EvaluationMetrics v={v.body} />
+          <ModelValidation pid={project.id} v={v} />
           <FinancialAssessment v={v.body} />
           <Coefficients pid={project.id} evidenceId={v.id} />
         </>

@@ -21,6 +21,8 @@ and submit again. Once accepted, the platform runs it and compares it with R.
 
 Carry the spec's semantics through: encode the event exactly as coded, apply the weights as their type requires,
 fit grouped binomial data with its trials, include the offset, and return predictions in the spec's units and keys.
+Keep the validation plan's sensitivity columns, under their spec names, in the frames prepare returns and derive
+features from them inside fit and predict, so shifting one moves the prediction as it would in R.
 
 Limits: implement exactly the interface and nothing else, with statsmodels, scipy or numpy; never scikit-learn.
 Translate baseline.R faithfully: never add, drop or fix a feature, never re-split or sample, never impute, never

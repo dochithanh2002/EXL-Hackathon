@@ -26,7 +26,7 @@ export function Report({ project }: StepProps) {
         </>
       }
     >
-      <Prose markdown={md} />
+      <Prose markdown={md} assets={p(project.id, "/report/files")} />
     </Panel>
   );
 }

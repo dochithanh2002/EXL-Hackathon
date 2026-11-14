@@ -101,7 +101,8 @@ export function Diff({ before, after }: { before: string; after: string }) {
   );
 }
 
-export function Prose({ markdown }: { markdown: string }) {
+/** Markdown; relative image paths resolve against `assets`, the URL the document's files are served from. */
+export function Prose({ markdown, assets }: { markdown: string; assets?: string }) {
   return (
     <div
       className={cn(
@@ -109,10 +110,20 @@ export function Prose({ markdown }: { markdown: string }) {
         "[&_h1]:mb-4 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:mt-8 [&_h2]:mb-3 [&_h2]:text-base [&_h2]:font-semibold",
         "[&_p]:my-3 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:font-mono [&_code]:text-[0.85em]",
         "[&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0",
-        "[&_table]:my-3 [&_table]:block [&_table]:w-full [&_table]:overflow-x-auto [&_table]:text-xs [&_th]:border-b [&_th]:px-2 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-medium [&_th]:text-muted-foreground [&_td]:border-b [&_td]:px-2 [&_td]:py-1",
+        "[&_h3]:mt-6 [&_h3]:mb-2 [&_h3]:font-semibold [&_h4]:mt-4 [&_h4]:mb-2 [&_h4]:text-xs [&_h4]:font-medium [&_h4]:text-muted-foreground [&_table]:my-3 [&_table]:block [&_table]:w-full [&_table]:overflow-x-auto [&_table]:text-xs [&_th]:border-b [&_th]:px-2 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-medium [&_th]:text-muted-foreground [&_td]:border-b [&_td]:px-2 [&_td]:py-1",
       )}
     >
-      <Markdown remarkPlugins={[remarkGfm]}>{markdown}</Markdown>
+      <Markdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          img: ({ src, alt }) => (
+            <img src={assets && typeof src === "string" && !/^[a-z]+:|^\//i.test(src) ? `${assets}/${src}` : src} alt={alt} className="my-3 w-full max-w-3xl rounded-md border" loading="lazy" />
+          ),
+          a: ({ href, children }) => <a href={href} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-foreground">{children}</a>,
+        }}
+      >
+        {markdown}
+      </Markdown>
     </div>
   );
 }

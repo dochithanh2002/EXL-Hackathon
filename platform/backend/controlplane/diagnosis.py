@@ -4,7 +4,8 @@ The Diagnostician sees what the Translator saw (spec, baseline.R, baseline metad
 candidate under diagnosis, the DS's comment if they rejected it, earlier attempts for the same spec, and a filtered
 view of the validation. The view keeps every check, per-term differences in tolerance units, row ids, evaluation
 metrics, the design comparison (fitted rows, design-matrix column statistics, reference levels, offsets and
-weights in R and Python) and the financial assessment summaries, and withholds three things:
+weights in R and Python), the financial assessment summaries and Python's side of the validation plan's
+evaluation, and withholds three things:
 - R's estimates and fit statistics, and the candidate's: its repair instructions go to the Translator, which must
   never be able to copy R's numbers into a candidate;
 - row-level predictions and responses;
@@ -21,6 +22,7 @@ from typing import Callable
 from pydantic import ValidationError
 
 from . import candidate as contract
+from .evaluation import evaluation_view
 from .schemas import Diagnosis, ModelSpec
 from .translation import baseline_context, coefficient_names
 
@@ -120,6 +122,8 @@ def validation_view(v: dict, words: set[str], source: str) -> dict:
         view["design"] = v["design"]
     if v.get("assessment"):
         view["assessment"] = v["assessment"]
+    if v.get("evaluation"):
+        view["evaluation"] = evaluation_view(v["evaluation"])
     return view
 
 
@@ -165,7 +169,8 @@ class Diagnostician:
                       "withheld). A tolerance check's value is the worst |python - r| / (atol + rtol * |r|); above 1 "
                       "fails. `design` compares what each side fitted; `assessment` summarises sample "
                       "suitability, stability, calibration and decision performance for R's reference and the "
-                      "candidate:", json.dumps(self.view(), indent=1), ""]
+                      "candidate; `evaluation` gives the validation plan's checks on the candidate (baseline "
+                      "comparison, calibration, subgroups, stability, sensitivity, assumptions) where they ran:", json.dumps(self.view(), indent=1), ""]
         if self.ds_comment:
             lines += ["The validation passed, but the DS rejected the candidate with this comment:", self.ds_comment,
                       ""]

@@ -1,4 +1,5 @@
-"""MLflow: one experiment per project; every step run is nested under the project's workflow parent run."""
+"""MLflow: one experiment per project; every step run is nested under the project's workflow parent run, and the
+runs a step adds (model fits, cross-validation folds, challengers) under that step's run."""
 from __future__ import annotations
 
 import os
@@ -9,11 +10,13 @@ from typing import Iterator
 
 os.environ.setdefault("MLFLOW_DISABLE_AGENT_HINT", "1")
 
-from mlflow.entities import Metric, Param, RunTag  # noqa: E402
+from mlflow.entities import Dataset, DatasetInput, InputTag, Metric, Param, RunTag  # noqa: E402
 from mlflow.tracking import MlflowClient  # noqa: E402
 from mlflow.utils.mlflow_tags import MLFLOW_PARENT_RUN_ID, MLFLOW_RUN_NAME  # noqa: E402
 
 from .runner import StepCancelled  # noqa: E402
+
+PARAM_LIMIT = 6000
 
 
 class StepRun:
@@ -21,10 +24,24 @@ class StepRun:
         self.client, self.run_id = client, run_id
 
     def params(self, **values) -> None:
-        self.client.log_batch(self.run_id, params=[Param(k, str(v)) for k, v in values.items()])
+        items = [Param(k, str(v)[:PARAM_LIMIT]) for k, v in values.items()]
+        for i in range(0, len(items), 100):                          # MLflow's batch limit for parameters
+            self.client.log_batch(self.run_id, params=items[i:i + 100])
 
     def metrics(self, **values: float) -> None:
-        self.client.log_batch(self.run_id, metrics=[Metric(k, float(v), 0, 0) for k, v in values.items()])
+        items = [Metric(k, float(v), 0, 0) for k, v in values.items()]
+        for i in range(0, len(items), 1000):
+            self.client.log_batch(self.run_id, metrics=items[i:i + 1000])
+
+    def series(self, key: str, values: list[float], steps: list[int]) -> None:
+        """One metric over meaningful steps (iterations, folds), so MLflow draws it as a curve."""
+        self.client.log_batch(self.run_id, metrics=[Metric(key, float(v), 0, int(st)) for v, st in zip(values, steps)])
+
+    def datasets(self, items: list[tuple[str, str, str, str]]) -> None:
+        """(name, digest, source, context) per data split, as MLflow dataset inputs."""
+        self.client.log_inputs(self.run_id, [DatasetInput(Dataset(name, digest, "local", source),
+                                                          [InputTag("mlflow.data.context", context)])
+                                             for name, digest, source, context in items])
 
     def tags(self, **values) -> None:
         self.client.log_batch(self.run_id, tags=[RunTag(k, str(v)) for k, v in values.items()])
@@ -57,9 +74,11 @@ class Tracker:
         return self.client.create_run(eid, tags={"kind": "workflow", MLFLOW_RUN_NAME: "workflow"}).info.run_id
 
     @contextmanager
-    def step(self, pid: str, kind: str, name: str, log: Path | None = None) -> Iterator[StepRun]:
-        """A nested run that ends FINISHED, or FAILED with the traceback and the step log as artifacts."""
-        parent = self.workflow_run(pid)
+    def step(self, pid: str, kind: str, name: str, log: Path | None = None,
+             parent: str | None = None) -> Iterator[StepRun]:
+        """A nested run that ends FINISHED, or FAILED with the traceback and the step log as artifacts. It is nested
+        under `parent` if given, else under the workflow run."""
+        parent = parent or self.workflow_run(pid)
         eid = self.client.get_run(parent).info.experiment_id
         run = StepRun(self.client, self.client.create_run(
             eid, tags={MLFLOW_PARENT_RUN_ID: parent, MLFLOW_RUN_NAME: name, "kind": kind}).info.run_id)

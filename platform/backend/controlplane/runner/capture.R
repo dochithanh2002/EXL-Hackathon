@@ -3,7 +3,7 @@
 # Usage: Rscript --vanilla capture.R <config.json>
 #   config: script, dataset, objects {model, train, test (or null)}, seed (or null), out, and the spec's semantics
 #   (ModelSpec.capture_config): response, response_type, event_coding, grouped, weights, prediction {kind, keys,
-#   r_predict}, period_column
+#   r_predict}, period_column, segments (the validation plan's subgroup columns)
 # lm and glm fits are read through summary(); any other class through coef(), vcov(), logLik() and the spec's
 # r_predict expression, so the extraction follows the spec rather than a list of supported classes.
 # Everything written to `out` is deterministic except timing.json, so a rerun reproduces the same baseline id.
@@ -210,6 +210,24 @@ predictions <- do.call(rbind, lapply(names(sets), function(s) {
 }))
 write_full(predictions, "predictions.csv")
 
+# ---- subgroup values of the validation plan's columns, one row per set, data row and column
+segment_cols <- as.character(unlist(cfg$segments))
+segment_types <- list()
+segments <- data.frame(set = character(), row = integer(), column = character(), value = character())
+for (col in segment_cols) {
+  present <- vapply(sets, function(df) col %in% names(df), logical(1))
+  if (!all(present)) { segment_types[[col]] <- "missing"; next }
+  x <- sets$train[[col]]
+  numeric <- is.numeric(x) && !is.factor(x) && length(unique(na.omit(x))) > 12
+  segment_types[[col]] <- if (numeric) "numeric" else "categorical"
+  segments <- rbind(segments, do.call(rbind, lapply(names(sets), function(s) {
+    v <- sets[[s]][[col]]
+    data.frame(set = s, row = rows[[s]], column = col,
+               value = if (numeric) ifelse(is.na(v), NA, sprintf("%.17g", as.numeric(v))) else as.character(v))
+  })))
+}
+write.csv(segments, out("segments.csv"), row.names = FALSE, na = "")
+
 # ---- fit statistics
 stat_of <- function(expr) { v <- optional(as.numeric(expr)); if (length(v) == 1) v else NULL }
 fit <- list(nobs = stat_of(nobs(m)), df_residual = stat_of(df.residual(m)), log_lik = stat_of(logLik(m)),
@@ -272,6 +290,8 @@ write_meta(list(
   xlevels = field("xlevels"), contrasts = field("contrasts"),
   offset = !is.null(mf) && !is.null(model.offset(mf)), weights = !is.null(prior) && any(prior != 1),
   n = lapply(rows, length), n_fit = length(fit_rows), row_identity_check = "passed",
+  segments = segment_types,
+  separation_warning = any(grepl("fitted probabilities numerically 0 or 1", fit_warnings, fixed = TRUE)),
   converged = converged, closed_form = is_lm && !is_glm, iterations = if (is_glm) m$iter else NULL,
   control = if (is_glm) list(epsilon = m$control$epsilon, maxit = m$control$maxit) else NULL,
   column_classes = lapply(sets$train, function(x) class(x)[1])

@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from pydantic import ValidationError
 
@@ -20,6 +22,14 @@ def assessment(test: bool = True, **overrides) -> dict:
             "sample_population": "the uploaded file", "evaluation_sets": sets, "missing_information": []} | overrides
 
 
+def plan(**overrides) -> dict:
+    """A validation plan that runs the checks needing no columns; `overrides` replaces any check."""
+    def c(run, **kw):
+        return {"run": run, "rationale": "relevant to the use" if run else "not relevant here", **kw}
+    return {"baseline_comparison": c(True), "calibration": c(True), "subgroup_performance": c(False),
+            "stability": c(True, folds=3), "sensitivity": c(False), "assumptions": c(False)} | overrides
+
+
 def spec(**overrides) -> ModelSpec:
     """A valid spec; families other than binomial get count semantics, a null test set drops the test role."""
     base = dict(
@@ -33,15 +43,17 @@ def spec(**overrides) -> ModelSpec:
     )
     base |= BINARY if overrides.get("family", "binomial") in ("binomial", "quasibinomial") else COUNT | {"metrics": []}
     base |= overrides
+    base.setdefault("validation_plan", plan())
     if "assessment" not in overrides:
         base["assessment"] = assessment(test=base["baseline_objects"]["test"] is not None)
     return ModelSpec.model_validate(base)
 
 
-@pytest.mark.parametrize("role", sorted(ROLES))
-def test_every_role_has_a_versioned_json_schema(role):
+@pytest.mark.parametrize("role, version", [("analyst", "3"), ("diagnostician", "2"), ("reporter", "3"),
+                                           ("translator", "2")])
+def test_every_role_has_a_versioned_json_schema(role, version):
     js = ROLES[role].model_json_schema()
-    assert js["properties"]["schema_version"]["const"] == "2"
+    assert js["properties"]["schema_version"]["const"] == version
     assert js["additionalProperties"] is False
 
 
@@ -128,67 +140,58 @@ def claims(text="Shown by {{v1.passed}}.", ids=("v1",)):
 
 
 def narrative(**overrides) -> dict:
-    fa = {q: claims() for q in ("sample_suitability", "stability", "calibration", "decision_performance")}
-    return {"scope": claims(), "model_and_data_semantics": claims(), "parity_results": claims(),
-            "financial_assessment": fa, "skipped_checks": claims(), "limitations": claims(),
-            "acceptance_decision": claims()} | overrides
+    migration = {k: claims() for k in ("parity_results", "skipped_checks", "acceptance_decision")}
+    validation = {k: claims() for k in ("performance", "calibration", "subgroup_performance", "stability",
+                                        "sensitivity", "assumptions", "sample_suitability", "decision_performance")}
+    return {"scope": claims(), "model_and_data_semantics": claims(), "migration": migration,
+            "validation": validation, "missing_evidence": claims(), "limitations": claims(),
+            "business_fitness": claims()} | overrides
 
 
 def test_report_follows_the_template_and_claims_may_not_contain_literal_numbers():
     ReportNarrative.model_validate(narrative())
     with pytest.raises(ValidationError, match="placeholders"):
-        ReportNarrative.model_validate(narrative(parity_results=claims("The test AUC is 0.81.")))
+        ReportNarrative.model_validate(narrative(business_fitness=claims("The test AUC is 0.81.")))
     with pytest.raises(ValidationError):
         ReportNarrative.model_validate(narrative(limitations=[]))
     with pytest.raises(ValidationError):
         ReportNarrative.model_validate(narrative(scope=claims("Fine.", ())))
     missing = narrative()
-    del missing["financial_assessment"]["calibration"]
+    del missing["validation"]["calibration"]
     with pytest.raises(ValidationError):
         ReportNarrative.model_validate(missing)
+    paths = [p for p, _ in ReportNarrative.model_validate(narrative()).sections()]
+    assert paths.index("migration.acceptance_decision") < paths.index("validation.performance")
+    assert paths[-1] == "business_fitness"
 
 
-def test_diagnosis_category_decides_who_acts():
-    base = dict(root_cause="r", evidence=["e"], repair_instructions=["fix"], spec_change_needed=False,
-                category="migration_defect")
-    Diagnosis.model_validate(base)
-    with pytest.raises(ValidationError, match="spec_change_needed must be false exactly"):
-        Diagnosis.model_validate(base | {"category": "model_fitness"})
-    with pytest.raises(ValidationError, match="limitation is required"):
-        Diagnosis.model_validate(base | {"category": "not_reproducible", "spec_change_needed": True,
-                                         "proposed_spec_change": "stop"})
+@pytest.mark.parametrize("change, error", [
+    ({"subgroup_performance": {"run": True, "rationale": "segments"}}, "subgroup_performance.columns: name"),
+    ({"sensitivity": {"run": True, "rationale": "pricing"}}, "sensitivity.columns: name"),
+    ({"assumptions": {"run": True, "rationale": "glm"}}, "assumptions.assumptions: list them"),
+    ({"assumptions": {"run": True, "rationale": "glm", "assumptions": ["zero_inflation"]}},
+     "['zero_inflation'] do not apply to a binary response"),
+    ({"stability": {"run": True, "rationale": "refits", "folds": 1}}, "greater than or equal to 2"),
+    ({"calibration": {"run": False, "rationale": ""}}, "at least 1 character"),
+])
+def test_the_validation_plan_must_be_actionable_and_fit_the_response(change, error):
+    with pytest.raises(ValidationError, match=re.escape(error)):
+        spec(validation_plan=plan(**change))
 
 
-def test_support_matrix_is_a_reference_not_an_allowlist():
-    m = support.load()
-    assert m.check(spec()) == []
-    assert m.support(spec()).model_dump() == {"tier": "exact", "proven": False, "known": True}
-    assert "known 'exact' pair" in m.check(spec(support_tier="approximate"))[0]
-    # a model outside the matrix is attempted at the Analyst's tier, unproven
-    other = spec(r_function="betareg::betareg", python_implementation="scipy.optimize.minimize",
-                 support_tier="approximate")
-    assert m.check(other) == [] and m.support(other).model_dump() == {
-        "tier": "approximate", "proven": False, "known": False}
-    # a known R function with a different implementation keeps the Analyst's tier and is unproven
-    custom = spec(python_implementation="scipy.optimize.minimize", support_tier="approximate")
-    assert m.support(custom).model_dump() == {"tier": "approximate", "proven": False, "known": False}
-    limited = spec(r_function="randomForest::randomForest", support_tier="unsupported", python_implementation="none",
-                   limitation="the forest's bootstrap and split search cannot be reproduced without scikit-learn")
-    assert m.support(limited).tier == "unsupported"
+def test_every_check_is_planned_or_excluded_with_a_rationale():
+    body = spec().model_dump(mode="json")
+    del body["validation_plan"]["sensitivity"]
+    with pytest.raises(ValidationError, match="sensitivity"):
+        ModelSpec.model_validate(body)
+    assert spec(validation_plan=plan(assumptions={"run": True, "rationale": "logit", "assumptions": [
+        "separation", "multicollinearity"]})).validation_plan.assumptions.run
 
 
-def test_pairs_are_unproven_until_a_fixture_exists(tmp_path):
-    m = support.load()
-    assert not any(p.proven for p in m.pairs)
-
-    matrix = tmp_path / "matrix.yaml"
-    matrix.write_text("version: 2\npairs:\n  - {r: stats::lm, python: [statsmodels.api.OLS], "
-                      "tier: exact, fixture: lm_ols}\n")
-    with pytest.raises(ValueError, match="fixtures not found"):
-        support.load(matrix, tmp_path / "fixtures")
-    (tmp_path / "fixtures" / "lm_ols").mkdir(parents=True)
-    proven = support.load(matrix, tmp_path / "fixtures")
-    assert proven.support(spec(r_function="stats::lm", family=None, link=None,
-                               python_implementation="statsmodels.api.OLS", response_type="continuous",
-                               prediction={"kind": "scalar", "quantity": "continuous", "units": "EUR",
-                                           "alignment_keys": ["row"]}, metrics=[])).proven
+def test_subgroup_columns_are_captured_with_the_baseline():
+    grouped = spec(validation_plan=plan(subgroup_performance={"run": True, "rationale": "segments",
+                                                              "columns": ["age"]}))
+    assert grouped.capture_config()["segments"] == ["age"] and spec().capture_config()["segments"] == []
+    assert canonical_hash(grouped.baseline_key()) != canonical_hash(spec().baseline_key())
+    unchanged = spec(validation_plan=plan(stability={"run": True, "rationale": "refits", "folds": 7}))
+    assert canonical_hash(unchanged.baseline_key()) == canonical_hash(spec().baseline_key())

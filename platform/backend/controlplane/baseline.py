@@ -14,8 +14,8 @@ from .schemas import ModelSpec, canonical_hash, sha256_file
 from .workflow.machine import InputFile
 
 CAPTURE_R = Path(__file__).parent / "runner" / "capture.R"
-CAPTURED = ("coefficients.csv", "split.csv", "predictions.csv", "fit.json", "design.json", "meta.json",
-            "sessionInfo.txt")
+CAPTURED = ("coefficients.csv", "split.csv", "predictions.csv", "segments.csv", "fit.json", "design.json",
+            "meta.json", "sessionInfo.txt")
 
 
 class BaselineFailed(Exception):

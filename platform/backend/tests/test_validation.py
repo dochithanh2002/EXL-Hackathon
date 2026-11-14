@@ -318,6 +318,17 @@ def test_assessment_with_criteria_and_threshold_is_assessed(tmp_path):
     assert a["stability"]["status"] == "assessed"
 
 
+def test_sample_suitability_reports_missing_evidence_when_parameter_count_is_unavailable(tmp_path):
+    r, py = pair(tmp_path)
+    (r / "coefficients.csv").write_text("term,estimate,std_error\n")
+    spec = make_spec().model_dump(mode="json")
+    spec["assessment"]["criteria"]["min_events_per_parameter"] = 10
+
+    answer = assess_both(r, py, spec)["python"]["sample_suitability"]
+    assert answer["status"] == "partially assessed" and answer["meets"] is None
+    assert answer["needs"] == ["a computable result for per_parameter >= 10"]
+
+
 def test_design_comparison_shows_fitted_rows_columns_and_reference_levels(tmp_path):
     r, py = pair(tmp_path)
     (r / "meta.json").write_text(json.dumps(json.loads((r / "meta.json").read_text())

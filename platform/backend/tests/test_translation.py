@@ -199,6 +199,19 @@ def test_m4_known_good_candidate_reaches_exact_parity(jobs, tmp_path):
     assert worst < 1e-10
     assert set(v.metrics["train"]) == {"auc", "gini", "log_loss"}
     assert v.assessment["python"]["stability"]["status"] == "not assessed"                 # no holdout, no periods
+    checks = v.evaluation["checks"]
+    assert {k: c["status"] for k, c in checks.items()} == {
+        "baseline_comparison": "executed", "calibration": "partially executed", "subgroup_performance": "executed",
+        "stability": "partially executed", "sensitivity": "executed", "assumptions": "executed"}, json.dumps(
+        {k: c["needs"] for k, c in checks.items()})
+    perf = checks["baseline_comparison"]["results"]["sets"]["train"]
+    assert perf["auc"]["python"] > 0.6 > perf["auc"]["constant"] and perf["log_loss"]["python_vs_constant"] > 0
+    cal = checks["calibration"]["results"]["sets"]["train"]["value"]["python"]
+    assert cal["observed_expected"] == pytest.approx(1, abs=1e-6)        # a logit with an intercept, in sample
+    cv = checks["stability"]["results"]["cross_validation"]
+    assert len(cv["folds"]) == 5 and cv["summary"]["auc"]["sd"] < 0.05
+    up = checks["sensitivity"]["results"]["columns"]["RevolvingUtilizationOfUnsecuredLines"]["sets"]["train"]
+    assert up["value"]["up"]["mean_change"] != 0
 
 
 MNLOGIT_PY = '''import numpy as np
@@ -349,3 +362,28 @@ def test_quantile_migration_passes_with_solver_specific_convergence(jobs, tmp_pa
     assert v.passed, [(c.name, c.status) for c in v.checks if not c.passed]
     assert {c.name for c in v.checks if c.passed} >= {
         "R reference fit converged", "Python fit converged", "predictions", "pinball_loss on train"}
+
+
+def test_diagnostics_that_fail_leave_the_validation_passed_and_record_missing_evidence(claims, tmp_path):
+    """A candidate that cannot refit on fewer rows passes parity; its cross-validation is missing evidence by stage
+    and type, and the sensitivity and VIF diagnostics still run."""
+    fragile = POISSON_PY.replace("def fit(train):\n", "def fit(train):\n    if len(train) < 140:\n"
+                                 "        raise ValueError('needs every train row: secret-7')\n")
+    v = run(claims, fragile, tmp_path)
+    assert v.passed, [c for c in v.checks if not c.passed]
+    checks = v.evaluation["checks"]
+    assert "cross-validation refits (failed in fit() on cross-validation fold 1 (ValueError))" in \
+        checks["stability"]["needs"]
+    assert checks["stability"]["results"]["training_curve"]["iterations"] > 1
+    age = checks["sensitivity"]["results"]["columns"]["age"]
+    assert age["status"] == "executed" and age["sets"]["test"]["value"]["up"]["mean_change"] > 0
+    assert checks["sensitivity"]["status"] == "partially executed"                  # area is not numeric
+    assert checks["assumptions"]["results"]["assumptions"]["multicollinearity"]["status"] == "executed"
+    assert "secret-7" not in json.dumps(v.evaluation)
+
+
+def test_cross_validation_folds_are_fixed_by_row_number(claims, tmp_path):
+    first = run(claims, POISSON_PY, tmp_path / "a").evaluation["checks"]["stability"]["results"]
+    again = run(claims, POISSON_PY, tmp_path / "b").evaluation["checks"]["stability"]["results"]
+    assert first["cross_validation"] == again["cross_validation"]
+    assert sum(f["held_out_rows"] for f in first["cross_validation"]["folds"]) == 140

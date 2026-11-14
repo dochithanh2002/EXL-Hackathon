@@ -31,6 +31,8 @@ def _r(x: float | None) -> float | None:
 
 def _answer(results: dict, needs: list[str], meets: bool | None, criterion: str | None,
             data_missing: bool = False) -> dict:
+    if meets is None and not needs and not data_missing:
+        needs = [f"a computable result for {criterion}" if criterion else "a criterion and a computable result"]
     status = NOT_ASSESSED if data_missing else PARTIAL if needs else ASSESSED
     return {"status": status, "needs": needs, "criterion": criterion,
             "meets": meets if status == ASSESSED else None, "results": results}

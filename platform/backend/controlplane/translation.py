@@ -21,7 +21,8 @@ from .baseline import copy_verified
 from .environments import Environments
 from .runner import Limits, Process, StepCancelled
 from .schemas import Candidate, ModelSpec
-from .validation import Validation, compare, failed_run
+from .evaluation import diagnostics_config
+from .validation import Validation, compare, failed_run, with_evaluation
 from .workflow.machine import InputFile
 
 HARNESS = Path(__file__).parent / "runner" / "candidate_harness.py"
@@ -138,7 +139,9 @@ def run_candidate(workdir: Path, module: str, spec: ModelSpec, baseline_dir: Pat
                   inputs_dir: Path, envs: Environments, limits: Limits = Limits(),
                   on_start: Callable[[Process], None] = lambda p: None) -> Validation:
     """Run the candidate under the harness in a fresh working directory holding only the data files and R's sets, then
-    compare its output with the baseline. A candidate that fails to run is a failed validation, not an error."""
+    compare its output with the baseline. A candidate that fails to run is a failed validation, not an error. A
+    passing candidate then runs the validation plan's Python diagnostics in a second harness process, whose failure
+    is recorded as missing evidence, never as a failed validation."""
     workdir.mkdir(parents=True)
     inputs = workdir / "inputs"
     inputs.mkdir()
@@ -151,17 +154,21 @@ def run_candidate(workdir: Path, module: str, spec: ModelSpec, baseline_dir: Pat
     inputs.chmod(0o555)
     (workdir / "candidate.py").write_text(module)
     shutil.copy(HARNESS, workdir / "harness.py")
-    (workdir / "config.json").write_text(json.dumps({
-        "candidate": "candidate.py", "dataset": f"inputs/{dataset.name}",
-        "data": {f.name: f"inputs/{f.name}" for f in data}, "split": "inputs/split.csv", "out": "output",
-        **spec.capture_config()}))
+    config = {"candidate": "candidate.py", "dataset": f"inputs/{dataset.name}",
+              "data": {f.name: f"inputs/{f.name}" for f in data}, "split": "inputs/split.csv", "out": "output",
+              **spec.capture_config()}
+    (workdir / "config.json").write_text(json.dumps(config))
 
-    proc = Process([str(envs.py()), "-I", "harness.py", "config.json"], workdir, {"PYTHONDONTWRITEBYTECODE": "1"},
-                   limits)
-    on_start(proc)
-    outcome = proc.start().wait()
-    if outcome.cancelled:
-        raise StepCancelled()
+    def harness(config_file: str):
+        proc = Process([str(envs.py()), "-I", "harness.py", config_file], workdir, {"PYTHONDONTWRITEBYTECODE": "1"},
+                       limits)
+        on_start(proc)
+        outcome = proc.start().wait()
+        if outcome.cancelled:
+            raise StepCancelled()
+        return outcome
+
+    outcome = harness("config.json")
     out = workdir / "output"
     if not outcome.ok:
         error = out / "error.json"
@@ -169,4 +176,15 @@ def run_candidate(workdir: Path, module: str, spec: ModelSpec, baseline_dir: Pat
             return failed_run(json.loads(error.read_text()))
         return failed_run({"stage": "the candidate harness", "type": "Stopped",
                            "message": "the candidate " + outcome.describe(lines=0)})
-    return compare(baseline_dir, out, spec)
+    v = compare(baseline_dir, out, spec)
+    diagnostics = None
+    if v.passed and (plan := diagnostics_config(spec.model_dump(mode="json"))):
+        diagnostics = workdir / "diagnostics"
+        (workdir / "diagnostics-config.json").write_text(json.dumps(config | {"out": "diagnostics",
+                                                                               "diagnostics": plan}))
+        outcome = harness("diagnostics-config.json")
+        if not outcome.ok and not (diagnostics / "error.json").is_file():
+            diagnostics.mkdir(exist_ok=True)
+            (diagnostics / "error.json").write_text(json.dumps({"stage": "the diagnostics harness",
+                                                                "type": "Stopped"}))
+    return with_evaluation(v, baseline_dir, out, diagnostics, spec)

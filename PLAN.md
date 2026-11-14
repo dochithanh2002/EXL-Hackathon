@@ -1,6 +1,6 @@
 # Plan: agentic R → Python ML transformation platform
 
-Status: build steps 1–7 built, plus the semantics and assessment revision (section 7); step 7's Docker image is written but not yet built on a Linux host (sections 12, 13). Date: 2026-11-14.
+Status: build steps 1–7 built, plus the semantics and assessment revision and the model validation workflow (section 7); step 7's Docker image is written but not yet built on a Linux host (sections 12, 13). Date: 2026-11-14.
 
 A Python control plane owns all workflow, execution and approval logic. A small Node service hosts Pi for the
 four agents. A React UI is the data scientist's (DS) workspace. Everything runs locally as plain processes; a
@@ -66,7 +66,7 @@ React UI ──HTTP/SSE──> Control plane (Python, FastAPI)
 | 3 | R Reference Results | static code | run succeeds; baseline frozen |
 | 4 | Python Migration & Comparison | Translator agent + static runner and validator | DS accepts or rejects the migration |
 | 5 | Discrepancy Analysis (only after a failure or rejection) | Diagnostician agent, then back to 4 | retry limit (default 3), then escalate to DS |
-| 6 | Migration Validation Report | Reporter agent | report built from recorded evidence |
+| 6 | Model Validation Report | Reporter agent | report built from recorded evidence |
 | 7 | Code & Reproducibility Package | static | download bundle |
 
 - Approvals are bound to hashes: spec version, baseline id, candidate code hash, validation result id. If any
@@ -87,10 +87,10 @@ is returned to the agent with the validation error, for a bounded number of retr
 
 | Role | Sees | Submits |
 |---|---|---|
-| Analyst | R code, column names, dtypes, level sets, summary statistics (no data rows) | `ModelSpec` v2: target model, R function, Python implementation and parity tier (or the limitation when none is faithful), family, link, formula, explicit semantics (response type, event meaning and coding, grouped-binomial trials, weight type and normalization, offset, prediction kind, quantity, units, keys, alignment keys and the R prediction expression), the financial assessment definition (business use, intended and sample population, evaluation-set roles, period column, decision threshold, criteria, missing information), preprocessing, split, evaluation metrics, `atol`/`rtol` per quantity, unsupported items, substitutions, and a minimal `baseline.R` slice |
+| Analyst | R code, column names, dtypes, level sets, summary statistics (no data rows) | `ModelSpec` v3: target model, R function, Python implementation and parity tier (or the limitation when none is faithful), family, link, formula, explicit semantics (response type, event meaning and coding, grouped-binomial trials, weight type and normalization, offset, prediction kind, quantity, units, keys, alignment keys and the R prediction expression), the financial assessment definition (business use, intended and sample population, evaluation-set roles, period column, decision threshold, criteria, missing information), the validation plan (section 7), preprocessing, split, evaluation metrics, `atol`/`rtol` per quantity, unsupported items, substitutions, and a minimal `baseline.R` slice |
 | Translator | `ModelSpec`, `baseline.R`, baseline metadata, repair instructions if any | `Candidate`: one Python module against a fixed interface, notes, and limitations it cannot reproduce |
-| Diagnostician | filtered validation (check statuses, differences in tolerance units, row ids, metrics, design comparison, assessment summaries, redacted errors), candidate, spec, DS comment, earlier attempts | `Diagnosis`: category (migration defect, specification, not reproducible, model fitness), root cause, evidence, repair instructions, assessment findings; all but a migration defect route to the DS |
-| Reporter | an evidence catalogue built by code from recorded runs, validation results and approvals; the approved candidate and `baseline.R` | `ReportNarrative` v2: claims for fixed sections (scope, semantics, parity, the four assessment questions, skipped checks, limitations, acceptance); every claim cites catalogue ids; numbers are `{{id.field}}` placeholders filled in by code, and names with digits must be in backticks and known to the project |
+| Diagnostician | filtered validation (check statuses, differences in tolerance units, row ids, metrics, design comparison, assessment summaries, Python's side of the evaluation, redacted errors), candidate, spec, DS comment, earlier attempts | `Diagnosis`: category (migration defect, specification, not reproducible, model fitness), root cause, evidence, repair instructions, assessment findings; all but a migration defect route to the DS |
+| Reporter | an evidence catalogue built by code from recorded runs, validation results, the evaluation and approvals; check statuses, the code's business fitness verdict and the plots it embeds; the approved candidate and `baseline.R` | `ReportNarrative` v3: claims for fixed sections (scope, semantics; migration acceptance: parity, skipped checks, acceptance; model validation: performance, calibration, subgroups, stability, sensitivity, assumptions, sample suitability, decision performance; missing evidence, limitations, business fitness); every claim cites catalogue ids; numbers are `{{id.field}}` placeholders filled in by code, and names with digits must be in backticks and known to the project |
 
 The `baseline.R` slice is the minimal part of the uploaded code that produces the target model. The DS sees it
 as a diff against the original before confirming. It is what keeps unrelated code (keras, xgboost, plotting)
@@ -193,14 +193,62 @@ calibration evidence rather than raising an exception. Grouped-binomial Brier sc
 individual-event scores, not squared errors against group proportions. These are screening summaries, not a
 complete judgment of sample representativeness or business fitness.
 
-Spec v1 records from earlier projects do not load under v2; those projects must be recreated.
+Model validation beyond parity (`evaluation.py`). The spec's `validation_plan` names six checks; for each the
+Analyst sets `run` and a rationale for this prediction task and business use, including why a check is left out.
+Agents propose and interpret; code executes, on R's and the candidate's predictions with the parity engine's metric
+code:
+- baseline comparison: each model's actual metrics (the primary loss for the prediction kind plus the spec's
+  metrics) against a constant fitted on the development set, as skill (losses) or lift (ranking scores). The
+  constant ignores offsets and exposure, which the evaluation notes;
+- calibration: observed/expected, deciles, and a recalibration slope and intercept (logistic for probabilities,
+  least squares otherwise); quantile coverage for quantile outputs;
+- subgroup performance: per subgroup of the plan's columns, whose values `capture.R` exports from R's set frames
+  (`segments.csv`): rows, observed, predicted, observed/expected, the primary loss and AUC. Numeric columns are cut
+  at development quintiles, categorical ones keep their 12 largest levels; small groups are flagged. Agent prompts
+  omit subgroup metrics unless each output for the model has at least the plan's minimum and at least 10 scored rows;
+- stability: the assessment's PSI, K-fold refits of the Python model on R's train rows (folds fixed by a hash of
+  the row number) with out-of-fold metrics and coefficient dispersion, and the fit's iteration history;
+- sensitivity: mean, mean absolute and largest change in Python's predictions when one numeric predictor moves by
+  `shift_sd` training standard deviations, all else fixed;
+- assumptions, limited by the spec validator to those of the response type: overdispersion, zero inflation
+  (Poisson), multicollinearity (VIF of the Python design), residual distribution and heteroscedasticity
+  (continuous), separation (binary).
+
+The Python-side parts (refits, shifts, VIF) run in a second harness process only for a candidate that passed
+parity; its failure is recorded by stage and exception type, never message, and never fails the validation. Each
+check is executed, partially executed, not executed or not planned with what it needs; `missing_evidence`
+collects these with the assessment's needs and the spec's missing information. Business fitness is "not
+established" unless every planned check ran and every assessment question has an explicit criterion result; then
+the spec's criteria decide "criteria met" or "criteria not met". Migration acceptance is never business fitness.
+
+Spec v1 and v2 records from earlier projects do not load under v3; those projects must be recreated.
 
 ## 8. MLflow
 
 One experiment per project. Each baseline run, translation attempt, validation, diagnosis and report is a run
-nested under a workflow parent run. Runs carry parameters (spec version, hashes, environment version, model
-used), metrics (KPIs, maximum differences), artifacts (code, lockfiles, logs, differences, DS feedback) and
-status, including FAILED with logs. Approvals and rejections are tags. The UI links to each run.
+nested under a workflow parent run (`runs.py`):
+
+```
+workflow
+├─ baseline vN              R's fit: model/<set>/<metric>, fit/<stat>, spec and split params, split inputs
+├─ translation vN
+└─ validation vN            r/<set>/<metric>, python/<set>/<metric>, parity/<check>/{ratio,max_abs_diff}
+   ├─ python fit            model/…, fit/…, train/deviance by IRLS iteration, cv/held_out/<primary> by fold
+   │  └─ cv fold k          model/held_out/<metric>
+   └─ challenger constant   model/<set>/<metric>
+```
+
+Model runs (R fit, Python fit, challenger) share the `model/` keys, the spec parameters and the data splits as
+dataset inputs (digest: hash of the set's row numbers), so MLflow compares them directly. The validation run is
+the only one with parity differences, all under `parity/`. Lineage tags: `reference_run_id`, `candidate_run_id`,
+`validation_run_id`, `fit_run_id`, plus evidence ids. The validation run's artifacts include SVG plots
+(`plots.py`: parity, performance, calibration, subgroups, CV, training curve, sensitivity, VIF; drawn without a
+plotting dependency, light and dark styles, a hover title per mark) and CSV tables of the same data. Runs end
+FINISHED, or FAILED with logs; approvals and rejections are tags. The UI links to each run.
+
+The report job downloads the approved validation run's plots from MLflow into the report's directory, embeds them
+beside their tables with a link to the source run, and logs the report with its plots. The deliverables bundle
+copies them to `plots/` beside `report.md`, so the report reads without an MLflow server.
 
 ## 9. UI
 
@@ -211,8 +259,10 @@ React, Vite, TypeScript, Tailwind, shadcn/ui, TanStack Query, SSE for streaming.
   steps 2 and 5.
 - **Step views**: understanding card and spec editor with the `baseline.R` diff; baseline report; side-by-side R
   and Python code; differences table coloured by tolerance; attempt history; final report; deliverables.
-- **Deliverables page**: Python code, both lockfiles, rerun instructions, validation results, final report, as
-  individual downloads and one bundle.
+- **Deliverables page**: Python code, both lockfiles, rerun instructions, validation results, final report and
+  its plots, as individual downloads and one bundle.
+- **Model validation**: in step 4, beside the parity checks, each planned check's status, rationale and needs,
+  its plots and the missing evidence, so the DS sees business fitness evidence before accepting the migration.
 - **Settings**: endpoints, per-role models, environment versions.
 
 The spec is changed through the Analyst chat, not edited in a form, so every version passes the Analyst's checks
@@ -276,6 +326,20 @@ M1 and M4 are from the rerun after the fixes, M2 and M3 from the first run. Foll
 prints a harmless pandas `DtypeWarning` reading `split.csv` (`in_fit` mixes booleans and blanks), and M1's repair
 loop is slow (about 45 minutes of model time). Evidence: `platform/var/live-smoke/e2e-20261114-024946/` and
 `e2e-20261114-032333/` (ignored).
+
+Model validation workflow on 2026-11-14: 235 backend tests pass, two skipped (the existing macOS/root
+exclusions); both TypeScript projects typecheck and the UI builds. New tests cover the plan's validator (columns,
+assumptions by response type, rationales), subgroup columns in the baseline key, every check's computation and
+statuses, missing evidence, the Diagnostician's evaluation view (no R values or estimates), a failing diagnostics
+run recorded by stage and type with parity still passing, folds fixed by row number, deterministic well-formed
+SVGs, a broken plot not failing the validation, and end to end: the MLflow run tree, metric namespaces, step-indexed
+curves, dataset inputs and lineage; the report's sections, figures retrieved from MLflow with run links, the
+figure route, and plots in the bundle. On M4's 150,000 rows the baseline, candidate, diagnostics and evaluation take
+about 14 seconds. Not yet run against a live LLM: the Analyst must now propose a validation plan and the Reporter
+writes the v3 template, so the live M1-M4 smoke test is pending (the step 4-6 scripts read the updated M4 fixture).
+
+Validation review fixes: 240 backend tests pass, two skipped. Regression tests check that small subgroup cells
+are withheld from both agents and that an unevaluable criterion cannot produce a passing business fitness verdict.
 
 Semantics and assessment revision on 2026-11-14: 210 backend tests passed, two skipped; both TypeScript projects
 typecheck and the UI builds. New tests cover the v2 spec validators, atol/rtol parity with missing and non-finite
@@ -364,6 +428,10 @@ relative differences: coefficients 1.104e-12, standard errors 1.107e-12; maximum
 - Pi is moving quickly (1.5.2 on 10 Nov 2026); the version stays pinned and upgrades are deliberate.
 - Error-message redaction (section 5) is heuristic: it keeps integers, which are mostly row ids and counts but
   could be integer data values.
+- Evaluation refits reuse `prepare()`'s frames, so preprocessing fitted on all rows (M4's standardisation) is not
+  refitted per fold, and sensitivity shifts only move columns the candidate keeps in its frames; the evaluation
+  notes both. The constant comparator ignores offsets. Subgroup and sensitivity columns are only as good as the
+  Analyst's choice; a missing column is reported, not guessed.
 - Gamma, inverse Gaussian and quasi-family likelihood statistics are excluded from fit-statistic parity because
   R and statsmodels handle scale differently; validation records the exclusion. An explicitly requested AIC KPI
   is still checked when R supplies it.

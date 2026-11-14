@@ -180,8 +180,66 @@ class Convergence(Contract):
         return self
 
 
+class PlannedCheck(Contract):
+    run: bool = Field(description="Whether the check applies to this prediction task and business use")
+    rationale: str = Field(min_length=1, description="Why it matters here, or why it is left out")
+
+
+class SubgroupCheck(PlannedCheck):
+    columns: list[str] = Field(default=[], description="Columns of R's set frames that define the subgroups the "
+                                                       "business cares about (segments, products, regions, bands); "
+                                                       "numeric columns are cut into quintiles of the development set")
+    min_rows: int = Field(default=100, ge=1, description="Subgroups with fewer rows are reported as too small")
+
+
+class StabilityCheck(PlannedCheck):
+    folds: int = Field(default=5, ge=2, le=10, description="Cross-validation refits of the Python model on the train "
+                                                           "rows, with folds assigned deterministically by row")
+
+
+class SensitivityCheck(PlannedCheck):
+    columns: list[str] = Field(default=[], description="Numeric predictor columns of the frames the Python model "
+                                                       "reads, each shifted down and up while all else is held fixed")
+    shift_sd: float = Field(default=0.1, gt=0, le=2, description="Shift size in training standard deviations")
+
+
+Assumption = Literal["overdispersion", "zero_inflation", "multicollinearity", "residual_distribution",
+                     "heteroscedasticity", "separation"]
+ASSUMPTIONS_FOR: dict[str, set[str]] = {
+    "binary": {"separation", "multicollinearity"},
+    "grouped_binomial": {"overdispersion", "separation", "multicollinearity"},
+    "count": {"overdispersion", "zero_inflation", "multicollinearity"},
+    "continuous": {"residual_distribution", "heteroscedasticity", "multicollinearity"},
+    "monetary_amount": {"overdispersion", "residual_distribution", "heteroscedasticity", "multicollinearity"},
+    "categorical": {"multicollinearity"},
+    "ordinal": {"multicollinearity"},
+}
+
+
+class AssumptionCheck(PlannedCheck):
+    assumptions: list[Assumption] = Field(default=[], description="Assumptions of this model to screen; only those "
+                                                                  "relevant to its response type and family")
+
+
+class ValidationPlan(Contract):
+    """Model validation beyond migration parity. The Analyst decides which checks apply and why; the platform runs
+    them on R's and Python's predictions and records what each could not establish."""
+    baseline_comparison: PlannedCheck = Field(description="Performance against a constant comparator fitted on the "
+                                                          "development set")
+    calibration: PlannedCheck = Field(description="Observed against predicted: overall, by decile, slope and "
+                                                  "intercept")
+    subgroup_performance: SubgroupCheck
+    stability: StabilityCheck = Field(description="Score stability across sets and periods, cross-validated "
+                                                  "metrics and coefficients")
+    sensitivity: SensitivityCheck
+    assumptions: AssumptionCheck
+
+    def checks(self) -> list[tuple[str, PlannedCheck]]:
+        return [(name, getattr(self, name)) for name in ValidationPlan.model_fields]
+
+
 class ModelSpec(Contract):
-    schema_version: Literal["2"] = "2"
+    schema_version: Literal["3"] = "3"
     target_model: str = Field(description="What the model predicts and for whom, in one sentence")
     r_function: str = QualifiedName
     python_implementation: str = Field(description="The Python estimator that reproduces it, e.g. "
@@ -203,6 +261,7 @@ class ModelSpec(Contract):
     preprocessing: list[PreprocessingStep]
     split: SplitDefinition
     assessment: Assessment
+    validation_plan: ValidationPlan
     metrics: list[Metric] = Field(description="Evaluation metrics compared between R and Python on every set")
     optional_metrics: dict[Literal["train", "test"], list[Metric]] = Field(default={},
         description="Explicit per-set exceptions: unavailable metrics do not block acceptance. All requested "
@@ -264,6 +323,17 @@ class ModelSpec(Contract):
         for name, metrics in self.optional_metrics.items():
             if name not in sets or not set(metrics) <= set(self.metrics):
                 errors.append("optional_metrics must name an evaluation set and requested metrics")
+        vp = self.validation_plan
+        for name in ("subgroup_performance", "sensitivity"):
+            if getattr(vp, name).run and not getattr(vp, name).columns:
+                errors.append(f"validation_plan.{name}.columns: name the columns, or set run to false")
+        if vp.assumptions.run:
+            allowed = ASSUMPTIONS_FOR[self.response_type]
+            if not vp.assumptions.assumptions:
+                errors.append("validation_plan.assumptions.assumptions: list them, or set run to false")
+            if bad := sorted(set(vp.assumptions.assumptions) - allowed):
+                errors.append(f"validation_plan.assumptions.assumptions: {bad} do not apply to a "
+                              f"{self.response_type} response; choose from {sorted(allowed)}")
         if errors:
             raise ValueError("; ".join(errors))
         return self
@@ -282,7 +352,9 @@ class ModelSpec(Contract):
                 "prediction": {"kind": self.prediction.kind, "keys": self.prediction.keys,
                                "r_predict": self.prediction.r_predict},
                 "convergence": self.convergence.model_dump(),
-                "period_column": self.assessment.period_column}
+                "period_column": self.assessment.period_column,
+                "segments": self.validation_plan.subgroup_performance.columns
+                if self.validation_plan.subgroup_performance.run else []}
 
 
 # ---------------------------------------------------------------- Translator
@@ -306,10 +378,11 @@ class Diagnosis(Contract):
     root_cause: str
     evidence: list[str] = Field(min_length=1, description="Observed differences or errors supporting the root cause")
     repair_instructions: list[str] = Field(description="What the Translator must change in the candidate")
-    assessment_findings: list[str] = Field(default=[], description="What the assessment summaries say about "
-                                                                   "sample suitability, stability, calibration and "
-                                                                   "decision performance, or that a question was "
-                                                                   "not assessed")
+    assessment_findings: list[str] = Field(default=[], description="What the assessment and model evaluation "
+                                                                   "summaries say (sample suitability, stability, "
+                                                                   "calibration, decision performance, subgroups, "
+                                                                   "sensitivity, assumptions), or what was not "
+                                                                   "assessed")
     spec_change_needed: bool = Field(description="True if the fix needs the DS (a new ModelSpec) rather than new code")
     proposed_spec_change: str | None = Field(default=None, description="Required when spec_change_needed is true")
     limitation: str | None = Field(default=None, description="Required for not_reproducible: what blocks a "
@@ -357,32 +430,46 @@ class Claim(Contract):
 Claims = Field(min_length=1)
 
 
-class FinancialAssessment(Contract):
-    sample_suitability: list[Claim] = Claims
-    stability: list[Claim] = Claims
+class MigrationAcceptance(Contract):
+    """Does the Python code reproduce R? Decided by the parity checks and the DS's acceptance."""
+    parity_results: list[Claim] = Claims
+    skipped_checks: list[Claim] = Claims
+    acceptance_decision: list[Claim] = Claims
+
+
+class ModelValidation(Contract):
+    """Is the model fit for its business use? Interpreted from the platform's evaluation and assessment."""
+    performance: list[Claim] = Field(min_length=1, description="Actual R and Python metrics against the constant "
+                                                               "comparator")
     calibration: list[Claim] = Claims
+    subgroup_performance: list[Claim] = Claims
+    stability: list[Claim] = Claims
+    sensitivity: list[Claim] = Claims
+    assumptions: list[Claim] = Claims
+    sample_suitability: list[Claim] = Claims
     decision_performance: list[Claim] = Claims
 
 
 class ReportNarrative(Contract):
-    """The fixed template of the migration validation report; code adds the headings, statuses and tables."""
-    schema_version: Literal["2"] = "2"
+    """The fixed template of the model validation report; code adds the headings, statuses, tables and plots."""
+    schema_version: Literal["3"] = "3"
     scope: list[Claim] = Claims
     model_and_data_semantics: list[Claim] = Claims
-    parity_results: list[Claim] = Claims
-    financial_assessment: FinancialAssessment
-    skipped_checks: list[Claim] = Claims
+    migration: MigrationAcceptance
+    validation: ModelValidation
+    missing_evidence: list[Claim] = Claims
     limitations: list[Claim] = Claims
-    acceptance_decision: list[Claim] = Claims
+    business_fitness: list[Claim] = Field(min_length=1, description="What the evidence supports about fitness for "
+                                                                    "the business use, kept apart from migration "
+                                                                    "acceptance")
 
     def sections(self) -> list[tuple[str, list[Claim]]]:
         """(field path, claims) in report order."""
-        fa = self.financial_assessment
-        return [("scope", self.scope), ("model_and_data_semantics", self.model_and_data_semantics),
-                ("parity_results", self.parity_results)] + [
-            (f"financial_assessment.{q}", getattr(fa, q)) for q in FinancialAssessment.model_fields] + [
-            ("skipped_checks", self.skipped_checks), ("limitations", self.limitations),
-            ("acceptance_decision", self.acceptance_decision)]
+        return ([("scope", self.scope), ("model_and_data_semantics", self.model_and_data_semantics)]
+                + [(f"migration.{k}", getattr(self.migration, k)) for k in MigrationAcceptance.model_fields]
+                + [(f"validation.{k}", getattr(self.validation, k)) for k in ModelValidation.model_fields]
+                + [("missing_evidence", self.missing_evidence), ("limitations", self.limitations),
+                   ("business_fitness", self.business_fitness)])
 
 
 ROLES: dict[str, type[Contract]] = {

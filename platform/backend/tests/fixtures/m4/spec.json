@@ -1,144 +1,185 @@
 {
-  "schema_version": "2",
-  "target_model": "Probability that a borrower is 90+ days delinquent within two years (Give Me Some Credit)",
-  "r_function": "stats::glm",
-  "python_implementation": "statsmodels.api.GLM",
-  "support_tier": "exact",
-  "limitation": null,
-  "family": "binomial",
-  "link": "logit",
-  "formula": "cs_training$SeriousDlqin2yrs ~ .",
-  "response": "SeriousDlqin2yrs",
-  "response_type": "binary",
-  "event": {
-    "meaning": "serious delinquency: 90 or more days past due within two years",
-    "complement": "no serious delinquency",
-    "coding": "1"
-  },
-  "grouped_binomial": null,
-  "offset": null,
-  "weights": null,
-  "prediction": {
-    "kind": "scalar",
-    "quantity": "probability",
-    "units": "probability of serious delinquency within two years",
-    "exposure": null,
-    "keys": [],
-    "alignment_keys": [
-      "row"
-    ],
-    "r_predict": "predict(model, newdata = newdata, type = \"response\", na.action = na.pass)"
-  },
-  "preprocessing": [
-    {
-      "order": 1,
-      "description": "Drop the row-number column",
-      "r_code": "cs_training = cs_training[,(-1)]",
-      "columns": [
-        "X"
-      ]
-    },
-    {
-      "order": 2,
-      "description": "Remove the two columns with missing values",
-      "r_code": "cs_training$MonthlyIncome <- NULL\ncs_training$NumberOfDependents <- NULL",
-      "columns": [
-        "MonthlyIncome",
-        "NumberOfDependents"
-      ]
-    },
-    {
-      "order": 3,
-      "description": "Encode the response as a factor with levels 0, 1",
-      "r_code": "cs_training$SeriousDlqin2yrs = factor(cs_training$SeriousDlqin2yrs, levels = c(0,1))",
-      "columns": [
-        "SeriousDlqin2yrs"
-      ]
-    },
-    {
-      "order": 4,
-      "description": "Standardise every predictor with the training mean and standard deviation",
-      "r_code": "cs_training[-1] = scale(cs_training[-1])",
-      "columns": [
-        "RevolvingUtilizationOfUnsecuredLines",
-        "age",
-        "NumberOfTime30-59DaysPastDueNotWorse",
-        "DebtRatio",
-        "NumberOfOpenCreditLinesAndLoans",
-        "NumberOfTimes90DaysLate",
-        "NumberRealEstateLoansOrLines",
-        "NumberOfTime60-89DaysPastDueNotWorse"
-      ]
-    }
+ "schema_version": "3",
+ "target_model": "Probability that a borrower is 90+ days delinquent within two years (Give Me Some Credit)",
+ "r_function": "stats::glm",
+ "python_implementation": "statsmodels.api.GLM",
+ "support_tier": "exact",
+ "limitation": null,
+ "family": "binomial",
+ "link": "logit",
+ "formula": "cs_training$SeriousDlqin2yrs ~ .",
+ "response": "SeriousDlqin2yrs",
+ "response_type": "binary",
+ "event": {
+  "meaning": "serious delinquency: 90 or more days past due within two years",
+  "complement": "no serious delinquency",
+  "coding": "1"
+ },
+ "grouped_binomial": null,
+ "offset": null,
+ "weights": null,
+ "prediction": {
+  "kind": "scalar",
+  "quantity": "probability",
+  "units": "probability of serious delinquency within two years",
+  "exposure": null,
+  "keys": [],
+  "alignment_keys": [
+   "row"
   ],
-  "split": {
-    "method": "none: the model is fit and evaluated on the full training file",
-    "r_code": "",
-    "seed": null
+  "r_predict": "predict(model, newdata = newdata, type = \"response\", na.action = na.pass)"
+ },
+ "preprocessing": [
+  {
+   "order": 1,
+   "description": "Drop the row-number column",
+   "r_code": "cs_training = cs_training[,(-1)]",
+   "columns": [
+    "X"
+   ]
   },
-  "assessment": {
-    "business_use": "Ranking credit applicants by risk of serious delinquency",
-    "intended_population": "Consumer credit borrowers scored for credit decisions",
-    "sample_population": "The Give Me Some Credit training file; the code does not state its period or channel",
-    "evaluation_sets": [
-      {
-        "set": "train",
-        "role": "development",
-        "description": "every row of cs-training.csv"
-      }
-    ],
-    "period_column": null,
-    "decision": null,
-    "criteria": {},
-    "missing_information": [
-      "a holdout or out-of-time set",
-      "the decision threshold",
-      "acceptance criteria"
-    ]
+  {
+   "order": 2,
+   "description": "Remove the two columns with missing values",
+   "r_code": "cs_training$MonthlyIncome <- NULL\ncs_training$NumberOfDependents <- NULL",
+   "columns": [
+    "MonthlyIncome",
+    "NumberOfDependents"
+   ]
   },
-  "metrics": [
-    "auc",
-    "gini",
-    "log_loss"
-  ],
-  "tolerances": {
-    "coefficients": {
-      "atol": 1e-08,
-      "rtol": 1e-06
-    },
-    "std_errors": {
-      "atol": 1e-08,
-      "rtol": 1e-06
-    },
-    "predictions": {
-      "atol": 1e-08,
-      "rtol": 1e-06
-    },
-    "fit_statistics": {
-      "atol": 1e-08,
-      "rtol": 1e-06
-    },
-    "metrics": {
-      "atol": 1e-08,
-      "rtol": 1e-06
-    },
-    "per_metric": {}
+  {
+   "order": 3,
+   "description": "Encode the response as a factor with levels 0, 1",
+   "r_code": "cs_training$SeriousDlqin2yrs = factor(cs_training$SeriousDlqin2yrs, levels = c(0,1))",
+   "columns": [
+    "SeriousDlqin2yrs"
+   ]
   },
-  "unsupported_items": [],
-  "substitutions": [
-    {
-      "original": "predictions on cs-test.csv, scaled with its own statistics",
-      "proposed": "evaluate on the training file only",
-      "rationale": "cs-test.csv has no response and is not an uploaded dataset"
-    }
-  ],
-  "r_packages": [
-    "stats"
-  ],
-  "baseline_r": "cs_training = read.csv(\"inputs/cs-training.csv\")\ncs_training = cs_training[,(-1)]\ncs_training$MonthlyIncome <- NULL\ncs_training$NumberOfDependents <- NULL\ncs_training$SeriousDlqin2yrs = factor(cs_training$SeriousDlqin2yrs, levels = c(0,1))\ncs_training[-1] = scale(cs_training[-1])\nRegModel = glm(formula = cs_training$SeriousDlqin2yrs ~ .,\n               family = binomial,\n               data = cs_training)\n",
-  "baseline_objects": {
-    "model": "RegModel",
-    "train": "cs_training",
-    "test": null
+  {
+   "order": 4,
+   "description": "Standardise every predictor with the training mean and standard deviation",
+   "r_code": "cs_training[-1] = scale(cs_training[-1])",
+   "columns": [
+    "RevolvingUtilizationOfUnsecuredLines",
+    "age",
+    "NumberOfTime30-59DaysPastDueNotWorse",
+    "DebtRatio",
+    "NumberOfOpenCreditLinesAndLoans",
+    "NumberOfTimes90DaysLate",
+    "NumberRealEstateLoansOrLines",
+    "NumberOfTime60-89DaysPastDueNotWorse"
+   ]
   }
+ ],
+ "split": {
+  "method": "none: the model is fit and evaluated on the full training file",
+  "r_code": "",
+  "seed": null
+ },
+ "assessment": {
+  "business_use": "Ranking credit applicants by risk of serious delinquency",
+  "intended_population": "Consumer credit borrowers scored for credit decisions",
+  "sample_population": "The Give Me Some Credit training file; the code does not state its period or channel",
+  "evaluation_sets": [
+   {
+    "set": "train",
+    "role": "development",
+    "description": "every row of cs-training.csv"
+   }
+  ],
+  "period_column": null,
+  "decision": null,
+  "criteria": {},
+  "missing_information": [
+   "a holdout or out-of-time set",
+   "the decision threshold",
+   "acceptance criteria"
+  ]
+ },
+ "validation_plan": {
+  "baseline_comparison": {
+   "run": true,
+   "rationale": "Ranking applicants needs discrimination beyond the portfolio's delinquency rate"
+  },
+  "calibration": {
+   "run": true,
+   "rationale": "Predicted probabilities feed credit decisions, so they must match observed delinquency"
+  },
+  "subgroup_performance": {
+   "run": true,
+   "rationale": "Risk ranking should hold across borrower age bands and utilisation",
+   "columns": [
+    "age",
+    "NumberOfTimes90DaysLate"
+   ],
+   "min_rows": 100
+  },
+  "stability": {
+   "run": true,
+   "rationale": "The model is fit on one file, so refits show how much the estimates move",
+   "folds": 5
+  },
+  "sensitivity": {
+   "run": true,
+   "rationale": "Credit policy needs to know how the score responds to utilisation and debt",
+   "columns": [
+    "RevolvingUtilizationOfUnsecuredLines",
+    "DebtRatio"
+   ],
+   "shift_sd": 0.1
+  },
+  "assumptions": {
+   "run": true,
+   "rationale": "A logit on correlated delinquency counts can separate or be collinear",
+   "assumptions": [
+    "separation",
+    "multicollinearity"
+   ]
+  }
+ },
+ "metrics": [
+  "auc",
+  "gini",
+  "log_loss"
+ ],
+ "tolerances": {
+  "coefficients": {
+   "atol": 1e-08,
+   "rtol": 1e-06
+  },
+  "std_errors": {
+   "atol": 1e-08,
+   "rtol": 1e-06
+  },
+  "predictions": {
+   "atol": 1e-08,
+   "rtol": 1e-06
+  },
+  "fit_statistics": {
+   "atol": 1e-08,
+   "rtol": 1e-06
+  },
+  "metrics": {
+   "atol": 1e-08,
+   "rtol": 1e-06
+  },
+  "per_metric": {}
+ },
+ "unsupported_items": [],
+ "substitutions": [
+  {
+   "original": "predictions on cs-test.csv, scaled with its own statistics",
+   "proposed": "evaluate on the training file only",
+   "rationale": "cs-test.csv has no response and is not an uploaded dataset"
+  }
+ ],
+ "r_packages": [
+  "stats"
+ ],
+ "baseline_r": "cs_training = read.csv(\"inputs/cs-training.csv\")\ncs_training = cs_training[,(-1)]\ncs_training$MonthlyIncome <- NULL\ncs_training$NumberOfDependents <- NULL\ncs_training$SeriousDlqin2yrs = factor(cs_training$SeriousDlqin2yrs, levels = c(0,1))\ncs_training[-1] = scale(cs_training[-1])\nRegModel = glm(formula = cs_training$SeriousDlqin2yrs ~ .,\n               family = binomial,\n               data = cs_training)\n",
+ "baseline_objects": {
+  "model": "RegModel",
+  "train": "cs_training",
+  "test": null
+ }
 }

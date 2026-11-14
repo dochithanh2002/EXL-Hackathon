@@ -29,6 +29,15 @@ PARITY = {
     "metrics": {"test": {"rmse": {"r": 0.81, "python": 0.83}}},
     "design": {"fitted_rows": {"r": 140, "python": 139}, "reference_levels": {"area": {"r": "A", "python": "B"}}},
     "assessment": {"python": {"stability": {"status": "not assessed", "needs": ["a holdout"]}}},
+    "evaluation": {"missing_evidence": ["Sensitivity: not in the validation plan (no lever)"], "checks": {
+        "assumptions": {"status": "executed", "rationale": "count", "needs": [], "notes": [], "results": {
+            "assumptions": {"overdispersion": {"status": "executed", "results": {
+                "r": {"pearson_dispersion": 1.4142135}, "python": {"pearson_dispersion": 1.4142136}}}}}},
+        "stability": {"status": "executed", "rationale": "refits", "needs": [], "notes": [], "results": {
+            "cross_validation": {"coefficients": [{"term": "areaB", "estimate": -0.3180216, "fold_sd": 0.02,
+                                                   "relative_sd": 0.06, "sign_changes": 0}]}}},
+        "calibration": {"status": "executed", "rationale": "pricing", "needs": [], "notes": [], "results": {
+            "sets": {"test": {"value": {"python": {"slope": 0.97, "bins": [{"mean_observed": 1.6180339}]}}}}}}}},
     "differences": {
         "worst_terms": [{"term": "areaB", "estimate_r": -0.3141592, "estimate_python": -0.3180216,
                          "estimate_rel": 0.012294518, "estimate_score": 12290.1, "std_error_r": 0.0271828,
@@ -54,6 +63,13 @@ def test_the_view_keeps_checks_names_rows_metrics_and_summaries_but_no_estimates
     assert check["status"] == "failed" and check["missing_one_side"] == 1 and "total" not in check
     assert view["metrics"] == PARITY["metrics"]
     assert view["design"] == PARITY["design"] and view["assessment"] == PARITY["assessment"]
+    ev = view["evaluation"]                         # Python's side only: no R values, estimates or binned values
+    assert ev["missing_evidence"] == PARITY["evaluation"]["missing_evidence"]
+    assert ev["checks"]["assumptions"]["results"]["assumptions"]["overdispersion"]["results"] == {
+        "python": {"pearson_dispersion": 1.4142136}}
+    assert ev["checks"]["stability"]["results"]["cross_validation"]["coefficients"] == [
+        {"term": "areaB", "fold_sd": 0.02, "relative_sd": 0.06, "sign_changes": 0}]
+    assert ev["checks"]["calibration"]["results"]["sets"]["test"]["value"]["python"] == {"slope": 0.97}
     assert view["differences"]["worst_terms"][0] == {
         "term": "areaB", "estimate_rel_diff": 0.0123, "estimate_tolerance_units": 12300.0,
         "estimate": "larger in magnitude", "std_error_rel_diff": 0.0, "std_error_tolerance_units": 0.0,
