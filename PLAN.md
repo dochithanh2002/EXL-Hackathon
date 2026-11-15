@@ -156,14 +156,6 @@ known pair with its listed implementation fixes the tier; any other model is att
 proposes (exact or approximate) and is unproven, so the DS must accept the parity risk. When no faithful
 implementation exists the Analyst sets the tier to unsupported and explains the limitation, which stops at step 2.
 scikit-learn is excluded by the spec validator and the candidate guardrails. No model is silently substituted.
-A pair is proven once its `fixture` names a directory under `backend/tests/fixtures/parity/` (a synthetic dataset,
-a spec with `baseline.R`, and a known-good candidate) that `tests/test_parity_fixtures.py` runs through R and
-Python to parity. `stats::glm` binomial (M2-shaped) and poisson with an exposure offset (M1-shaped) are proven;
-`tests/fixtures/parity/make_datasets.py` regenerates their data.
-
-Default acceptance criteria by response type are in `envs/criteria_defaults.yaml`, taken from the legacy
-factory's validation thresholds. The Analyst sees them in the project summary and may propose them where the code,
-documents and DS state none, saying which it used; they bind only once the DS confirms the spec.
 
 The spec states the statistical semantics explicitly, and code carries them through every step:
 - event meaning and coding (`capture.R` refuses a coding that is not the outcome R predicts);
@@ -195,7 +187,7 @@ individual-event scores, not squared errors against group proportions.
 Model validation beyond parity (`evaluation.py`, on statistics from `statistics.py`). `statistics.Inputs` reads
 each side's predictions.csv once, shared with the parity comparison, and computes each statistic once per side and
 set: metrics (the constant comparator's too), calibration and coverage, discrimination, decisions at the threshold,
-PSI by set and period, and sample counts. Nine checks derive from it. The spec's `validation_plan` names seven; for
+PSI by set and period, and sample counts. Eight checks derive from it. The spec's `validation_plan` names six; for
 each the Analyst sets `run` and a rationale for this prediction task and business use, including why a check is left
 out. Sample suitability and decision performance always run (decision performance is not applicable to a model
 without a binary event probability). Agents propose and interpret; code executes:
@@ -215,11 +207,6 @@ without a binary event probability). Agents propose and interpret; code executes
 - assumptions, limited by the spec validator to those of the response type: overdispersion, zero inflation
   (Poisson), multicollinearity (VIF of the Python design), residual distribution and heteroscedasticity
   (continuous), separation (binary);
-- fairness: per group of the plan's protected attributes (exported by `capture.R` like the subgroup columns):
-  rows, observed/expected and, for a binary decision with a stated favourable side of the threshold, the
-  favourable-outcome share and the impact ratio (lowest share over highest, per column and set). Groups below
-  `min_rows` are reported but not judged. A spec without a fairness plan (older v3 records) records it as not
-  planned;
 - sample suitability: rows, events (or class counts, or the mean observed value) per set, and events per
   estimated parameter on the development set;
 - decision performance: AUC, Gini and KS, and outcomes at the decision threshold.
@@ -229,8 +216,7 @@ parity; its failure is recorded by stage and exception type, never message, and 
 check carries two independent answers: `status` (executed, partially executed, not executed, not planned, not
 applicable) with `needs`, what prevented full execution; and `criterion` {rule, limit, value, outcome, judged_on},
 the spec's criterion judged on the Python candidate (min_events_per_parameter → sample suitability, max_psi →
-stability, max_calibration_deviation → calibration, min_auc and min_events_captured → decision performance,
-min_impact_ratio (binary only) and max_group_calibration_deviation → fairness), with
+stability, max_calibration_deviation → calibration, min_auc and min_events_captured → decision performance), with
 outcome met, not met, no criterion or not judged (statistic not computable). A check the plan leaves out still runs
 when the spec sets its criterion, with a note. `missing_evidence` collects every gap and the spec's missing
 information. `business_fitness` is part of the evaluation: any criterion not met → "criteria not met"; else any

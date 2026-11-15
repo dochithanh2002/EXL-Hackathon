@@ -1,6 +1,6 @@
-"""Model validation beyond migration parity: nine checks, executed by code on both sides' predictions.
+"""Model validation beyond migration parity: eight checks, executed by code on both sides' predictions.
 
-The Analyst plans seven of them and says why (`ModelSpec.validation_plan`); sample suitability and decision
+The Analyst plans six of them and says why (`ModelSpec.validation_plan`); sample suitability and decision
 performance run for every model they apply to. The statistics come from `statistics.Inputs`, computed once per side
 and set; agents interpret the results.
 - baseline comparison: each side's metrics against a constant comparator fitted on the development set;
@@ -12,8 +12,6 @@ and set; agents interpret the results.
 - sensitivity: the change in Python's predictions when one predictor moves, all else fixed;
 - assumptions: screens of the model's assumptions (overdispersion, zero inflation, multicollinearity, residual
   distribution, heteroscedasticity, separation);
-- fairness: per protected group, rows, observed/expected and, for a binary decision, the favourable-outcome rate
-  and the impact ratio between groups (values exported by capture.R, like the subgroups);
 - sample suitability: rows, events and events per estimated parameter;
 - decision performance: discrimination, and the decisions at the business threshold.
 
@@ -40,21 +38,17 @@ __all__ = ["Inputs", "evaluate", "evaluated_metrics", "scores", "business_fitnes
 EXECUTED, PARTIAL, NOT_EXECUTED = "executed", "partially executed", "not executed"
 NOT_PLANNED, NOT_APPLICABLE = "not planned", "not applicable"
 MET, NOT_MET, NO_CRITERION, NOT_JUDGED = "met", "not met", "no criterion", "not judged"
-PLANNED = ("baseline_comparison", "calibration", "subgroup_performance", "stability", "sensitivity", "assumptions",
-           "fairness")
+PLANNED = ("baseline_comparison", "calibration", "subgroup_performance", "stability", "sensitivity", "assumptions")
 CHECKS = (*PLANNED, "sample_suitability", "decision_performance")
 TITLES = {"baseline_comparison": "Baseline comparison", "calibration": "Calibration",
           "subgroup_performance": "Subgroup performance", "stability": "Stability", "sensitivity": "Sensitivity",
-          "assumptions": "Model assumptions", "fairness": "Fairness", "sample_suitability": "Sample suitability",
+          "assumptions": "Model assumptions", "sample_suitability": "Sample suitability",
           "decision_performance": "Decision performance"}
 # check -> statistic -> (the spec's criterion, how the statistic must compare with it)
 CRITERIA = {"sample_suitability": {"per_parameter": ("min_events_per_parameter", ">=")},
             "calibration": {"max_deviation": ("max_calibration_deviation", "<=")},
             "stability": {"max_psi": ("max_psi", "<=")},
-            "decision_performance": {"auc": ("min_auc", ">="), "events_captured": ("min_events_captured", ">=")},
-            "fairness": {"impact_ratio": ("min_impact_ratio", ">="),
-                         "max_group_deviation": ("max_group_calibration_deviation", "<=")}}
-NO_FAIRNESS_PLAN = "No fairness review was planned: the specification names no protected attributes."
+            "decision_performance": {"auc": ("min_auc", ">="), "events_captured": ("min_events_captured", ">=")}}
 MAX_LEVELS = 12
 MIN_AGENT_GROUP_ROWS = 10
 QUINTILES = 5
@@ -79,32 +73,24 @@ def _status(results: bool, needs: list[str]) -> str:
     return NOT_EXECUTED if not results else PARTIAL if needs else EXECUTED
 
 
-def judge(check: str, spec: dict, values: dict[str, float | None], judged_on: list[str],
-          applies: list[str] | None = None) -> dict:
+def judge(check: str, spec: dict, values: dict[str, float | None], judged_on: list[str]) -> dict:
     """The spec's criterion for a check, judged on the Python candidate's statistics. A stated limit that fails is
-    not met; one whose statistic is missing is not judged; a limit the spec does not state leaves no criterion.
-    `applies` restricts the check's criteria to those defined for this model (all by default)."""
+    not met; one whose statistic is missing is not judged; a limit the spec does not state leaves no criterion."""
     stated = spec["assessment"]["criteria"]
-    defined = {stat: x for stat, x in CRITERIA[check].items() if applies is None or stat in applies}
-    limits = {stat: stated[key] for stat, (key, _) in defined.items() if stated.get(key) is not None}
-    ops = {stat: op for stat, (_, op) in defined.items()}
+    limits = {stat: stated[key] for stat, (key, _) in CRITERIA[check].items() if stated.get(key) is not None}
+    ops = {stat: op for stat, (_, op) in CRITERIA[check].items()}
     failing = [stat for stat, limit in limits.items() if values.get(stat) is not None
                and not (values[stat] >= limit if ops[stat] == ">=" else values[stat] <= limit)]
     outcome = (NOT_MET if failing else NOT_JUDGED if any(values.get(stat) is None for stat in limits)
-               else NO_CRITERION if len(limits) < len(defined) else MET)
-    out = {"rule": " and ".join(f"{stat} {ops[stat]} {limit:g}" for stat, limit in limits.items()) or None,
-           "limit": limits, "value": {k: _r(v) for k, v in values.items() if k in defined}, "outcome": outcome,
-           "judged_on": judged_on}
-    if applies is not None:
-        out["applies"] = list(defined)
-    return out
+               else NO_CRITERION if len(limits) < len(CRITERIA[check]) else MET)
+    return {"rule": " and ".join(f"{stat} {ops[stat]} {limit:g}" for stat, limit in limits.items()) or None,
+            "limit": limits, "value": {k: _r(v) for k, v in values.items()}, "outcome": outcome,
+            "judged_on": judged_on}
 
 
 def unstated(check: str, criterion: dict) -> list[str]:
     """The spec's criteria a check needs but the spec does not state."""
-    applies = criterion.get("applies")
-    return [key for stat, (key, _) in CRITERIA[check].items()
-            if stat not in criterion["limit"] and (applies is None or stat in applies)]
+    return [key for stat, (key, _) in CRITERIA[check].items() if stat not in criterion["limit"]]
 
 
 # ---------------------------------------------------------------- baseline comparison
@@ -265,87 +251,6 @@ def subgroup_performance(inp: Inputs, plan: dict) -> dict:
         "metric": inp.metrics[0], "min_rows": plan["min_rows"], "judged_on": inp.judged, "columns": columns}, needs,
         notes=["numeric columns are cut at quintiles of the development set; categorical columns keep their "
                f"{MAX_LEVELS} largest levels and fold the rest into Other"])
-
-
-# ---------------------------------------------------------------- fairness
-def _favourable_share(inp: Inputs, units: list, threshold: float, favourable: str) -> float | None:
-    total = sum(inp.wt(w) for *_, w in units)
-    if not total:
-        return None
-    below = sum(inp.wt(w) for _, _, _, p, w in units if p < threshold)
-    return (below if favourable == "below_threshold" else total - below) / total
-
-
-def fairness(inp: Inputs, plan: dict) -> dict:
-    """Per protected group on every evaluation set: rows, observed/expected and, for a binary decision, the share of
-    favourable outcomes at the threshold. Judged on the Python candidate over groups of at least `min_rows` rows on
-    the judged sets: the impact ratio (lowest favourable share over the highest, per column and set) and the largest
-    |observed / expected - 1| of a group."""
-    segments, types = _segments(inp.baseline), inp.meta.get("segments") or {}
-    decision = inp.spec["assessment"].get("decision") or {}
-    threshold, favourable = decision.get("threshold"), plan.get("favourable_outcome")
-    decides = inp.binary and threshold is not None and favourable is not None
-    applies = ["max_group_deviation", *(["impact_ratio"] if inp.binary else [])]
-    columns, needs, ratios, deviations = {}, [], [], []
-    if not plan["columns"]:
-        needs.append("the protected attributes to compare")
-    if inp.binary and not decides:
-        needs.append("the decision threshold and which side of it is favourable, for the impact ratio")
-    for col in plan["columns"]:
-        kind = types.get(col, "missing")
-        if kind == "missing" or col not in segments:
-            columns[col] = {"status": NOT_EXECUTED, "reason": "the column is not in R's set frames"}
-            needs.append(f"protected attribute {col} in R's set frames")
-            continue
-        labels, groups = _groups(inp, segments[col], kind)
-        buckets: dict[tuple[str, str, str | None], list] = defaultdict(list)
-        for side in inp.sides():
-            for s in inp.roles:
-                for x in inp.side_units(side, s):
-                    buckets[(side, s, labels.get((s, x[0])))].append(x)
-        judged_shares: dict[str, list[float]] = defaultdict(list)
-        for g in groups:
-            g["sets"] = {}
-            for s in inp.roles:
-                rows = len({x[0] for x in buckets.get(("r", s, g["group"]), [])})
-                if not rows:
-                    continue
-                entry = {"rows": rows, "small": rows < plan["min_rows"]}
-                for side in inp.sides():
-                    if units := buckets.get((side, s, g["group"])):
-                        stats = _group_stats(inp, units)
-                        if decides:
-                            stats["favourable_share"] = _r(_favourable_share(inp, units, threshold, favourable))
-                        entry[side] = stats
-                g["sets"][s] = entry
-                py = entry.get("python") or {}
-                if s in inp.judged and not entry["small"] and py:
-                    if py.get("observed_expected") is not None:
-                        deviations.append(abs(py["observed_expected"] - 1))
-                    if py.get("favourable_share") is not None:
-                        judged_shares[s].append(py["favourable_share"])
-        impact = {s: _r(min(v) / max(v)) if len(v) > 1 and max(v) > 0 else None for s, v in judged_shares.items()}
-        ratios += [x for x in impact.values() if x is not None]
-        columns[col] = {"status": EXECUTED, "type": kind, "groups": [g for g in groups if g["sets"]],
-                        "impact_ratio": impact}
-        if small := [g["group"] for g in groups if any(v["small"] for v in g["sets"].values())]:
-            columns[col]["small_groups"] = small
-    if columns and not deviations and not ratios:
-        needs.append(f"protected groups of at least {plan['min_rows']} rows with valid Python predictions on "
-                     + ", ".join(inp.judged))
-    values = {"impact_ratio": min(ratios) if ratios else None,
-              "max_group_deviation": max(deviations) if deviations else None}
-    criterion = judge("fairness", inp.spec, values, inp.judged, applies)
-    executed = any(c["status"] == EXECUTED for c in columns.values())
-    notes = ["groups below min_rows are reported but not judged; numeric columns are cut at quintiles of the "
-             f"development set, categorical columns keep their {MAX_LEVELS} largest levels"]
-    if decides:
-        notes.append(f"favourable outcome: prediction {'below' if favourable == 'below_threshold' else 'at or above'} "
-                     f"{threshold:g}")
-    return _check(_status(executed, needs), plan["rationale"], {
-        "min_rows": plan["min_rows"], "judged_on": inp.judged, "threshold": threshold if decides else None,
-        "favourable_outcome": favourable if decides else None, "impact_ratio": _r(values["impact_ratio"]),
-        "max_group_deviation": _r(values["max_group_deviation"]), "columns": columns}, needs, notes, criterion)
 
 
 # ---------------------------------------------------------------- stability
@@ -629,11 +534,10 @@ def evaluate(inp: Inputs) -> dict:
         "stability": lambda c, planned: stability(inp, c, report, planned),
         "sensitivity": lambda c, planned: sensitivity(c, report),
         "assumptions": lambda c, planned: assumptions(inp, c, report),
-        "fairness": lambda c, planned: fairness(inp, c),
     }
     checks = {}
     for name in PLANNED:
-        c = vp.get(name) or {"run": False, "rationale": NO_FAIRNESS_PLAN, "columns": [], "min_rows": 100}
+        c = vp[name]
         keys = [key for key, _ in CRITERIA.get(name, {}).values() if stated.get(key) is not None]
         if c["run"]:
             checks[name] = run[name](c, True)
@@ -712,9 +616,9 @@ def evaluation_view(ev: dict) -> dict:
         return x
     checks = ev.get("checks", {})
     out = {k: strip(v) for k, v in checks.items()}
-    for name in ("subgroup_performance", "fairness"):
-        if name in out:
-            out[name]["results"] = subgroup_prompt_results(checks[name].get("results", {}), sides=("python",))
+    if "subgroup_performance" in out:
+        out["subgroup_performance"]["results"] = subgroup_prompt_results(
+            checks["subgroup_performance"].get("results", {}), sides=("python",))
     return {"checks": out, "missing_evidence": ev.get("missing_evidence", []),
             "business_fitness": ev.get("business_fitness")}
 
@@ -740,14 +644,8 @@ def subgroup_prompt_results(results: dict, sides: tuple[str, ...] = SIDES) -> di
         columns[name] = {"status": col["status"], "groups": groups, "cells_withheld": withheld}
         if "reason" in col:
             columns[name]["reason"] = col["reason"]
-        if "impact_ratio" in col:
-            columns[name]["impact_ratio"] = col["impact_ratio"]
-    out = {"metric": results.get("metric"), "min_rows": minimum, "judged_on": results.get("judged_on", []),
-           "columns": columns}
-    for key in ("impact_ratio", "max_group_deviation", "threshold", "favourable_outcome"):
-        if key in results:
-            out[key] = results[key]
-    return out
+    return {"metric": results.get("metric"), "min_rows": minimum, "judged_on": results.get("judged_on", []),
+            "columns": columns}
 
 
 # ---------------------------------------------------------------- tables
@@ -814,14 +712,6 @@ def tables(v: dict) -> dict[str, tuple[list[str], list[list]]]:
                                    for c, e in cols.items() if e.get("status") == EXECUTED
                                    for s, keys in e["sets"].items() for k, dirs in keys.items()
                                    for d, x in dirs.items()])
-    if cols := res("fairness").get("columns"):
-        out["fairness.csv"] = (["column", "group", "set", "side", "rows", "small", "mean_observed", "mean_predicted",
-                                "observed_expected", "favourable_share"],
-                               [[col, g["group"], s, side, e["rows"], e["small"],
-                                 *[e[side].get(k) for k in ("mean_observed", "mean_predicted", "observed_expected",
-                                                            "favourable_share")]]
-                                for col, c in cols.items() for g in c.get("groups", [])
-                                for s, e in g["sets"].items() for side in SIDES if side in e])
     items = res("assumptions").get("assumptions") or {}
     if (m := items.get("multicollinearity") or {}).get("status") == EXECUTED:
         out["vif.csv"] = (["column", "vif"], [[c["name"], c["vif"]] for c in m["results"]["columns"]])

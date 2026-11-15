@@ -14,7 +14,6 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from . import criteria
 from .candidate import ENV_PACKAGES
 from .environments import R_BASE, Environments
 from .profile import ProfileFailed, profile
@@ -133,12 +132,6 @@ class Analyst:
         for pair in self.matrix.pairs:
             fam = f" [{', '.join(pair.families)}]" if pair.families else ""
             lines.append(f"- {pair.r}{fam}: {', '.join(pair.python)} ({pair.tier})")
-        lines += ["", "Default acceptance criteria by response type, from the platform's validation thresholds. Use them "
-                  "only where the code, the documents and the DS state no criterion, and tell the DS which ones you "
-                  "used:"]
-        for response_type, values in criteria.load().defaults.items():
-            lines.append(f"- {response_type}: " + ", ".join(f"{k} {v:g}" for k, v in
-                                                            values.model_dump(exclude_none=True).items()))
         lines += ["", "R packages baseline.R can load: " + ", ".join(sorted(self.r_packages, key=str.lower)), "",
                   "Read the files and the data profiles (dataset_profile, with a data file's name for the others), "
                   "then submit the ModelSpec."]

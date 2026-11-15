@@ -113,7 +113,7 @@ export function EvaluationMetrics({ v }: { v: ValidationBody }) {
 const CHECKS = [
   ["baseline_comparison", "Baseline comparison"], ["calibration", "Calibration"],
   ["subgroup_performance", "Subgroup performance"], ["stability", "Stability"], ["sensitivity", "Sensitivity"],
-  ["assumptions", "Model assumptions"], ["fairness", "Fairness"], ["sample_suitability", "Sample suitability"],
+  ["assumptions", "Model assumptions"], ["sample_suitability", "Sample suitability"],
   ["decision_performance", "Decision performance"],
 ] as const;
 const CHECK_BADGE: Record<CheckStatus, "outline" | "warn" | "secondary"> = {

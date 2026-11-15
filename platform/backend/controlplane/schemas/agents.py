@@ -112,11 +112,6 @@ class Criteria(Contract):
     min_auc: float | None = Field(default=None, gt=0, le=1)
     min_events_captured: float | None = Field(default=None, ge=0, le=1,
         description="Minimum event recall at the stated decision threshold on independent data")
-    min_impact_ratio: float | None = Field(default=None, gt=0, le=1,
-        description="Fairness: lowest favourable-outcome rate of a protected group divided by the highest, at the "
-                    "decision threshold (the four-fifths rule is 0.8)")
-    max_group_calibration_deviation: float | None = Field(default=None, gt=0,
-        description="Fairness: largest |observed / expected - 1| of a protected group on an evaluation set")
 
 
 class Assessment(Contract):
@@ -226,16 +221,6 @@ class AssumptionCheck(PlannedCheck):
                                                                   "relevant to its response type and family")
 
 
-class FairnessCheck(PlannedCheck):
-    columns: list[str] = Field(default=[], description="Protected attributes, or close proxies, among the columns of "
-                                                       "R's set frames (sex, age, marital status, ...); numeric "
-                                                       "columns are cut into quintiles of the development set")
-    min_rows: int = Field(default=100, ge=1, description="Groups with fewer rows are reported but not judged")
-    favourable_outcome: Literal["below_threshold", "at_or_above_threshold"] | None = Field(
-        default=None, description="Which side of the decision threshold is favourable to the person scored, e.g. "
-                                  "below_threshold when a prediction at or above it declines")
-
-
 class ValidationPlan(Contract):
     """Model validation beyond migration parity. The Analyst decides which checks apply and why; the platform runs
     them on R's and Python's predictions and records what each could not establish."""
@@ -248,12 +233,9 @@ class ValidationPlan(Contract):
                                                   "metrics and coefficients")
     sensitivity: SensitivityCheck
     assumptions: AssumptionCheck
-    fairness: FairnessCheck | None = Field(default=None, description="Outcomes and calibration by protected group. "
-                                                                     "Required in new specifications; older ones "
-                                                                     "without it record fairness as not planned")
 
     def checks(self) -> list[tuple[str, PlannedCheck]]:
-        return [(name, c) for name in ValidationPlan.model_fields if (c := getattr(self, name)) is not None]
+        return [(name, getattr(self, name)) for name in ValidationPlan.model_fields]
 
 
 class ModelSpec(Contract):
@@ -345,10 +327,6 @@ class ModelSpec(Contract):
         for name in ("subgroup_performance", "sensitivity"):
             if getattr(vp, name).run and not getattr(vp, name).columns:
                 errors.append(f"validation_plan.{name}.columns: name the columns, or set run to false")
-        if vp.fairness and vp.fairness.run and not vp.fairness.columns:
-            errors.append("validation_plan.fairness.columns: name the protected attributes, or set run to false")
-        if vp.fairness and vp.fairness.favourable_outcome and a.decision is None:
-            errors.append("validation_plan.fairness.favourable_outcome: needs assessment.decision")
         if vp.assumptions.run:
             allowed = ASSUMPTIONS_FOR[self.response_type]
             if not vp.assumptions.assumptions:
@@ -375,13 +353,8 @@ class ModelSpec(Contract):
                                "r_predict": self.prediction.r_predict},
                 "convergence": self.convergence.model_dump(),
                 "period_column": self.assessment.period_column,
-                "segments": self.segment_columns()}
-
-    def segment_columns(self) -> list[str]:
-        """The set-frame columns capture.R exports per row: the subgroup columns, then the protected attributes."""
-        vp = self.validation_plan
-        columns = vp.subgroup_performance.columns if vp.subgroup_performance.run else []
-        return list(dict.fromkeys([*columns, *(vp.fairness.columns if vp.fairness else [])]))
+                "segments": self.validation_plan.subgroup_performance.columns
+                if self.validation_plan.subgroup_performance.run else []}
 
 
 # ---------------------------------------------------------------- Translator
