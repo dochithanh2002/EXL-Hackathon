@@ -25,9 +25,8 @@ def at_baseline(store):
     store.apply(pid, FilesUploaded(files=FILES))
     v = store.add_spec(pid, spec(), support.load())
     s = store.state(pid)
-    assert (s.drafted_tier, s.drafted_proven) == ("exact", False)      # stats::glm has no parity fixture yet
-    store.apply(pid, SpecConfirmed(version=v, tier="exact", proven=False, baseline_key="1" * 64,
-                                   parity_risk_accepted=True))
+    assert (s.drafted_tier, s.drafted_proven) == ("exact", True)       # binomial glm has a passing parity fixture
+    store.apply(pid, SpecConfirmed(version=v, tier="exact", proven=True, baseline_key="1" * 64))
     return pid
 
 

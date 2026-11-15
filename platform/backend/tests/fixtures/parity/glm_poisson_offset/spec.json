@@ -1,0 +1,121 @@
+{
+ "target_model": "Claim frequency per policy-year for motor policies (synthetic, M1-shaped)",
+ "r_function": "stats::glm",
+ "python_implementation": "statsmodels.api.GLM",
+ "support_tier": "exact",
+ "family": "poisson",
+ "link": "log",
+ "formula": "ClaimNb ~ VehPowerGLM + VehAgeGLM + DrivAgeGLM + BonusMalusGLM + DensityGLM + AreaGLM",
+ "response": "ClaimNb",
+ "response_type": "count",
+ "offset": "log(Exposure)",
+ "prediction": {
+  "kind": "scalar",
+  "quantity": "count",
+  "units": "expected claims over the policy's exposure",
+  "exposure": "Exposure",
+  "alignment_keys": [
+   "row"
+  ]
+ },
+ "preprocessing": [
+  {
+   "order": 1,
+   "description": "Area as 1-based level codes",
+   "r_code": "dat$AreaGLM <- as.integer(as.factor(dat$Area))",
+   "columns": [
+    "Area"
+   ]
+  },
+  {
+   "order": 2,
+   "description": "Vehicle power capped at 9, as a factor with reference 6",
+   "r_code": "dat$VehPowerGLM <- as.factor(pmin(dat$VehPower, 9))\ndat$VehPowerGLM <- relevel(dat$VehPowerGLM, ref = \"6\")",
+   "columns": [
+    "VehPower"
+   ]
+  },
+  {
+   "order": 3,
+   "description": "Cap vehicle age, driver age and bonus-malus",
+   "r_code": "dat$VehAgeGLM <- pmin(dat$VehAge, 12)",
+   "columns": [
+    "VehAge",
+    "DrivAge",
+    "BonusMalus"
+   ]
+  },
+  {
+   "order": 4,
+   "description": "Log density",
+   "r_code": "dat$DensityGLM <- as.numeric(log(dat$Density))",
+   "columns": [
+    "Density"
+   ]
+  }
+ ],
+ "split": {
+  "method": "sample",
+  "r_code": "ll <- sample(nrow(dat), round(0.8 * nrow(dat)))",
+  "seed": 100
+ },
+ "assessment": {
+  "business_use": "Motor claim frequency pricing",
+  "intended_population": "Motor policies",
+  "sample_population": "Synthetic motor policies",
+  "evaluation_sets": [
+   {
+    "set": "train",
+    "role": "development",
+    "description": "rows R samples for fitting"
+   },
+   {
+    "set": "test",
+    "role": "holdout",
+    "description": "the remaining rows"
+   }
+  ],
+  "missing_information": []
+ },
+ "validation_plan": {
+  "baseline_comparison": {
+   "run": true,
+   "rationale": "Pricing must beat a flat rate"
+  },
+  "calibration": {
+   "run": true,
+   "rationale": "Expected claims must match observed"
+  },
+  "subgroup_performance": {
+   "run": false,
+   "rationale": "Not needed for the parity fixture"
+  },
+  "stability": {
+   "run": false,
+   "rationale": "Not needed for the parity fixture"
+  },
+  "sensitivity": {
+   "run": false,
+   "rationale": "Not needed for the parity fixture"
+  },
+  "assumptions": {
+   "run": false,
+   "rationale": "Not needed for the parity fixture"
+  }
+ },
+ "metrics": [
+  "deviance",
+  "actual_expected"
+ ],
+ "unsupported_items": [],
+ "substitutions": [],
+ "r_packages": [
+  "stats"
+ ],
+ "baseline_r": "dat <- read.csv(\"inputs/policies.csv\")\ndat$AreaGLM <- as.integer(as.factor(dat$Area))\ndat$VehPowerGLM <- as.factor(pmin(dat$VehPower, 9))\ndat$VehPowerGLM <- relevel(dat$VehPowerGLM, ref = \"6\")\ndat$VehAgeGLM <- pmin(dat$VehAge, 12)\ndat$DrivAgeGLM <- pmin(dat$DrivAge, 80)\ndat$BonusMalusGLM <- as.integer(pmin(dat$BonusMalus, 150))\ndat$DensityGLM <- as.numeric(log(dat$Density))\nset.seed(100)\nll <- sample(nrow(dat), round(0.8 * nrow(dat)))\nlearn <- dat[ll, ]\ntest <- dat[-ll, ]\nglm1 <- glm(ClaimNb ~ VehPowerGLM + VehAgeGLM + DrivAgeGLM + BonusMalusGLM + DensityGLM + AreaGLM,\n            family = poisson(), data = learn, offset = log(Exposure))\n",
+ "baseline_objects": {
+  "model": "glm1",
+  "train": "learn",
+  "test": "test"
+ }
+}

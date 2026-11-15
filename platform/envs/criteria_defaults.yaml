@@ -1,0 +1,18 @@
+# Default acceptance criteria the Analyst may propose when the code, the documents and the DS state none. Each value
+# is a key of ModelSpec.assessment.criteria; the DS confirms or changes them with the spec, which is what makes them
+# binding. Response types not listed get no defaults.
+#
+# Source: the Model Risk Factory's validation thresholds (legacy layout: agent/config/thresholds.yaml, owned by
+# Model Risk Management). A criterion here is the boundary of that file's RED rating: the model fails a criterion
+# exactly where the factory rated it RED. Thresholds the factory states in other units (calibration gaps in
+# percentage points, minimum exposure) have no equivalent criterion and are left out.
+version: 1
+defaults:
+  binary:
+    min_auc: 0.65                          # validation.binary_pd.auc: amber boundary (green 0.70)
+    max_psi: 0.25                          # validation.binary_pd.psi: amber boundary (green 0.10)
+    min_impact_ratio: 0.8                  # fairness.binary_pd.dir_min: the four-fifths rule
+  count:
+    max_psi: 0.25                          # monitoring.poisson_frequency.freq_psi: red
+    max_calibration_deviation: 0.1         # validation.poisson_frequency.ae_dev: amber boundary (green 0.05)
+    max_group_calibration_deviation: 0.1   # fairness.poisson_frequency.ae_band: [0.90, 1.10]

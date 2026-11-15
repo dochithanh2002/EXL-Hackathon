@@ -68,24 +68,27 @@ def _calibration(ev: dict) -> list[Plot]:
     return out
 
 
-def _subgroups(ev: dict) -> list[Plot]:
-    res = ev["checks"]["subgroup_performance"].get("results") or {}
+def _subgroups(ev: dict, check: str = "subgroup_performance", prefix: str = "subgroups") -> list[Plot]:
+    """Observed / expected (or the primary metric, or the favourable share at the decision threshold) by group."""
+    res = (ev["checks"].get(check) or {}).get("results") or {}
     out = []
     for col, c in (res.get("columns") or {}).items():
         if c.get("status") != "executed":
             continue
         for s in res.get("judged_on", []):
             groups = [g for g in c["groups"] if s in g["sets"]]
-            stat = "observed_expected" if any("observed_expected" in g["sets"][s].get("python", g["sets"][s].get(
-                "r", {})) for g in groups) else res["metric"]
+            cells = [g["sets"][s].get("python", g["sets"][s].get("r", {})) for g in groups]
+            stat = ("favourable_share" if any("favourable_share" in x for x in cells) else
+                    "observed_expected" if any("observed_expected" in x for x in cells) else res.get("metric"))
+            if stat is None:
+                continue
             series = [Series(SIDE_NAMES[k], [g["sets"][s].get(k, {}).get(stat) for g in groups])
                       for k in ("r", "python") if any(k in g["sets"][s] for g in groups)]
             label = "observed / expected" if stat == "observed_expected" else stat.replace("_", " ")
             svg = bars(f"{col} on {s}", "", [("", [g["group"] for g in groups], series)],
                        dots=True, ref=1.0 if stat == "observed_expected" else None, x_label=label)
             if svg:
-                out.append(Plot(f"subgroups-{_slug(col)}-{s}.svg", f"{col} on {s}", "validation.subgroup_performance",
-                                svg))
+                out.append(Plot(f"{prefix}-{_slug(col)}-{s}.svg", f"{col} on {s}", f"validation.{check}", svg))
     return out
 
 
@@ -148,7 +151,8 @@ def render(validation: dict, dest: Path) -> list[dict]:
     makers = [lambda: [_parity(validation)]]
     if ev.get("checks"):
         makers += [lambda: [_performance(ev)], *(lambda f=f: f(ev) for f in (_calibration, _subgroups, _stability,
-                                                                            _sensitivity, _assumptions))]
+                                                                            _sensitivity, _assumptions)),
+                   lambda: _subgroups(ev, "fairness", "fairness")]
     plots = []
     for make in makers:
         try:

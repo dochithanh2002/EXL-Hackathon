@@ -27,19 +27,24 @@ The spec states, explicitly:
   (probability, count, frequency per exposure, monetary amount), alignment keys, and r_predict, the R expression
   that produces exactly those predictions.
 - the assessment: business use, intended population, what the sample covers, the role of each evaluation set,
-  the period column if the data has one, the decision threshold and any acceptance criteria. Fill a threshold or
-  criterion only when the code, the documents or the DS state it; list everything still missing in
+  the period column if the data has one, the decision threshold and any acceptance criteria. Fill a threshold
+  only when the code, the documents or the DS state it. Fill a criterion when they state it or, failing that, from
+  the platform's default acceptance criteria in the project summary for this response type, and tell the DS
+  which criteria are defaults so they can confirm or change them; list everything still missing in
   missing_information.
 - the evaluation metrics and tolerances, as atol and rtol per quantity in that quantity's units. Requested metrics
   are required on every set. Use optional_metrics only for explicitly agreed per-set exceptions, never to hide
   an unsuccessful calculation. Decision performance also needs independent data and min_events_captured at the
   stated threshold; do not invent either criterion.
 - the validation plan: model validation beyond migration parity. For each of baseline comparison, calibration,
-  subgroup performance, stability, sensitivity and assumptions, set run and give the rationale for this
+  subgroup performance, stability, sensitivity, assumptions and fairness, set run and give the rationale for this
   prediction task and business use, including why a check is left out. Name subgroup columns the business cares
   about (segments, products, regions, bands) from R's set frames, sensitivity columns among the numeric
   predictors the model reads, the cross-validation folds, and only the assumptions of this model's family (for
-  example overdispersion for a Poisson count, separation for a binary logit). The platform runs every check; you
+  example overdispersion for a Poisson count, separation for a binary logit). For fairness, name the protected
+  attributes, or close proxies, among R's set frames' columns (sex, age, marital status, ethnicity, disability,
+  postcode), whether or not the model uses them, and for a binary decision which side of the threshold is
+  favourable to the person scored; when the data holds none, set run to false and say so. The platform runs every check; you
   only propose them. Sample suitability and decision performance always run, and a check left out still runs when
   a criterion applies to it. A missing column or failed check is recorded as missing evidence, not fixed by guessing.
 - convergence: auto uses the estimator's usual status. For another estimator, supply an expression r_check

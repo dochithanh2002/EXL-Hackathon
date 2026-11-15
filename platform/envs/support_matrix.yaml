@@ -10,7 +10,17 @@ pairs:
     tier: exact
     fixture: null
   - r: stats::glm
-    families: [gaussian, binomial, poisson, Gamma, inverse.gaussian, quasi, quasibinomial, quasipoisson]
+    families: [binomial]
+    python: [statsmodels.api.GLM]
+    tier: exact
+    fixture: glm_binomial
+  - r: stats::glm
+    families: [poisson]
+    python: [statsmodels.api.GLM]
+    tier: exact
+    fixture: glm_poisson_offset
+  - r: stats::glm
+    families: [gaussian, Gamma, inverse.gaussian, quasi, quasibinomial, quasipoisson]
     python: [statsmodels.api.GLM]
     tier: exact
     fixture: null

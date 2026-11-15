@@ -255,6 +255,14 @@ def evaluation_facts(ev: dict) -> dict:
         col: {"status": c["status"], "cells_withheld": c["cells_withheld"],
               "groups": {g["group"]: g["sets"] for g in c["groups"]}}
         for col, c in subgroups.get("columns", {}).items()}}
+    fair = subgroup_prompt_results(res["fairness"])
+    out["fairness"] |= {k: res["fairness"].get(k) for k in ("impact_ratio", "max_group_deviation", "threshold",
+                                                            "favourable_outcome") if k in res["fairness"]}
+    if fair:
+        out["fairness"] |= {"min_rows": fair.get("min_rows"), "columns": {
+            col: {"status": c["status"], "cells_withheld": c["cells_withheld"], "impact_ratio": c.get("impact_ratio"),
+                  "groups": {g["group"]: g["sets"] for g in c["groups"]}}
+            for col, c in fair.get("columns", {}).items()}}
     st = res["stability"]
     if cv := st.get("cross_validation"):
         worst = cv["coefficients"][0] if cv["coefficients"] else {}
@@ -369,7 +377,9 @@ class Reporter:
                            *meta.get("column_classes", {}), record.spec.response,
                            *[name for step in record.spec.preprocessing for name in step.columns],
                            *record.spec.validation_plan.subgroup_performance.columns,
-                           *record.spec.validation_plan.sensitivity.columns])
+                           *record.spec.validation_plan.sensitivity.columns,
+                           *(record.spec.validation_plan.fairness.columns if record.spec.validation_plan.fairness
+                             else [])])
         # the key findings rest on the accepted parity checks, the acceptance and the model validation
         self.required = [record.approved.validation["id"], record.approval_id, "evaluation"]
 
@@ -497,6 +507,7 @@ class Reporter:
         plan = dict(sp.validation_plan.checks())
         out += ["### Validation plan", ""] + _table(["Check", "Planned", "Rationale"], [
             [CHECK_TITLES[k], "yes" if plan[k].run else "no", plan[k].rationale] if k in plan else
+            [CHECK_TITLES[k], "no", (checks.get(k) or {}).get("rationale", "")] if k == "fairness" else
             [CHECK_TITLES[k], "not applicable" if (checks.get(k) or {}).get("status") == "not applicable" else "always",
              (checks.get(k) or {}).get("rationale", "")] for k in CHECKS]) + [""]
 
@@ -671,6 +682,22 @@ def _evaluation_tables(check: str, res: dict) -> list[tuple[list[str], list[list
                                  fmt(py.get("observed_expected")), fmt(py.get(res["metric"])), fmt(py.get("auc"))])
         return [(["Column", "Group", "Set", "Rows", "Observed / expected", res["metric"].replace("_", " "), "AUC"],
                  rows)]
+    if check == "fairness" and res.get("columns"):
+        rows = []
+        for col, c in res["columns"].items():
+            if c["status"] != "executed":
+                rows.append([f"`{col}`", c.get("reason", c["status"]), "", "", "", ""])
+                continue
+            for g in c["groups"]:
+                for s, e in g["sets"].items():
+                    py = e.get("python") or e.get("r") or {}
+                    rows.append([f"`{col}`", g["group"] + _range(g), s,
+                                 fmt(e["rows"]) + (" (small)" if e["small"] else ""),
+                                 fmt(py.get("observed_expected")), fmt(py.get("favourable_share"))])
+        ratios = [[f"`{col}`", s, fmt(x)] for col, c in res["columns"].items()
+                  for s, x in (c.get("impact_ratio") or {}).items()]
+        return [(["Column", "Group", "Set", "Rows", "Observed / expected", "Favourable share"], rows),
+                (["Column", "Set", "Impact ratio"], ratios)]
     if check == "stability":
         out = []
         if psi := _stability_psi(res):

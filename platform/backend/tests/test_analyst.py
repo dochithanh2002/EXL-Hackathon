@@ -148,7 +148,7 @@ def test_analyst_drafts_the_spec_answers_the_ds_and_the_confirmed_spec_runs_the_
     assert run.info.status == "FINISHED" and run.data.params["model"] == "fake / fake-1"
     assert run.data.metrics == {"tool_calls": 4.0, "invalid_submissions": 1.0}
     spec = cp.get(f"/api/projects/{pid}/specs/1").json()
-    assert spec["spec"]["family"] == "poisson" and spec["support"] == {"tier": "exact", "proven": False, "known": True}
+    assert spec["spec"]["family"] == "poisson" and spec["support"] == {"tier": "exact", "proven": True, "known": True}
 
     # the next turn replays the whole transcript, tool results included
     llm.script = [text("Claims are counts per unit of exposure.")]

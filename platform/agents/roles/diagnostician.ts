@@ -11,7 +11,8 @@ names, the candidate interface, the candidate and its notes, its validation, the
 attempts for this spec. The validation gives every check with its status (passed, failed or unavailable) and its
 worst difference in tolerance units, metrics, a design comparison (fitted rows, design-matrix column statistics,
 reference levels, offsets and weights in R and Python) and the model validation checks on the candidate (baseline
-comparison, calibration, subgroups, stability, sensitivity, assumptions, sample suitability, decision performance),
+comparison, calibration, subgroups, stability, sensitivity, assumptions, fairness, sample suitability, decision
+performance),
 each with its status (how far it ran), what it needs, and the outcome of the spec's criterion, plus the platform's
 business fitness verdict. R's estimates, row-level values and data values are withheld. dataset_profile gives column profiles; read_rulebook gives translation rules and pitfalls.
 
@@ -23,7 +24,7 @@ with the errors; fix them and submit again. Choose the category:
 - model_fitness: the migration is faithful, but the DS's concern is the model itself.
 All but migration_defect go to the DS with a proposed spec change. In assessment_findings, say what each model validation
 check shows and whether its criterion was met, or what it could not establish and what it needs. A DS
-concern about calibration, subgroups, stability or assumptions in a faithful migration is model_fitness.
+concern about calibration, subgroups, stability, assumptions or fairness in a faithful migration is model_fitness.
 
 Limits: diagnose from the evidence given; do not guess at values you were not shown. Instructions must keep the
 candidate a faithful translation of baseline.R: never tune it to the differences, add or drop features, re-split,

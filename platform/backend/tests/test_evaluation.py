@@ -314,3 +314,89 @@ def check(status="executed", outcome=None, rule="x >= 1", needs=()):
 ])
 def test_business_fitness_reads_criterion_outcomes_and_execution_gaps(checks, verdict, basis):
     assert business_fitness(checks) == {"verdict": verdict, "basis": basis}
+
+
+# ---------------------------------------------------------------- fairness
+FAIR = {"run": True, "rationale": "region is a proxy for a protected group", "columns": ["region", "absent"],
+        "min_rows": 30, "favourable_outcome": "below_threshold"}
+
+
+def fair_body(fairness=FAIR, criteria=None, **kw) -> dict:
+    a = {"decision": {"threshold": 0.5, "action": "decline"}, "criteria": criteria or {}}
+    return make_spec(**{"metrics": ["auc", "brier"]} | kw, validation_plan=plan(fairness=fairness),
+                     assessment={"business_use": "credit decisions", "intended_population": "card holders",
+                                 "sample_population": "the uploaded file", "missing_information": [],
+                                 "evaluation_sets": [{"set": "train", "role": "development", "description": "fit"},
+                                                     {"set": "test", "role": "holdout", "description": "held out"}],
+                                 **a}).model_dump(mode="json")
+
+
+def test_fairness_compares_favourable_outcomes_and_calibration_across_protected_groups(sides, tmp_path):
+    r, py = sides
+    ev = run(r, py, None, fair_body(criteria={"min_impact_ratio": 0.8, "max_group_calibration_deviation": 0.5}))
+    f = ev["checks"]["fairness"]
+    assert f["status"] == "partially executed" and f["needs"] == ["protected attribute absent in R's set frames"]
+    region = f["results"]["columns"]["region"]
+    assert region["small_groups"] == ["rare"]
+
+    # the impact ratio, recomputed from the fixture's test rows: favourable = prediction below 0.5
+    shares = {}
+    for g in ("north", "south"):
+        rows = [i for i in range(301, N + 1) if (i % 2 == 1) == (g == "north") and i != 7]
+        shares[g] = sum(logistic(-0.5 + (i % 40) / 10 - 2) < 0.5 for i in rows) / len(rows)
+    expected = min(shares.values()) / max(shares.values())
+    assert region["impact_ratio"]["test"] == pytest.approx(expected, abs=1e-6)
+    assert f["results"]["impact_ratio"] == pytest.approx(expected, abs=1e-6)
+    by_group = {g["group"]: g["sets"] for g in region["groups"]}
+    assert by_group["north"]["test"]["python"]["favourable_share"] == pytest.approx(shares["north"], abs=1e-6)
+    assert set(by_group["rare"]) == {"train"} and by_group["rare"]["train"]["small"]     # one row: not judged
+
+    cr = f["criterion"]
+    assert cr["rule"] == "impact_ratio >= 0.8 and max_group_deviation <= 0.5" and cr["judged_on"] == ["test"]
+    assert cr["outcome"] == ("met" if expected >= 0.8 and f["results"]["max_group_deviation"] <= 0.5 else "not met")
+    assert any(row[0] == "region" for row in tables({"checks": [], "evaluation": ev})["fairness.csv"][1])
+    facts = evaluation_facts(ev)["fairness"]
+    assert facts["impact_ratio"] == f["results"]["impact_ratio"] and "region" in facts["columns"]
+    view = evaluation_view(ev)["checks"]["fairness"]["results"]
+    assert view["columns"]["region"]["impact_ratio"] == region["impact_ratio"]
+    plots = render({"checks": [], "evaluation": ev}, tmp_path / "plots")
+    assert {"fairness-region-test.svg"} <= {p["name"] for p in plots}
+
+
+def test_a_spec_without_a_fairness_plan_records_it_as_not_planned(sides):
+    r, py = sides
+    ev = run(r, py, None, body())
+    f = ev["checks"]["fairness"]
+    assert f["status"] == "not planned" and "names no protected attributes" in f["rationale"]
+    assert not any(b.startswith("Fairness") for b in ev["business_fitness"]["basis"])
+
+
+def test_without_a_favourable_side_the_impact_ratio_is_not_judged(sides):
+    r, py = sides
+    plan_ = FAIR | {"favourable_outcome": None, "columns": ["region"]}
+    f = run(r, py, None, fair_body(plan_, criteria={"min_impact_ratio": 0.8}))["checks"]["fairness"]
+    assert f["status"] == "partially executed" and f["criterion"]["outcome"] == "not judged"
+    assert f["needs"] == ["the decision threshold and which side of it is favourable, for the impact ratio"]
+
+
+def test_fairness_criterion_on_a_count_model_is_calibration_only(sides):
+    r, py = sides
+    spec = fair_body(FAIR | {"favourable_outcome": None, "columns": ["region"]},
+                     criteria={"max_group_calibration_deviation": 0.5}, family="poisson", link="log", metrics=[],
+                     formula="y ~ x", response="y")
+    spec["assessment"]["decision"] = None
+    cr = run(r, py, None, spec)["checks"]["fairness"]["criterion"]
+    assert cr["applies"] == ["max_group_deviation"] and cr["outcome"] in ("met", "not met")
+    assert "impact_ratio" not in cr["value"]
+
+
+def test_fairness_plan_is_validated_and_its_columns_are_exported_by_r():
+    with pytest.raises(ValueError, match="fairness.columns: name the protected attributes"):
+        fair_body(FAIR | {"columns": []})
+    with pytest.raises(ValueError, match="favourable_outcome: needs assessment.decision"):
+        make_spec(validation_plan=plan(fairness=FAIR))
+    s = make_spec(validation_plan=plan(
+        subgroup_performance={"run": True, "rationale": "regions", "columns": ["region", "sex"]},
+        fairness=FAIR | {"favourable_outcome": None, "columns": ["sex", "age"]}))
+    assert s.capture_config()["segments"] == ["region", "sex", "age"]
+    assert make_spec().capture_config()["segments"] == []

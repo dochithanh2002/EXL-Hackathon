@@ -10,11 +10,11 @@ rules:
     verified: CV-IO-01
     detect: "read.csv(...) with default check.names=TRUE"
     python: "pd.read_csv(path); then apply R's make.names(unique = TRUE) exactly: every character other than letters, digits, '.' and '_' becomes '.'; prefix 'X' when the ORIGINAL name does not start with a letter or a dot not followed by a digit (also for an empty name); reserved words (if, else, TRUE, FALSE, NA, NULL, in, for, function, ...) get a trailing '.'; then make.unique appends '.1', '.2', ... to later duplicates without colliding with existing names. E.g. 'default payment next month' -> 'default.payment.next.month', 'NumberOfTime30-59DaysPastDueNotWorse' -> 'NumberOfTime30.59DaysPastDueNotWorse'."
-    pitfall: "R silently renames columns with spaces or symbols, and its coefficient names use the renamed columns. Non-ASCII names depend on R's locale: flag them in limitations."
+    pitfall: "R silently renames columns with spaces or symbols, and its coefficient names use the renamed columns. In the C locale only ASCII letters count as letters; non-ASCII names depend on R's locale: flag them in limitations."
   - id: R-IO-02
     verified: CV-IO-02
     detect: "read.csv(...) defaults for missing values and text (R >= 4.0, stringsAsFactors = FALSE)"
-    python: "Each column goes through type.convert(as.is = TRUE): logical (T, F, TRUE, FALSE, true, false, True, False), else integer (fits in 32 bits), else double, else character. Only 'NA' is a missing-value string: read with dtype=str, keep_default_na=False, na_values=['NA'], then convert per column. Blank fields are missing in logical, integer and double columns but stay '' in character columns. Numeric fields are whitespace-stripped, character fields are not. Short rows are filled with missing values."
+    python: "Each column goes through type.convert(as.is = TRUE): logical (T, F, TRUE, FALSE, true, false, True, False), else integer (fits in 32 bits), else double, else character. Only 'NA' is a missing-value string: read with dtype=str, keep_default_na=False, na_values=['NA'], then convert per column. Blank fields are missing in logical, integer and double columns but stay '' in character columns. Numeric fields are whitespace-stripped, character fields are not. Short rows are filled with missing values. Verified details: 'NA' and the logical tokens must match EXACTLY (' NA' and ' TRUE' are text, which makes the column character); an integer allows LEADING blanks only ('5 ' makes the column double, which allows blanks on both sides); a field of blanks only is missing in numeric columns; leading zeros and an explicit sign still parse as numbers, and an integer beyond 32 bits makes the column double; quoted numbers convert like unquoted ones and a quoted \"NA\" is missing; '.5' and '5.' are doubles; 'Inf', '-Inf' and 'inf' are infinities; a column with only missing values is logical; separators, doubled quotes and newlines inside quotes belong to the field."
     pitfall: "pandas also treats '', 'N/A', 'None', 'null', 'nan' and others as missing, and infers types differently; a value pandas treats as missing but R does not changes the rows R's na.omit drops. A UTF-8 BOM, a data row longer than the header (R then takes row names) or hexadecimal numerals behave differently again: flag them."
   - id: R-IO-03
     detect: "rows of the loaded data"
@@ -24,7 +24,7 @@ rules:
     verified: CV-IO-03
     detect: "read.csv(..., quote = \"\\\"'\") / string columns that need cleaning after load"
     python: "Select text columns with pd.api.types.is_string_dtype(s), never `df.dtypes == object` alone. With quote = \"\\\"'\" both quote characters delimit fields: read with quotechar='\"', then strip single quotes from a field wholly wrapped in them ('' inside is a literal quote), and only then type-convert the field as R-IO-02 does."
-    pitfall: "pandas has one quote character, and pandas >= 3 reads text as the 'str' dtype, so a dtype == object filter selects nothing and the cleaning silently does not happen. A single quote that does not wrap the whole field, or a separator inside single quotes, cannot be reproduced this way: flag it."
+    pitfall: "pandas has one quote character, and pandas >= 3 reads text as the 'str' dtype, so a dtype == object filter selects nothing and the cleaning silently does not happen. A single quote that does not wrap the whole field, a separator inside single quotes, or a double-quoted field holding single quotes cannot be reproduced this way: flag it."
   - id: R-IO-05
     verified: CV-IO-04
     detect: "colnames(df) <- tolower(colnames(df))"
@@ -75,6 +75,11 @@ rules:
     detect: "log(x)"
     python: "np.log on float values: log(0) = -inf, log(negative) = nan, missing stays missing."
     pitfall: "Clipping or replacing -inf with a small number changes rows R drops or keeps; an offset of log(0) = -inf makes R's glm stop (R-EST-03)."
+  - id: R-VEC-05
+    verified: CV-AUTO-ROUND
+    detect: "round(x, digits) on a double vector"
+    python: "Reproduce R >= 4.0 (src/nmath/fround.c): with p = 10^digits, take the two candidates floor(x*p)/p and ceil(x*p)/p and keep the one CLOSER to x; on an exact tie keep the even one. digits is rounded to an integer first; negative digits round to tens, hundreds; NA, NaN and +-Inf pass through; round(x) with digits 0 is ties-to-even (np.rint)."
+    pitfall: "np.round and Python's round scale first and then round, so they differ from R on values whose decimal form is not exact: R gives round(0.15, 1) = 0.1 because 0.15 is stored as 0.1499999..., np.round gives 0.2. round() on integer, logical or text input, or with a vector of digits, needs its own check."
   - id: R-VEC-04
     verified: CV-VEC-04
     detect: "arithmetic on a numeric vector and a scalar: x + 1, x - 17, x * k, x / k"
@@ -86,7 +91,7 @@ rules:
     verified: CV-REC-01
     detect: "x %in% c(...)  /  x[x %in% c(...)] <- value"
     python: "s.isin([...]) with matching dtypes. %in% never returns NA: a missing element matches only a missing value in the table. Numbers compared with strings are compared as text (as.character(4) == '4'). Assigning a double into an integer vector converts the WHOLE vector to float."
-    pitfall: "Type mismatch between R numeric and Python int or str. Character or factor vectors, and replacement vectors longer than 1, need extra care."
+    pitfall: "Type mismatch between R numeric and Python int or str. The integer-to-double conversion happens even when no element matches. Character or factor vectors, and replacement vectors longer than 1, need extra care."
   - id: R-REC-02
     detect: "recodes executed in sequence"
     python: "Apply the recodes in exactly the R order. Each recode sees the result of the one before it."
@@ -111,7 +116,7 @@ rules:
     verified: CV-MM-01
     detect: "factor in a glm/lm formula (contr.treatment)"
     python: "Build treatment-coded dummies explicitly, named '<var><level>' exactly as R's model.matrix names them (e.g. 'sex2', 'areaB'), from the baseline metadata's xlevels, not the levels observed in Python: '(Intercept)' first, then each term in formula order, numeric terms as is, a dummy for every level except the reference. Character columns in a formula are turned into factors with sorted levels. A level absent from the rows keeps its all-zero column."
-    pitfall: "A level missing from the train set, or an extra level in the test set, silently changes the columns. Interactions, I(), poly(), logical terms and -1 / +0 formulas need their own handling: check the coefficient names."
+    pitfall: "A level missing from the train set, or an extra level in the test set, silently changes the columns. A level with no training rows gives an all-zero column and an NA coefficient in R (rank deficiency): flag it. A value outside the levels at prediction makes R stop ('factor x has new levels'); never map it to the reference level. Interactions, I(), poly(), logical terms and -1 / +0 formulas need their own handling: check the coefficient names."
   - id: R-FAC-03
     detect: "factor response in a binomial glm"
     python: "y = 1 for every level except the first, so the event is the second level ('1' for a 0/1 factor). Cast to float."
