@@ -1,0 +1,5 @@
+# Upstream files kept byte-for-byte to match their checksums
+examples/*/data/** -whitespace
+examples/*/code/** -whitespace
+examples/M5_hmeq/UPSTREAM_README.md -whitespace
+examples/M5_hmeq/LICENSE.upstream -whitespace

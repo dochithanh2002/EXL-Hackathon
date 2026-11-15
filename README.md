@@ -10,7 +10,7 @@ cancellation, and a Dockerfile and compose file for Linux.
 
 ```sh
 ./platform/bootstrap.sh                  # build the environments, the agent service and the UI (once)
-cd platform/backend && uv run pytest     # tests; the M4 tests read M4_DIR
+cd platform/backend && uv run pytest     # tests; the M4 tests need examples/M4_givemesomecredit/data
 ./platform/dev.sh                        # UI on :5173; MLflow :5000, agent service :8100, control plane :8000
 ```
 
@@ -36,6 +36,8 @@ docker compose -f deploy/compose.yaml -f deploy/compose.caddy.yaml up -d --build
 
 Caddy obtains the TLS certificate and requires the same login for the UI, API, and MLflow at `/mlflow/`.
 The web UI links to project experiments and runs there. Authorized users share the same projects and settings.
+
+[`examples/`](examples/README.md) holds five public R models with their data, ready to upload.
 
 The previous Agentic Model Risk Factory is in [`legacy/`](legacy/README.md) as read-only reference; its working
 layout is at git tag `legacy-v2.1`.

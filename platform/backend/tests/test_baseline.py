@@ -17,7 +17,7 @@ from tests.test_schemas import plan
 from tests.test_schemas import spec as make_spec
 
 FIXTURES = Path(__file__).parent / "fixtures"
-M4_DIR = Path(os.environ.get("M4_DIR", Path.home() / "Desktop/EXL-Hackathon-26/downloads/M4_givemesomecredit"))
+M4_DIR = Path(os.environ.get("M4_DIR", Path(__file__).parents[3] / "examples" / "M4_givemesomecredit"))
 
 CLAIMS = "\n".join(
     ["id,claims,exposure,area,age"]

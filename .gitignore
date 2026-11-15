@@ -11,3 +11,8 @@ platform/var/
 platform/frontend/dist/
 platform/envs/r/library/
 platform/envs/*/.venv/
+
+examples/*/outputs/
+examples/M3_ulb_fraud/data/creditcard.csv
+examples/M4_givemesomecredit/data/*.csv
+examples/M4_givemesomecredit/data/*.zip
