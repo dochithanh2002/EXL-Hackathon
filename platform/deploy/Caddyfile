@@ -1,0 +1,20 @@
+{$R2PY_DOMAIN} {
+	header >Cache-Control "no-store"
+	basic_auth {
+		import /etc/caddy/users.caddy
+	}
+	handle /mlflow {
+		redir * /mlflow/ 308
+	}
+	# MLflow's UI resolves its assets and API URLs relative to /mlflow/.
+	handle_path /mlflow/* {
+		reverse_proxy mlflow:5000 {
+			header_up -Authorization
+		}
+	}
+	handle {
+		reverse_proxy controlplane:8000 {
+			header_up -Authorization
+		}
+	}
+}

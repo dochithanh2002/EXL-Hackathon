@@ -1,20 +1,17 @@
-# Agent instructions (Codex, Claude Code and other coding agents)
+# Agent instructions
 
-This repository is the **Agentic Model Risk Factory**: it documents, migrates (R → Python with parity proof),
-validates and monitors legacy models under PRA SS1/23.
+This repository is being rebuilt as an agentic R → Python ML transformation platform. The plan is `PLAN.md`;
+follow it.
 
-- `agent/`  the agents (`agent/agents/*.md`), the skills users invoke (`agent/skills/*/SKILL.md`), deterministic
-  tools (`agent/bin/mrf`), validators, and **all thresholds** (`agent/config/thresholds.yaml`)
-- `input/`  one folder per legacy model (`model.R`, `model.yaml`, `data/`, `docs/`)
-- `output/` one folder per model: `logs/`, `model/`, `reports/`
+- `platform/` (to be created): the new platform — `backend/` (Python, FastAPI), `agents/` (Node, Pi SDK),
+  `frontend/` (React), `envs/` (pinned R and Python environments), `deploy/`.
+- `legacy/`: the previous Agentic Model Risk Factory, kept as read-only reference for code to port (capture
+  harness, guardrails, parity logic, rulebook). It does not run from this location; the working layout is at
+  git tag `legacy-v2.1`. Ignore `legacy/AGENTS.md` and `legacy/CLAUDE.md` unless working on that tag.
 
-## How to work here
-1. When the user asks to run, document, migrate, validate or monitor a model, follow
-   `agent/skills/run/SKILL.md`. Ask the user which model in `input/` to use; never scan the whole repository.
-2. Each stage is done by following the matching agent file in `agent/agents/`. If you cannot spawn subagents, do
-   the stages yourself, in order, exactly as those files say.
-3. Every check is a command: `agent/bin/mrf <command> <model>` (`agent/bin/mrf --help`). Exit 1 = fix and retry;
-   exit 4 = ESCALATED, stop and ask the user.
-4. Never edit `agent/config/thresholds.yaml`, `agent/config/rulebook.yaml`, `agent/tools/`, `input/`, or frozen
-   references to make a check pass. Never read data rows. Never approve on the user's behalf (`approve` skill).
-5. Tests: `.venv/bin/python -m pytest` from the repository root.
+Rules:
+1. Do not edit `legacy/`; copy what you need into `platform/`.
+2. Pin every dependency version.
+3. Never commit credentials or `*.env` files, and never read dataset rows into an agent prompt.
+4. Avoid unneccessary secondary labels and descriptions. Let the layout do the explaining.
+5. REMEMBER: You are the owner and long-term maintainer of this codebase.

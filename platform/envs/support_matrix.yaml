@@ -1,0 +1,69 @@
+# Known R -> Python pairs. A reference, not an allowlist: a model not listed is still attempted at the tier the
+# Analyst proposes, and the DS accepts the parity risk. scikit-learn is never used.
+# `tier` is the parity a pair is expected to reach. A pair is proven only once `fixture` names a directory under
+# platform/backend/tests/fixtures/parity/ that the parity tests pass; until then the DS must accept the parity risk
+# at confirmation, and the UI shows it as unproven, even for an exact pair.
+version: 2
+pairs:
+  - r: stats::lm
+    python: [statsmodels.api.OLS, statsmodels.api.WLS]
+    tier: exact
+    fixture: null
+  - r: stats::glm
+    families: [gaussian, binomial, poisson, Gamma, inverse.gaussian, quasi, quasibinomial, quasipoisson]
+    python: [statsmodels.api.GLM]
+    tier: exact
+    fixture: null
+  - r: MASS::glm.nb
+    python: [statsmodels.api.NegativeBinomial, statsmodels.api.GLM]
+    tier: exact
+    fixture: null
+  - r: nnet::multinom
+    python: [statsmodels.api.MNLogit]
+    tier: exact
+    fixture: null
+  - r: MASS::polr
+    python: [statsmodels.miscmodels.ordinal_model.OrderedModel]
+    tier: exact
+    fixture: null
+  - r: quantreg::rq
+    python: [statsmodels.api.QuantReg]
+    tier: exact
+    fixture: null
+  - r: nlme::gls
+    python: [statsmodels.api.GLS, statsmodels.api.GLSAR]
+    tier: exact
+    fixture: null
+  - r: glmnet::glmnet
+    python: [statsmodels.api.GLM.fit_regularized, statsmodels.api.OLS.fit_regularized]
+    tier: approximate
+  - r: glmnet::cv.glmnet
+    python: [statsmodels.api.GLM.fit_regularized, statsmodels.api.OLS.fit_regularized]
+    tier: approximate
+  - r: mgcv::gam
+    python: [statsmodels.gam.api.GLMGam]
+    tier: approximate
+  - r: lme4::lmer
+    python: [statsmodels.api.MixedLM]
+    tier: approximate
+  - r: lme4::glmer
+    python: [statsmodels.genmod.bayes_mixed_glm.BinomialBayesMixedGLM, statsmodels.genmod.bayes_mixed_glm.PoissonBayesMixedGLM]
+    tier: approximate
+  - r: nlme::lme
+    python: [statsmodels.api.MixedLM]
+    tier: approximate
+  - r: MASS::rlm
+    python: [statsmodels.api.RLM]
+    tier: approximate
+  - r: survival::coxph
+    python: [statsmodels.api.PHReg]
+    tier: approximate
+  - r: stats::arima
+    python: [statsmodels.tsa.arima.model.ARIMA, statsmodels.tsa.statespace.sarimax.SARIMAX]
+    tier: approximate
+  - r: forecast::Arima
+    python: [statsmodels.tsa.arima.model.ARIMA, statsmodels.tsa.statespace.sarimax.SARIMAX]
+    tier: approximate
+  - r: forecast::auto.arima
+    python: [statsmodels.tsa.arima.model.ARIMA, statsmodels.tsa.statespace.sarimax.SARIMAX]
+    tier: approximate
