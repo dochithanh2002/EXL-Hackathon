@@ -3,7 +3,15 @@
 # Python translation, and the pitfall it prevents.
 # Rules with `verified` carry R semantics proven against real R runs by the Model Risk Factory conversion catalog
 # (legacy layout: agent/conversion/rules, ids CV-*), restated here as plain pandas / numpy / statsmodels guidance.
-version: "3.0"   # 3.0: merged the R-verified conversion catalog semantics
+# A rule without `verified` is translated from R's documentation only: treat its edge cases as unconfirmed.
+version: "3.1"
+changelog:
+  - version: "3.1"
+    date: 2026-11-15
+    changes: "Rules for every support_matrix.yaml pair (R-EST-08 to R-EST-18), readr and data.table loading (R-IO-06, R-IO-07), dplyr and tidyr (R-DPL-*), dates (R-DT-*), strings (R-STR-*) and aggregation (R-AGG-*); R-EST-02 prior weights; R-NA-01 offset, weights and na.exclude; R-PRED-01 link scale and no newdata; new R-DF-03 merge, R-VEC-06 ifelse, R-VEC-07 quantile, R-REC-05 cut, R-EST-05 quasi families, R-EST-06 glmnet, R-EST-07 step; R-EST-01 scoped to unpenalised fits; GOV-01 protected attributes, proxies and escalation; R-IDX-01 and R-IDX-02 separated."
+  - version: "3.0"
+    date: 2026-11-15
+    changes: "Merged the R-verified conversion catalog semantics (CV-*); edge cases from the glm parity work; R-FAC-02 corrected for drop.unused.levels."
 rules:
   # ---------------- Data loading ----------------
   - id: R-IO-01
@@ -30,6 +38,14 @@ rules:
     detect: "colnames(df) <- tolower(colnames(df))"
     python: "Lower-case the names AFTER applying make.names (R-IO-01). Duplicates created by lower-casing are kept as they are."
     pitfall: "Lower-casing before make.names, or de-duplicating afterwards, gives different names from R's coefficient names."
+  - id: R-IO-06
+    detect: "readr::read_csv(...)"
+    python: "Column names are kept as written (no make.names); an empty name becomes '...<position>' and a duplicated name gets '...<position>' appended. Both '' and 'NA' are missing in EVERY column, character columns included, and fields are whitespace-trimmed (trim_ws = TRUE). Types are guessed from the first 1000 rows (guess_max): logical, double (readr has no 32-bit integer guess), ISO 8601 dates and date-times, else character. Text stays character, never factor."
+    pitfall: "Applying read.csv's rules (R-IO-01, R-IO-02) renames columns and keeps blanks as '' where readr gives NA, which changes the rows na.omit drops. A value after row 1000 that does not fit the guessed type becomes NA with a parsing problem, not a type change. Non-syntactic names appear in R's coefficient names wrapped in backticks: take them from R's names exactly."
+  - id: R-IO-07
+    detect: "data.table::fread(...)"
+    python: "Column names are kept as written (check.names = FALSE). Only 'NA' is missing by default; a blank field is NA in logical, integer and double columns and '' in character columns. Types are detected from a sample of rows; integers beyond 32 bits are read as integer64 (bit64), not double. Text stays character."
+    pitfall: "integer64 arithmetic and as.numeric conversions differ from double: flag any integer64 column. data.table's := and set* functions modify the table in place, so a later reference sees the change even without reassignment."
 
   # ---------------- Columns ----------------
   - id: R-DF-01
@@ -42,6 +58,40 @@ rules:
     detect: "df$col <- value"
     python: "A value of length nrow is stored as is; a shorter value is RECYCLED (np.resize) when nrow is a multiple of its length; otherwise R stops ('replacement has k rows, data has n'), so the R code would fail and the translation must not invent a result."
     pitfall: "pandas aligns a Series on its index instead of by position, and raises where R recycles."
+  - id: R-DF-03
+    detect: "merge(x, y, by = ...) / dplyr joins"
+    python: "pd.merge with how='inner' for merge's default all = FALSE ('left' for all.x, 'outer' for all). merge's default sort = TRUE orders the result by the key columns; reproduce that order. Non-key columns present in both get the suffixes '.x' and '.y'. merge resets row names to 1..n: carry the data-row number (R-IO-03) through the join as a column so each surviving row keeps its label."
+    pitfall: "A join reorders rows and can duplicate or drop them, so the rows prepare() returns no longer match R's sets. pandas suffixes are '_x' and '_y', which changes coefficient names. Key ordering of character keys follows R's locale (R-FAC-01). dplyr joins do not sort and keep x's order: check which function the R code calls."
+
+  # ---------------- dplyr / tidyr ----------------
+  - id: R-DPL-01
+    detect: "dplyr::filter(df, cond, ...)"
+    python: "df.loc[cond.fillna(False)], with several conditions combined by &. Rows where a condition is missing are DROPPED. Keep the surviving data-row labels (R-IO-03)."
+    pitfall: "Base R's df[cond, ] keeps a missing condition as an all-NA row instead: check which form the R code uses."
+  - id: R-DPL-02
+    detect: "dplyr::mutate / transmute / select / rename / relocate"
+    python: "mutate evaluates its arguments in order, each seeing the columns created before it; a new column goes at the end, an existing one keeps its position. select and relocate set column order, which matters for y ~ . (R-FAC-05) and positional access (R-IDX-01). Vectorised helpers follow their base rules (R-VEC-*)."
+    pitfall: "Assigning all columns at once with df.assign(**{...}) from the original frame loses the in-order dependency. Inside a grouped mutate (group_by) every function is applied per group: mean(x) is the group mean."
+  - id: R-DPL-03
+    detect: "dplyr::case_when(...)"
+    python: "np.select over the conditions in order with each missing condition treated as False; the first TRUE wins; no match gives NA, or .default when given."
+    pitfall: "A missing condition is not a match, unlike np.where in R-VEC-06 where a missing test gives NA. A trailing TRUE ~ value is the catch-all."
+  - id: R-DPL-04
+    detect: "dplyr::arrange(df, ...)"
+    python: "df.sort_values(cols, ascending=..., na_position='last', kind='stable'). Character columns sort in the C locale (byte order: digits < upper case < lower case) since dplyr 1.1.0; desc() reverses one key and still puts NA last."
+    pitfall: "Locale-aware sorting (R-FAC-01) does not apply here, and an unstable sort reorders ties, which changes which row distinct() or slice() keeps."
+  - id: R-DPL-05
+    detect: "dplyr::group_by(...) |> summarise(...)  /  count() / n()"
+    python: "df.groupby(keys, dropna=False, sort=True, observed=False for factors).agg(...), then reset to columns. Groups are sorted with NA as its own group last; summarise drops the LAST grouping key from the result's grouping. Summaries such as mean(x) return NA for a group with any missing x unless na.rm = TRUE."
+    pitfall: "pandas drops NA groups by default and its mean skips NaN, both unlike R. A factor key keeps empty levels only with .drop = FALSE."
+  - id: R-DPL-06
+    detect: "dplyr::distinct / slice / slice_head / slice_max / first / lag / lead"
+    python: "distinct keeps the FIRST occurrence (drop_duplicates(keep='first')); slice uses 1-based positions; lag and lead shift by row order within each group and fill with NA; slice_max keeps ties unless with_ties = FALSE."
+    pitfall: "These depend on row order, so any earlier sort must match R exactly (R-DPL-04)."
+  - id: R-DPL-07
+    detect: "tidyr::drop_na / replace_na / fill / pivot_longer / pivot_wider"
+    python: "drop_na() with no columns drops rows missing in any column; replace_na(list(col = v)) is fillna per column; fill() carries the last value down within groups (ffill). pivot_wider creates columns in order of first appearance of names_from values and fills absent cells with NA; pivot_longer stacks columns in their selected order, row by row."
+    pitfall: "pandas pivot sorts new columns, which changes column order and so y ~ . and positional access. drop_na drops rows, so the data-row labels must follow (R-IO-03)."
 
   # ---------------- Indexing ----------------
   - id: R-IDX-01
@@ -50,9 +100,9 @@ rules:
     python: "Resolve each position to a column NAME using the column order at that point in the R script (R is 1-based, after earlier drops and renames; negative indices drop). Then use names in Python, never iloc positions. df[rows, ][[i]] <- v rewrites column i for those rows only; the whole column becomes float when v is a double."
     pitfall: "Off-by-one errors, and positions that shift after a column is dropped. When no row matches, R STOPS ('replacement has 1 row, data has 0'): the R code itself would fail there."
   - id: R-IDX-02
-    detect: "df[which(cond), ][[i]] <- value  /  df$x[cond] <- value"
-    python: "df.loc[cond, col] = value"
-    pitfall: "Chained assignment in pandas (df[cond][col] = v) silently does nothing."
+    detect: "df$x[cond] <- value  /  df[cond, 'x'] <- value (named column; positional access is R-IDX-01)"
+    python: "df.loc[cond, col] = value. With a logical cond, positions where cond is missing are skipped for a length-1 value: use cond.fillna(False). which(cond) drops missing positions the same way."
+    pitfall: "Chained assignment in pandas (df[cond][col] = v) silently does nothing. With a value longer than 1 and a missing cond, R stops ('NAs are not allowed in subscripted assignments'): the R code itself would fail."
   - id: R-IDX-03
     verified: CV-IDX-02
     detect: "lookup-table row index M[x + k, j] (often with cbind)"
@@ -85,6 +135,14 @@ rules:
     detect: "arithmetic on a numeric vector and a scalar: x + 1, x - 17, x * k, x / k"
     python: "integer op integer literal (1L) stays integer for + - * and overflows to missing; with a double literal (1) or for '/' the result is float. Missing values propagate."
     pitfall: "The integer-versus-float type matters for later recodes and as.integer. Vector-vector arithmetic recycles in R, and ^, %% and %/% follow their own rules: check them."
+  - id: R-VEC-06
+    detect: "ifelse(test, yes, no) / dplyr::if_else"
+    python: "np.where(test, yes, no), then set the result to missing wherever test is missing: ifelse returns NA there, whatever yes and no hold. The result type is the common type of the yes and no values actually used."
+    pitfall: "np.where treats a missing test as True (NaN is truthy), so it returns yes where R returns NA. A factor in yes or no gives its integer codes in ifelse, not its labels (R-FAC-06). dplyr::if_else is strict about types and does not do this: check which one the R code calls."
+  - id: R-VEC-07
+    detect: "quantile(x, probs)"
+    python: "np.quantile(x, probs, method='linear'), which is R's default type 7. Another type= maps to its own numpy method: check it. With na.rm = FALSE (the default) a missing x makes R stop; with na.rm = TRUE use np.nanquantile."
+    pitfall: "pandas' and numpy's defaults agree with type 7, but quantile() used as cut() breaks (R-REC-05) also needs the breaks to be unique, or cut() stops."
 
   # ---------------- Recoding and scaling ----------------
   - id: R-REC-01
@@ -105,6 +163,40 @@ rules:
     detect: "x[x == v] <- w"
     python: "x == v is missing where x is missing, and with a length-1 value R skips those positions: s.loc[s.eq(v) & s.notna()] = w. Type coercion as in R-REC-01."
     pitfall: "Treating missing as False is right here, but filling missing values first, or comparing after astype(str), changes which rows are recoded."
+  - id: R-REC-05
+    detect: "cut(x, breaks, ...)"
+    python: "pd.cut(x, bins, right=True, include_lowest=False), matching R's defaults: intervals are (a, b], so a value equal to the lowest break is MISSING unless include.lowest = TRUE; a value outside the breaks is missing. A single number of breaks gives equal-width intervals over range(x), with the outer limits extended by 0.1% of the range. Levels are the intervals in increasing order; take their labels from the baseline metadata's xlevels when the result enters a formula."
+    pitfall: "R labels intervals with dig.lab = 3 significant digits ('(1e+03,2e+03]'), unlike pandas' labels, and these labels are the factor levels that appear in coefficient names. Breaks that are not unique make R stop."
+
+  # ---------------- Dates and times ----------------
+  - id: R-DT-01
+    detect: "as.Date(x) / as.Date(x, format = ...) / lubridate::ymd etc."
+    python: "pd.to_datetime(x, format=..., errors='coerce').dt.normalize(). Without format, as.Date picks '%Y-%m-%d' or '%Y/%m/%d' from the FIRST non-missing element and applies it to all; elements that do not match become NA; if the first element matches neither, R stops. A Date is a day count: as.numeric(d) is days since 1970-01-01, and d2 - d1 is a difference in days."
+    pitfall: "pd.to_datetime without format infers per element and accepts formats R rejects, so values R makes NA get dates. format(d, '%m') and months() return text, not numbers."
+  - id: R-DT-02
+    detect: "as.POSIXct / strptime / difftime / Sys.Date / Sys.time"
+    python: "Parse with an explicit timezone: R uses the session's local timezone when tz is not given; take it from the R environment's TZ. difftime(t1, t2) with the default units = 'auto' picks secs, mins, hours, days or weeks from the size of the gap, so as.numeric(difftime(...)) is in that unit: reproduce the choice, or use the units the R code sets."
+    pitfall: "A fixed unit in Python where R chose 'auto' scales the variable by 60, 3600 or 86400. Sys.Date() and Sys.time() make the result depend on the run date: name them in limitations."
+
+  # ---------------- Strings ----------------
+  - id: R-STR-01
+    detect: "paste / paste0 / substr / nchar / toupper / tolower / trimws / sprintf / strsplit"
+    python: "paste joins with sep = ' ' (paste0 with '') and turns a missing value into the text 'NA'. substr(x, start, stop) is 1-based and inclusive: s.str[start-1:stop], and out-of-range gives ''. nchar of a missing character value is NA. trimws strips [ \\t\\r\\n] from both ends. strsplit returns a list of pieces per element."
+    pitfall: "pandas string concatenation propagates NaN where R writes 'NA'. toupper and tolower of non-ASCII text depend on R's locale."
+  - id: R-STR-02
+    detect: "grepl / grep / sub / gsub / regmatches / regexpr"
+    python: "Default patterns are POSIX extended regular expressions (TRE); perl = TRUE is PCRE; fixed = TRUE is a literal match (str.contains(..., regex=False), str.replace(..., regex=False)). Translate POSIX classes such as [[:alpha:]], [[:digit:]], [[:space:]] into explicit character sets. sub replaces the first match, gsub all; '\\\\1' in the replacement is a backreference. grepl on a missing value returns FALSE; sub and gsub return NA."
+    pitfall: "Python's re has no POSIX classes and differs in greedy alternation under POSIX leftmost-longest matching: a pattern with alternatives can match differently. str.contains returns NaN on missing input where grepl returns FALSE."
+
+  # ---------------- Aggregation and apply ----------------
+  - id: R-AGG-01
+    detect: "aggregate(y ~ g, data, FUN) / aggregate(x, by = list(...), FUN) / tapply / ave"
+    python: "groupby over the keys with sort=True. The formula method drops rows missing in ANY formula variable first (na.action = na.omit); the by = method drops rows whose key is missing. In the result the FIRST grouping variable varies fastest. tapply returns one cell per factor level, NA for an empty level. ave(x, g, FUN = mean) returns a vector of x's length with each element replaced by its group's value."
+    pitfall: "pandas orders a multi-key result with the last key varying fastest and keeps NA keys only with dropna=False. FUN = mean without na.rm returns NA for a group with a missing value (R-DPL-05)."
+  - id: R-AGG-02
+    detect: "apply / sapply / lapply / vapply / table"
+    python: "apply(df, 1 or 2, f) first turns the frame into a matrix: if any column is character, EVERY value becomes text, and numbers are formatted with format(), padded to a common width. sapply simplifies to a vector or matrix when every result has the same length, else returns a list. table(x) counts per level in level order (R-FAC-01) and excludes NA unless useNA is set."
+    pitfall: "df.apply(f, axis=1) keeps per-column types, so a comparison or arithmetic inside f that R performed on padded text gives a different answer, or R would have stopped. value_counts sorts by count, not by level."
 
   # ---------------- Factors / design matrix ----------------
   - id: R-FAC-01
@@ -156,11 +248,11 @@ rules:
   - id: R-EST-01
     detect: "glm(..., family = binomial / poisson / Gamma / gaussian / inverse.gaussian)"
     python: "sm.GLM(y, X, family=sm.families.<Family>(link=sm.families.links.<Link>())) on an explicit design matrix whose columns are R's coefficient names, fitted with IRLS."
-    pitfall: "A penalised estimator (sklearn LogisticRegression, fit_regularized) changes every coefficient."
+    pitfall: "For an unpenalised glm, a penalised estimator (sklearn LogisticRegression, fit_regularized) changes every coefficient; fit_regularized is only for R's penalised fits (R-EST-06). quasi families have no statsmodels family (R-EST-05)."
   - id: R-EST-02
     verified: CV-GLM-01, CV-GLM-02
     detect: "glm convergence: glm.fit starts IRLS from family$initialize's mustart and stops at |dev - dev_old| / (|dev| + 0.1) < epsilon (default 1e-8, maxit 25)"
-    python: "Start statsmodels' IRLS where R starts: subclass the family and override starting_mu with R's mustart (poisson: y + 0.1; binomial with 0/1 response: (y + 0.5) / 2, which statsmodels already uses; gaussian, Gamma, inverse.gaussian: y). With default fit(), this gives standard-error relative differences around 2e-15 in the Poisson fixture and 1e-12 in M4. Stopping criteria still differ: validate each model rather than assuming the same accuracy for every family. R also halves the step on an invalid fit, clamps the logit's linear predictor at |eta| > 30 and floors the log link's mean at machine epsilon."
+    python: "Start statsmodels' IRLS where R starts: subclass the family and override starting_mu with R's mustart (poisson: y + 0.1; binomial: (weights * y + 0.5) / (weights + 1), which is (y + 0.5) / 2 only with unit prior weights, the case statsmodels already uses; a cbind(successes, failures) response is y = successes / total with prior weights = total; gaussian, Gamma, inverse.gaussian: y). With default fit(), this gives standard-error relative differences around 2e-15 in the Poisson fixture and 1e-12 in M4. Stopping criteria still differ: validate each model rather than assuming the same accuracy for every family. R also halves the step on an invalid fit, clamps the logit's linear predictor at |eta| > 30 and floors the log link's mean at machine epsilon."
     pitfall: "From statsmodels' own start the fit stops at a different iterate: coefficients still match to ~1e-11, but standard errors only to ~1e-6, because R takes them from the QR of its last iteration's weighted design, one iterate behind the coefficients. Tightening tol alone does not help. A rank-deficient design (R reports NA coefficients) and zero weights need their own handling."
   - id: R-EST-03
     verified: CV-GLM-02
@@ -171,24 +263,80 @@ rules:
     detect: "lm(...)"
     python: "sm.OLS(y, X) (sm.WLS with weights) on an explicit design matrix with R's coefficient names."
     pitfall: "statsmodels OLS adds no intercept by default (R-FAC-04)."
+  - id: R-EST-05
+    detect: "glm(..., family = quasipoisson / quasibinomial / quasi(link, variance))"
+    python: "Fit the matching sm.families.Poisson or Binomial with the same link and fit(scale='X2'): coefficients equal the Poisson or binomial fit, and standard errors are scaled by the Pearson dispersion, sum of squared Pearson residuals / df.residual, as R's summary.glm does."
+    pitfall: "Without scale='X2' the standard errors assume a dispersion of 1. statsmodels counts zero-weight rows in df_resid where R does not. quasi(link, variance) with a variance other than a Poisson- or binomial-type one has no statsmodels counterpart: name it in limitations."
+  - id: R-EST-06
+    detect: "glmnet::glmnet / glmnet::cv.glmnet"
+    python: "Approximate parity only (support_matrix.yaml). GLM.fit_regularized(method='elastic_net', alpha=lambda, L1_wt=glmnet's alpha) minimises the same average loss plus penalty, but on the columns as given. glmnet standardises x by default (standardize = TRUE, weighted mean and 1/n variance), fits on that scale and reports coefficients on the original scale: do the same, then back-transform. glmnet never penalises the intercept: pass a per-column alpha array with 0 for '(Intercept)'."
+    pitfall: "cv.glmnet picks lambda from random folds (R-RNG-01): the folds and the chosen lambda cannot be reproduced; use the lambda R selected only if it is supplied as an input, otherwise name it in limitations. Coordinate-descent tolerances differ, so coefficients agree only to the tolerance the approximate tier allows."
+  - id: R-EST-07
+    detect: "step(), MASS::stepAIC, drop1/add1-driven selection"
+    python: "Do not re-run the selection. Translate the final model only: its terms are the ones in R's coefficient names, in that order."
+    pitfall: "Re-running selection in Python can choose different terms on ties or near-ties of AIC, and the selection path is itself a modelling decision that belongs to R's baseline."
+  - id: R-EST-08
+    detect: "MASS::glm.nb(...)"
+    python: "Estimate theta by maximum likelihood (sm.NegativeBinomial(y, X, offset=...) gives alpha = 1 / theta), then refit sm.GLM(y, X, family=sm.families.NegativeBinomial(alpha=1/theta, link=log), offset=...) with that fixed alpha. Coefficients and standard errors come from the second fit, as summary.negbin treats theta as known; R reports theta and its own SE separately."
+    pitfall: "The discrete NegativeBinomial model's standard errors come from the joint Hessian with alpha and differ from R's. statsmodels' GLM NegativeBinomial family defaults to alpha = 1, not an estimated value. R starts from a Poisson fit and alternates IRLS with theta.ml until both converge: compare the final theta."
+  - id: R-EST-09
+    detect: "nnet::multinom(y ~ ...)"
+    python: "sm.MNLogit(codes, X) with the response coded 0..K-1 in R's level order, so the reference is R's FIRST level. multinom's coefficient matrix has one row per non-reference level and one column per design column; MNLogit's params have one column per non-reference level, in the same level order. A two-level response gives a single coefficient vector, as a binomial glm."
+    pitfall: "MNLogit takes the reference from np.unique of the response, which follows R's level order only when the codes are in that order. multinom stops at nnet's BFGS tolerances (maxit = 100, reltol = 1e-8), not at the exact optimum, so parity with MNLogit's Newton fit is limited by R's stopping point; decay > 0 adds a penalty MNLogit does not have."
+  - id: R-EST-10
+    detect: "MASS::polr(y ~ ..., method = 'logistic' / 'probit')"
+    python: "OrderedModel(codes, X_without_intercept, distr='logit' / 'probit', offset=...). Both use P(Y <= k) = F(cut_k - x'b), so slopes have the same sign. polr's zeta are the cut points themselves, named 'a|b' for adjacent levels; OrderedModel stores the first cut point and then log increments: cut = cumsum([first, exp(increments)]) before comparing."
+    pitfall: "OrderedModel raises if the design has a constant: drop '(Intercept)', as polr does. method = 'cloglog' or 'cauchit' needs a custom distribution. polr's standard errors come from a numerical Hessian of optim's result, so they agree only to that precision."
+  - id: R-EST-11
+    detect: "quantreg::rq(y ~ ..., tau = 0.5)"
+    python: "sm.QuantReg(y, X).fit(q=tau). R's default method 'br' (simplex) and statsmodels' IRLS reach the same coefficients when the solution is unique."
+    pitfall: "With discrete or tied data the quantile regression solution is often not unique and the two algorithms can return different optimal coefficients with the same loss: compare the objective and name the case in limitations. summary.rq uses se = 'rank' (confidence intervals, no standard errors) for n < 1001 and 'nid' otherwise, neither of which matches statsmodels' kernel sandwich."
+  - id: R-EST-12
+    detect: "nlme::gls(model, correlation = ..., weights = ..., method = 'REML')"
+    python: "Without correlation and weights, gls is OLS: same coefficients and, under REML, the same residual standard error. With a correlation or variance structure, R estimates its parameters by REML (the default) or ML: maximise that likelihood over the structure's parameters (e.g. phi of corAR1 within each group, ordered by the form's covariate) with scipy, then fit sm.GLS with the implied covariance."
+    pitfall: "GLSAR is a feasible two-step estimator, not REML: its rho and coefficients differ from corAR1's. The correlation runs within groups and in the order the form = ~ t | g defines, not in row order."
+  - id: R-EST-13
+    detect: "mgcv::gam(y ~ s(x) + ...)"
+    python: "Approximate parity only. Parametric terms translate as in glm. GLMGam with BSplines or CyclicCubicSplines and a penalty chosen by its own criterion stands in for each s()."
+    pitfall: "s() defaults to a thin plate regression spline (bs = 'tp') that statsmodels does not have, and gam's default smoothing selection is GCV.Cp (method = 'REML' when set): smooth terms will not match coefficient by coefficient. Compare predictions and name every smooth in limitations."
+  - id: R-EST-14
+    detect: "lme4::lmer(y ~ ... + (1 | g) / (x | g) / (1 | g1) + (1 | g2))"
+    python: "sm.MixedLM(y, X, groups=g, exog_re=...).fit(reml=True) for REML = TRUE (the default; reml=False for ML). (1 | g) is a random intercept, (x | g) correlated intercept and slope (exog_re with both columns). Crossed effects (1 | g1) + (1 | g2) use one constant group and vc_formula with a variance component per factor."
+    pitfall: "lmer prints random-effect standard deviations, MixedLM reports variances; (x || g) means uncorrelated, which needs vc_formula. Optimisers differ, so variance components agree only approximately, and a singular fit (variance at 0) can land differently."
+  - id: R-EST-15
+    detect: "nlme::lme(fixed, random = ~ 1 | g, method = 'REML')"
+    python: "As R-EST-14: MixedLM with reml=True (lme's default), groups from the random formula's grouping factor."
+    pitfall: "correlation = and weights = structures in lme have no MixedLM counterpart: name them in limitations. Nested groups ~ 1 | g1/g2 need a variance component per nesting level."
+  - id: R-EST-16
+    detect: "lme4::glmer(y ~ ... + (1 | g), family = binomial / poisson)"
+    python: "Approximate at best. glmer maximises a Laplace approximation (nAGQ = 1) of the likelihood; statsmodels' BinomialBayesMixedGLM and PoissonBayesMixedGLM fit a variational Bayes posterior, a different estimator. Use fit_vb and compare fixed effects and predictions only."
+    pitfall: "Random-effect variances from the Bayesian fit are not comparable to glmer's. Present the difference as an estimator change in limitations, not as a parity failure to fix."
+  - id: R-EST-17
+    detect: "MASS::rlm(y ~ ...)"
+    python: "sm.RLM(y, X, M=sm.robust.norms.HuberT(t=1.345)).fit(scale_est='mad') for rlm's defaults (psi.huber, k = 1.345, scale.est = 'MAD', least-squares start). rlm's scale is median(|residual|) / 0.6745, re-estimated every iteration. psi.bisquare maps to TukeyBiweight(c=4.685), psi.hampel to Hampel(a=2, b=4, c=8)."
+    pitfall: "rlm stops when the residuals change by less than acc = 1e-4 (maxit 20), a looser rule than statsmodels' deviance criterion, so coefficients agree only to about that tolerance. summary.rlm's standard errors use their own formula: compare them with a looser tolerance. method = 'MM' needs an S-estimator start statsmodels does not provide."
+  - id: R-EST-18
+    detect: "survival::coxph(Surv(time, status) ~ ..., ties = 'efron')"
+    python: "sm.PHReg(time, X_without_intercept, status=status, ties='efron', strata=..., offset=...). coxph's default ties method is Efron; strata() terms become strata=, and cluster() or robust = TRUE needs the robust covariance."
+    pitfall: "PHReg's default ties method is Breslow, which changes every coefficient when event times tie. Surv(start, stop, event) counting-process data needs entry=start. A Cox model has no intercept: drop '(Intercept)'."
   - id: R-NA-01
     verified: CV-MM-01
     detect: "every glm/lm (default na.action = na.omit)"
-    python: "Fit only on train rows complete in every model variable and the response, as R does (missing='drop', or drop them before fit), keeping the surviving row labels. predict() returns NaN for any row with a missing input, exactly where R predict() returns NA. Never impute or fillna to obtain a prediction."
-    pitfall: "Imputing gives a prediction R never made; validation compares the NA pattern row by row."
+    python: "Fit only on train rows complete in every model variable, the response, and the offset and weights variables, as R's model.frame does (missing='drop', or drop them before fit), keeping the surviving row labels. With y ~ . every column of the frame is a model variable (R-FAC-05), so a missing value in any column drops the row. predict() returns NaN for any row with a missing input, exactly where R predict() returns NA. Never impute or fillna to obtain a prediction."
+    pitfall: "Imputing gives a prediction R never made; validation compares the NA pattern row by row. na.action = na.exclude fits the same rows but pads fitted values and residuals with NA back to the full row count, unlike na.omit: check which one the R code sets."
 
   # ---------------- Prediction ----------------
   - id: R-PRED-01
     verified: CV-GLM-01
     detect: "predict(model, newdata, type = 'response')"
     python: "result.predict(X_new, offset=...) returns the mean response. Build X_new with the same design function and R's captured levels."
-    pitfall: "Building X_new from a separate get_dummies call misaligns columns."
+    pitfall: "Building X_new from a separate get_dummies call misaligns columns. type = 'link' (predict's default for glm) is the linear predictor including the offset: result.predict(X_new, offset=..., which='linear'). predict(model) without newdata returns fitted values for the fitted rows only (padded with NA under na.exclude). se.fit = TRUE needs its own check."
 
   # ---------------- Governance ----------------
   - id: GOV-01
-    detect: "protected attributes used in the R model"
-    python: "Translate faithfully, even when the model uses protected attributes. Never add, remove or 'fix' a feature. Name every protected attribute the model uses in the candidate's notes."
-    pitfall: "Silently improving a model during translation destroys the parity proof and the audit trail."
+    detect: "protected attributes, or likely proxies for them, used in the R model or in its preprocessing"
+    python: "Translate faithfully, even when the model uses protected attributes. Never add, remove or 'fix' a feature. Name in the candidate's notes every model variable that is, or may stand in for, a protected attribute: the variable, the ground, and whether it is direct or a proxy. Protected grounds: the nine grounds of Ireland's Equal Status Acts 2000-2018 (gender, civil status, family status, sexual orientation, religion, age, disability, race, membership of the Traveller community; housing assistance for accommodation) and the EU equality directives. Likely proxies: names, titles (Mr, Mrs, Ms), postcode or Eircode and other fine-grained geography, nationality, language, country of birth, marital or dependant fields, and any column whose profile tracks a protected ground. Whether a ground may lawfully be used (for example age where actuarially justified, or gender, which may not set insurance prices in the EU since 21 December 2012) is a legal decision for the data scientist and the model owner, not the Translator's."
+    pitfall: "Silently improving a model during translation destroys the parity proof and the audit trail. Reporting only direct attributes misses proxies, which carry the same risk. A protected attribute dropped before fitting but used to build the sets or filter rows still shapes the model: name it too."
   - id: GOV-02
     detect: "R code that cannot be mapped with confidence"
     python: "Say so in the candidate's notes with the specific question for the data scientist. Do not guess silently."
