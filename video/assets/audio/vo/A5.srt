@@ -1,0 +1,24 @@
+1
+00:00:00,050 --> 00:00:06,400
+Meet R-Pythonizer: a web platform that moves statistical models from R to Python, and proves the result.
+
+2
+00:00:06,400 --> 00:00:07,731
+The rule is simple.
+
+3
+00:00:07,731 --> 00:00:09,398
+AI writes the Python.
+
+4
+00:00:09,398 --> 00:00:10,914
+Plain code proves it.
+
+5
+00:00:10,914 --> 00:00:12,353
+A human approves.
+
+6
+00:00:12,353 --> 00:00:17,175
+And if a model has no faithful Python equivalent, the platform says so and stops.
+

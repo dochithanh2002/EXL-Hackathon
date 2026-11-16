@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>R-Pythonizer demo shots</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=block" rel="stylesheet">
+<style>
+:root { --navy: #12324B; --orange: #FF5000; --slate: #4E6173; --mist: #D6DFE8; --cream: #FBF4EF; --white: #FFFFFF; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--cream); font-family: Inter, system-ui, sans-serif; color: var(--navy); -webkit-font-smoothing: antialiased; }
+.win { position: absolute; left: 80px; top: 104px; width: 1760px; height: 846px; border-radius: 16px; background: var(--white);
+       border: 1.5px solid var(--mist); box-shadow: 0 24px 60px -30px rgba(18,50,75,.35); overflow: hidden; }
+.bar { height: 44px; display: flex; align-items: center; gap: 9px; padding: 0 18px; border-bottom: 1.5px solid var(--mist); background: #F7F9FB; }
+.bar i { width: 12px; height: 12px; border-radius: 50%; background: var(--mist); }
+.bar .url { margin-left: 18px; font-size: 17px; color: var(--slate); background: var(--white); border: 1px solid var(--mist); border-radius: 8px; padding: 5px 14px; }
+.view { position: absolute; top: 44px; left: 0; right: 0; bottom: 0; overflow: hidden; }
+.cam { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.cam img { display: block; width: 1920px; }
+.hl { position: absolute; border: 4px solid var(--orange); border-radius: 10px; box-shadow: 0 0 0 9999px rgba(18,50,75,.0); opacity: 0; }
+.label { position: absolute; left: 80px; top: 30px; display: flex; align-items: center; gap: 18px; font-size: 30px; font-weight: 600; }
+.label .n { width: 50px; height: 50px; border-radius: 50%; background: var(--navy); color: #fff; display: grid; place-items: center; font-size: 24px; }
+.chip { position: absolute; right: 80px; top: 42px; font-size: 22px; color: var(--slate); font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="win">
+  <div class="bar"><i></i><i></i><i></i><span class="url" id="url"></span></div>
+  <div class="view"><div class="cam" id="cam"><img id="img" alt=""></div></div>
+</div>
+<div class="label" id="label"><span class="n" id="n"></span><span id="title"></span></div>
+<div class="chip" id="chip"></div>
+<script>
+// Viewport inside the window: 1760 x 802 CSS px. Image coordinates are CSS px of a 1920-wide capture.
+const VW = 1760, VH = 802;
+const ms = (s) => s * 1000;
+
+function camFrame(k) {
+  // k: {x, y, z} = image point to centre, zoom (1 = 1920 px image fitted to 1760 width * z)
+  const base = VW / 1920, s = base * k.z;
+  const tx = VW / 2 - k.x * s, ty = VH / 2 - k.y * s;
+  return { transform: `translate(${tx}px, ${ty}px) scale(${s})` };
+}
+
+window.sceneReady = (async () => {
+  const id = new URLSearchParams(location.search).get("s");
+  const shots = await (await fetch("demo.json")).json();
+  const shot = shots[id];
+  const img = document.getElementById("img");
+  img.src = "../assets/screens/" + shot.img;
+  await img.decode();
+  document.getElementById("url").textContent = "r-pythonizer.iline.work" + (shot.url || "");
+  document.getElementById("n").textContent = shot.step ?? "";
+  document.getElementById("n").style.display = shot.step ? "grid" : "none";
+  document.getElementById("title").textContent = shot.title;
+  document.getElementById("chip").textContent = shot.chip || "";
+  const cam = document.getElementById("cam");
+  const keys = shot.cam;
+  const dur = shot.dur;
+  cam.animate(keys.map(k => ({ ...camFrame(k), offset: k.t / dur, easing: "cubic-bezier(.45,0,.25,1)" })),
+              { duration: ms(dur), fill: "both" });
+  for (const h of shot.hl || []) {
+    const e = document.createElement("div");
+    e.className = "hl";
+    Object.assign(e.style, { left: h.x + "px", top: h.y + "px", width: h.w + "px", height: h.h + "px" });
+    cam.appendChild(e);
+    e.animate([{ opacity: 0 }, { opacity: 1, offset: .25 / (h.t1 - h.t0) }, { opacity: 1, offset: 1 - .25 / (h.t1 - h.t0) }, { opacity: 0 }],
+              { delay: ms(h.t0), duration: ms(h.t1 - h.t0), fill: "both" });
+  }
+  for (const el of shot.enter ? [document.querySelector(".win"), document.getElementById("label"), document.getElementById("chip")] : []) {
+    el.animate([{ opacity: 0, transform: "translateY(16px)" }, { opacity: 1, transform: "none" }], { duration: 450, easing: "ease-out", fill: "both" });
+  }
+  await document.fonts.ready;
+  return { id, dur };
+})();
+
+window.seek = (t) => { for (const a of document.getAnimations()) { a.pause(); a.currentTime = t * 1000; } };
+</script>
+</body>
+</html>

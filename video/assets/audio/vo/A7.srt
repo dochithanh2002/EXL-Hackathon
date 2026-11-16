@@ -1,0 +1,4 @@
+1
+00:00:00,050 --> 00:00:06,701
+But a perfect copy of a bad model is still a bad model, so we also check calibration, stability and fairness, as a separate verdict.
+

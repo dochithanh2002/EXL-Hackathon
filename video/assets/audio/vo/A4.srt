@@ -1,0 +1,12 @@
+1
+00:00:00,050 --> 00:00:02,118
+And those defaults are the trap.
+
+2
+00:00:02,118 --> 00:00:07,430
+Under PRA SS1/23, a rewrite is a model change that needs evidence.
+
+3
+00:00:07,430 --> 00:00:13,078
+One hidden penalty or missing-value rule, and a coefficient shifts enough to flip a loan decision.
+

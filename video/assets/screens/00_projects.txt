@@ -1,0 +1,36 @@
+R-Pythonizer
+Projects
+Settings
+Projects
+New project
+Name	Step	Status	Created
+M4 GiveMeSomeCredit terra	
+Code & Reproducibility Package
+	done	Nov 15, 2026, 1:39 PM
+M2 Taiwan default terra	
+Code & Reproducibility Package
+	done	Nov 15, 2026, 1:39 PM
+M1 freMTPL2 terra	
+Code & Reproducibility Package
+	done	Nov 15, 2026, 1:38 PM
+M5 HMEQ	
+Code & Reproducibility Package
+	done	Nov 14, 2026, 11:35 PM
+M1 GLM1 terra-sol	
+Code & Reproducibility Package
+	done	Nov 14, 2026, 10:49 PM
+M4 GMSC Deepseek	
+Model Specification
+	specification drafted	Nov 14, 2026, 4:56 PM
+M3 ULB fraud — Chrome E2E	
+Model Specification
+	Analyst replied	Nov 14, 2026, 3:29 PM
+M2 Taiwan default — Chrome E2E	
+Code & Reproducibility Package
+	done	Nov 14, 2026, 2:03 PM
+M1 freMTPL2 — Chrome E2E	
+Code & Reproducibility Package
+	done	Nov 14, 2026, 2:03 PM
+M4 GiveMeSomeCredit — Chrome E2E	
+Code & Reproducibility Package
+	done	Nov 14, 2026, 2:02 PM

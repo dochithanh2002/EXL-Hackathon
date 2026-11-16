@@ -1,0 +1,180 @@
+1
+00:00:04,350 --> 00:00:07,066
+For twenty years, risk models were built in R.
+
+2
+00:00:07,066 --> 00:00:10,562
+A statistician writes the script, runs it on their own laptop, and
+
+3
+00:00:10,562 --> 00:00:11,568
+emails the numbers.
+
+4
+00:00:11,568 --> 00:00:13,782
+It works, until that person leaves.
+
+5
+00:00:15,850 --> 00:00:20,383
+R runs in memory, one thread at a time, and it's hard to plug into production.
+
+6
+00:00:20,383 --> 00:00:23,774
+Meanwhile, fifty-eight percent of developers use Python.
+
+7
+00:00:23,774 --> 00:00:24,376
+R?
+
+8
+00:00:24,376 --> 00:00:25,024
+Five.
+
+9
+00:00:26,850 --> 00:00:28,723
+So why R, and not SAS?
+
+10
+00:00:28,723 --> 00:00:33,221
+SAS migration is already industrialised: EXL's own Code Harbor cut
+
+11
+00:00:33,221 --> 00:00:35,607
+conversion time by seventy percent.
+
+12
+00:00:35,607 --> 00:00:40,758
+R is the gap: twenty-two thousand open packages, each with its own defaults.
+
+13
+00:00:42,850 --> 00:00:44,918
+And those defaults are the trap.
+
+14
+00:00:44,918 --> 00:00:50,230
+Under PRA SS1/23, a rewrite is a model change that needs evidence.
+
+15
+00:00:50,230 --> 00:00:54,073
+One hidden penalty or missing-value rule, and a coefficient shifts
+
+16
+00:00:54,073 --> 00:00:55,878
+enough to flip a loan decision.
+
+17
+00:00:57,850 --> 00:01:02,166
+Meet R-Pythonizer: a web platform that moves statistical models from R
+
+18
+00:01:02,166 --> 00:01:04,200
+to Python, and proves the result.
+
+19
+00:01:04,200 --> 00:01:05,531
+The rule is simple.
+
+20
+00:01:05,531 --> 00:01:07,198
+AI writes the Python.
+
+21
+00:01:07,198 --> 00:01:08,714
+Plain code proves it.
+
+22
+00:01:08,714 --> 00:01:10,153
+A human approves.
+
+23
+00:01:10,153 --> 00:01:14,975
+And if a model has no faithful Python equivalent, the platform says so and stops.
+
+24
+00:01:16,850 --> 00:01:19,994
+R runs the model once and freezes an answer key.
+
+25
+00:01:19,994 --> 00:01:24,925
+Python gets R's exact rows, and the AI never sees R's numbers, so it can't cheat.
+
+26
+00:01:24,925 --> 00:01:29,091
+Then plain code checks every coefficient and prediction, and if anything
+
+27
+00:01:29,091 --> 00:01:30,827
+fails, an agent finds out why.
+
+28
+00:01:33,350 --> 00:01:37,006
+But a perfect copy of a bad model is still a bad model, so we also check
+
+29
+00:01:37,006 --> 00:01:40,001
+calibration, stability and fairness, as a separate verdict.
+
+30
+00:01:42,350 --> 00:01:46,808
+Seven fixed steps, four narrow agents, zero data rows, and a script
+
+31
+00:01:46,808 --> 00:01:48,006
+anyone can re-run.
+
+32
+00:01:48,006 --> 00:01:52,914
+We tried four AI models, and GPT-6.1 terra, fast and cheap, got the same
+
+33
+00:01:52,914 --> 00:01:55,436
+verified result for under five cents.
+
+34
+00:02:00,550 --> 00:02:04,506
+Let's try it on a real credit-default model: an R notebook and a hundred
+
+35
+00:02:04,506 --> 00:02:05,824
+and fifty thousand rows.
+
+36
+00:02:07,650 --> 00:02:11,589
+The Analyst agent drafts the spec, and even flags what's missing, like a
+
+37
+00:02:11,589 --> 00:02:12,738
+labelled holdout set.
+
+38
+00:02:15,150 --> 00:02:17,588
+R runs once and freezes the answer key.
+
+39
+00:02:19,250 --> 00:02:23,289
+The Translator writes Python, and twenty-five checks pass: coefficients
+
+40
+00:02:23,289 --> 00:02:26,190
+and predictions match R to thirteen decimal places.
+
+41
+00:02:26,190 --> 00:02:27,510
+Business fitness?
+
+42
+00:02:27,510 --> 00:02:30,982
+Not established yet, and the platform tells you exactly why.
+
+43
+00:02:32,250 --> 00:02:36,899
+The report backs every number with evidence, and the package re-runs the proof anywhere.
+
+44
+00:02:40,550 --> 00:02:41,680
+R-Pythonizer.
+
+45
+00:02:41,680 --> 00:02:44,354
+AI writes, code proves, humans approve.
+

@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>R-Pythonizer video scenes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=block" rel="stylesheet">
+<style>
+@property --num { syntax: '<integer>'; inherits: false; initial-value: 0; }
+:root {
+  --navy: #12324B; --orange: #FF5000; --slate: #4E6173; --mist: #D6DFE8;
+  --cream: #FBF4EF; --peach: #FFE8DC; --white: #FFFFFF;
+  --ease: cubic-bezier(.2,.7,.2,1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--cream); }
+body { font-family: Inter, system-ui, sans-serif; color: var(--navy); -webkit-font-smoothing: antialiased; }
+.mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-ligatures: none; }
+section { position: absolute; inset: 0; display: none; padding: 120px; }
+section.on { display: block; }
+
+/* motion: --d = enter delay, --o = exit delay (seconds) */
+.in { animation: up .6s var(--ease) calc(var(--d, 0) * 1s) both, out .45s ease calc(var(--o, 999) * 1s) forwards; }
+.fade { animation: fade .6s ease calc(var(--d, 0) * 1s) both, out .45s ease calc(var(--o, 999) * 1s) forwards; }
+.grow { transform-origin: left center; animation: grow .9s var(--ease) calc(var(--d, 0) * 1s) both; }
+.dim { animation: dim .5s ease calc(var(--x, 999) * 1s) forwards; }
+@keyframes up { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes out { to { opacity: 0; } }
+@keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes dim { to { opacity: 0; } }
+@keyframes count { from { --num: 0; } to { --num: var(--to); } }
+
+.eyebrow { font-size: 26px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--slate); }
+.accent { color: var(--orange); }
+.mark { background: linear-gradient(transparent 62%, var(--peach) 62%); }
+.rule { height: 6px; width: 220px; background: linear-gradient(90deg, #FB4E0B, #FFA92B); border-radius: 3px; }
+.card { background: var(--white); border: 1.5px solid var(--mist); border-radius: 18px; }
+.chip { display: inline-flex; align-items: center; gap: 14px; padding: 16px 26px; white-space: nowrap; border-radius: 999px;
+        background: var(--white); border: 1.5px solid var(--mist); font-size: 28px; font-weight: 500; }
+.chip .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--navy); }
+.note { position: absolute; left: 120px; top: 64px; font-size: 20px; color: var(--slate); }
+.logo { position: absolute; right: 120px; bottom: 48px; height: 52px; }
+
+/* ---------- INTRO ---------- */
+#INTRO .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 34px; }
+#INTRO h1 { font-size: 150px; font-weight: 700; letter-spacing: -.035em; }
+#INTRO p { font-size: 40px; color: var(--slate); }
+#INTRO .logo-top { position: absolute; left: 120px; top: 96px; height: 92px; }
+#INTRO .foot { position: absolute; left: 0; right: 0; bottom: 80px; text-align: center; font-size: 24px; color: var(--slate); letter-spacing: .04em; }
+
+/* ---------- A1 ---------- */
+#A1 .grid2 { display: grid; grid-template-columns: 560px 1fr; gap: 90px; height: 100%; align-items: center; }
+#A1 .big { font-size: 260px; font-weight: 700; letter-spacing: -.05em; line-height: .9; }
+#A1 .lbl { font-size: 40px; color: var(--slate); margin-top: 26px; line-height: 1.35; }
+#A1 .stage { position: relative; height: 700px; }
+#A1 .screen { position: absolute; left: 40px; right: 40px; top: 30px; height: 470px; border-radius: 22px 22px 6px 6px; background: var(--navy); padding: 16px; }
+#A1 .win { height: 100%; border-radius: 10px; background: var(--white); overflow: hidden; }
+#A1 .wbar { height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 20px; background: #F2F5F8; border-bottom: 1.5px solid var(--mist); font-size: 22px; color: var(--slate); }
+#A1 .wbar i { width: 12px; height: 12px; border-radius: 50%; background: var(--mist); }
+#A1 .wbar span { margin-left: 14px; }
+#A1 pre { font-size: 27px; line-height: 1.6; padding: 26px 30px; color: var(--navy); }
+#A1 pre .c { color: var(--slate); }
+#A1 .base { position: absolute; left: 0; right: 0; top: 500px; height: 26px; border-radius: 0 0 26px 26px; background: #2A4A63; }
+#A1 .mail { position: absolute; right: 0; top: 300px; width: 520px; padding: 24px 28px; box-shadow: 0 24px 50px -24px rgba(18,50,75,.45); }
+#A1 .mail .k { font-size: 20px; color: var(--slate); }
+#A1 .mail .t { font-size: 28px; font-weight: 600; margin-top: 8px; }
+#A1 .mail .f { display: inline-block; margin-top: 14px; font-size: 22px; padding: 6px 14px; border-radius: 8px; background: var(--peach); }
+#A1 .owner { position: absolute; left: 40px; top: 580px; display: flex; align-items: center; gap: 22px; font-size: 30px; font-weight: 600; }
+#A1 .owner .av { width: 72px; height: 72px; border-radius: 50%; background: var(--mist); display: grid; place-items: center; font-size: 28px; color: var(--navy); }
+#A1 .owner .gone { font-size: 24px; color: #fff; background: var(--orange); border-radius: 999px; padding: 8px 18px; }
+
+/* ---------- A2 ---------- */
+#A2 { display: none; flex-direction: column; justify-content: center; }
+#A2.on { display: flex; }
+#A2 .limits { display: flex; gap: 22px; margin-top: 34px; }
+#A2 .bars { margin-top: 120px; display: grid; gap: 34px; }
+#A2 .bars .r { display: grid; grid-template-columns: 220px 1fr 200px; align-items: center; gap: 36px; font-size: 48px; font-weight: 700; }
+#A2 .bars .track { height: 76px; }
+#A2 .bars .track b { display: block; height: 100%; border-radius: 12px; background: var(--orange); }
+#A2 .bars .r.rr .track b { background: var(--navy); }
+#A2 .bars .v { font-size: 56px; text-align: right; }
+#A2 .src { margin-top: 44px; font-size: 24px; color: var(--slate); }
+
+/* ---------- A3 ---------- */
+#A3 h2 { font-size: 80px; font-weight: 700; letter-spacing: -.03em; }
+#A3 .cols { margin-top: 64px; display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
+#A3 .col { padding: 48px 52px; min-height: 560px; }
+#A3 .col.r { border: 3px solid var(--orange); }
+#A3 .col h3 { font-size: 30px; font-weight: 600; color: var(--slate); letter-spacing: .06em; }
+#A3 .col.r h3 { color: var(--orange); }
+#A3 .col .big { font-size: 120px; font-weight: 700; letter-spacing: -.04em; margin-top: 26px; line-height: 1; }
+#A3 .col .sub { font-size: 30px; color: var(--slate); margin-top: 14px; }
+#A3 .col ul { list-style: none; margin-top: 40px; display: grid; gap: 18px; }
+#A3 .col li { font-size: 34px; font-weight: 500; display: flex; gap: 16px; align-items: baseline; }
+#A3 .col li::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--navy); flex: none; transform: translateY(-4px); }
+#A3 .col.r li::before { background: var(--orange); }
+
+/* ---------- A4 (problem) ---------- */
+#A4 .tag { position: absolute; top: 96px; left: 120px; right: 120px; display: flex; justify-content: space-between; align-items: center; }
+#A4 .tag .pill { font-size: 26px; font-weight: 600; padding: 12px 24px; border-radius: 999px; background: var(--navy); color: var(--white); }
+#A4 .panels { position: absolute; top: 210px; left: 120px; right: 120px; display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
+#A4 .panel { padding: 34px 40px; }
+#A4 .panel h3 { font-size: 26px; font-weight: 600; color: var(--slate); margin-bottom: 22px; letter-spacing: .04em; }
+#A4 pre { font-size: 31px; line-height: 1.55; white-space: pre; }
+#A4 .u { position: relative; }
+#A4 .u::after { content: ""; position: absolute; left: 0; right: 0; bottom: -4px; height: 5px; background: var(--orange); border-radius: 3px;
+                transform-origin: left; animation: grow .6s var(--ease) calc(var(--d) * 1s) both; }
+#A4 .chips { position: absolute; top: 500px; left: 120px; right: 120px; display: flex; gap: 22px; flex-wrap: wrap; }
+#A4 .flip { position: absolute; top: 640px; left: 120px; right: 120px; display: grid; grid-template-columns: 1.15fr 1fr; gap: 48px; }
+#A4 .flip .card { padding: 34px 40px; }
+#A4 .flip .k { font-size: 24px; color: var(--slate); margin-bottom: 14px; }
+#A4 .flip .v { font-size: 46px; font-weight: 600; display: flex; gap: 40px; align-items: baseline; }
+#A4 .flip .v small { font-size: 24px; color: var(--slate); font-weight: 500; margin-right: 12px; }
+#A4 .decision { display: flex; align-items: center; gap: 28px; font-size: 46px; font-weight: 700; }
+#A4 .decision .arrow { color: var(--slate); font-weight: 400; }
+
+/* ---------- A5 (approach) ---------- */
+#A5 .name { font-size: 34px; font-weight: 600; color: var(--slate); }
+#A5 .trio { margin-top: 70px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
+#A5 .trio .card { padding: 54px 50px; min-height: 330px; }
+#A5 .trio .n { font-size: 26px; color: var(--slate); font-weight: 600; }
+#A5 .trio h2 { font-size: 78px; font-weight: 700; letter-spacing: -.03em; margin-top: 24px; line-height: 1.02; }
+#A5 .trio p { font-size: 28px; color: var(--slate); margin-top: 22px; line-height: 1.4; }
+#A5 .trio .hl { border-color: var(--orange); border-width: 3px; }
+#A5 .scope { margin-top: 64px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
+#A5 .scope div { border-top: 3px solid var(--navy); padding-top: 22px; font-size: 30px; line-height: 1.4; }
+#A5 .scope b { display: block; font-size: 22px; color: var(--slate); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 8px; font-weight: 600; }
+
+/* ---------- A5 intro beat ---------- */
+#A5 .meet { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 34px; text-align: center; }
+#A5 .meet h1 { font-size: 140px; font-weight: 700; letter-spacing: -.035em; }
+#A5 .meet p { font-size: 46px; color: var(--slate); line-height: 1.35; }
+#A5 .meet .rule { animation: grow .9s var(--ease) 1.4s both, out .45s ease 6.9s forwards; }
+/* ---------- A6 (proof) ---------- */
+#A6 .flow { position: absolute; top: 150px; left: 120px; right: 120px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 34px; }
+#A6 .node { padding: 30px 28px; min-height: 196px; position: relative; }
+#A6 .node .n { font-size: 22px; color: var(--slate); font-weight: 600; }
+#A6 .node h3 { font-size: 34px; font-weight: 700; margin-top: 12px; line-height: 1.15; }
+#A6 .node p { font-size: 22px; color: var(--slate); margin-top: 10px; line-height: 1.35; }
+#A6 .node .arr { position: absolute; right: -30px; top: 50%; width: 26px; height: 3px; background: var(--slate); }
+#A6 .node .arr::after { content: ""; position: absolute; right: -2px; top: -6px; border: 7.5px solid transparent; border-left: 10px solid var(--slate); border-right: 0; }
+#A6 .lock { position: absolute; left: 50%; top: -24px; transform: translateX(-50%); white-space: nowrap; background: var(--orange); color: #fff; font-size: 20px; font-weight: 600; padding: 8px 16px; border-radius: 999px; }
+#A6 .low { position: absolute; top: 460px; left: 120px; right: 120px; display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
+#A6 .formula { padding: 44px 48px; }
+#A6 .formula .f { font-size: 44px; font-weight: 600; white-space: nowrap; }
+#A6 .formula p { font-size: 26px; color: var(--slate); margin-top: 22px; line-height: 1.45; }
+#A6 .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 30px; align-content: start; padding-top: 10px; }
+#A6 .checks div { display: flex; align-items: center; gap: 16px; font-size: 30px; font-weight: 500; }
+#A6 .tick { width: 40px; height: 40px; border-radius: 50%; background: var(--navy); color: #fff; display: grid; place-items: center; font-size: 24px; flex: none; }
+#A6 .loop { position: absolute; left: 120px; right: 120px; bottom: 170px; display: flex; align-items: center; gap: 22px; font-size: 30px; font-weight: 600; }
+#A6 .loop .pill { padding: 14px 26px; border-radius: 999px; border: 2px solid var(--orange); color: var(--orange); background: var(--white); }
+#A6 .loop .sep { color: var(--slate); font-weight: 400; }
+
+/* ---------- A7 (beyond parity) ---------- */
+#A7 { display: none; flex-direction: column; justify-content: center; }
+#A7.on { display: flex; }
+#A7 h2 { font-size: 72px; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; max-width: 1500px; }
+#A7 .chips { margin-top: 72px; display: flex; flex-wrap: wrap; gap: 22px; max-width: 1500px; }
+#A7 .verdict { margin-top: 90px; display: flex; align-items: center; gap: 44px; font-size: 44px; font-weight: 700; }
+#A7 .verdict .b { padding: 26px 40px; border-radius: 16px; background: var(--white); border: 2px solid var(--navy); }
+#A7 .verdict .ne { font-size: 90px; color: var(--orange); font-weight: 500; }
+
+/* ---------- A8 (platform) ---------- */
+#A8 .steps { position: absolute; top: 190px; left: 120px; right: 120px; display: grid; grid-template-columns: repeat(7, 1fr); gap: 14px; }
+#A8 .step { text-align: center; position: relative; }
+#A8 .step .c { width: 76px; height: 76px; margin: 0 auto; border-radius: 50%; background: var(--navy); color: #fff; display: grid; place-items: center; font-size: 32px; font-weight: 700; position: relative; z-index: 1; }
+#A8 .step.cond .c { background: var(--cream); color: var(--navy); border: 3px dashed var(--navy); }
+#A8 .step .t { font-size: 23px; font-weight: 600; margin-top: 18px; line-height: 1.25; padding: 0 6px; }
+#A8 .line { position: absolute; top: 38px; left: 7%; right: 7%; height: 3px; background: var(--mist); }
+#A8 .agents { position: absolute; top: 470px; left: 120px; right: 120px; display: grid; grid-template-columns: repeat(7, 1fr); gap: 14px; }
+#A8 .agent { padding: 22px 18px; text-align: center; }
+#A8 .agent h4 { font-size: 26px; font-weight: 700; }
+#A8 .agent p { font-size: 19px; color: var(--orange); font-weight: 600; margin-top: 8px; }
+#A8 .code { padding: 22px 18px; text-align: center; border: 1.5px dashed var(--mist); border-radius: 18px; font-size: 22px; color: var(--slate); font-weight: 600; display: grid; place-items: center; }
+#A8 .pills { position: absolute; top: 730px; left: 120px; right: 120px; display: flex; gap: 22px; justify-content: center; }
+#A8 .bench { position: absolute; inset: 120px; display: flex; flex-direction: column; justify-content: center; }
+#A8 .bench h2 { font-size: 64px; font-weight: 700; letter-spacing: -.03em; }
+#A8 .rows { margin-top: 70px; display: grid; gap: 30px; }
+#A8 .row { display: grid; grid-template-columns: 400px 1fr 150px 170px 170px; padding: 14px 22px; border-radius: 14px; align-items: center; gap: 30px; font-size: 32px; }
+#A8 .row .nm { font-weight: 600; }
+#A8 .row .track { height: 46px; background: var(--white); border: 1.5px solid var(--mist); border-radius: 10px; overflow: hidden; }
+#A8 .row .track b { display: block; height: 100%; background: var(--navy); border-radius: 8px; }
+#A8 .row .cost { font-weight: 700; text-align: right; }
+#A8 .row .ok { color: var(--navy); font-size: 28px; font-weight: 600; }
+#A8 .rows { gap: 12px; margin-top: 56px; }
+#A8 .row.head { font-size: 20px; color: var(--slate); font-weight: 600; padding-top: 0; padding-bottom: 0; }
+#A8 .row .tm { text-align: right; color: var(--slate); }
+#A8 .row.gpt { background: var(--peach); }
+#A8 .row.gpt .nm { color: var(--orange); }
+#A8 .row.gpt .track b { background: var(--orange); }
+#A8 .row .tag { font-style: normal; font-size: 19px; font-weight: 700; color: #fff; background: var(--orange); border-radius: 999px; padding: 5px 12px; margin-left: 14px; vertical-align: middle; }
+#A8 .bench .src { margin-top: 44px; font-size: 22px; color: var(--slate); }
+
+/* ---------- B0 / END / TEAM ---------- */
+#B0 .center, #B6 .center, #TEAM .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 30px; text-align: center; }
+#B0 .eyebrow { color: var(--orange); }
+#B0 h1 { font-size: 120px; font-weight: 700; letter-spacing: -.035em; }
+#B0 p { font-size: 38px; color: var(--slate); }
+#B6 h1 { font-size: 140px; font-weight: 700; letter-spacing: -.035em; }
+#B6 .tag { font-size: 52px; font-weight: 600; }
+#B6 .tag span.h { color: var(--slate); font-weight: 500; }
+#B6 .logo-b { height: 90px; margin-top: 30px; }
+#TEAM h2 { font-size: 88px; font-weight: 700; letter-spacing: -.03em; }
+#TEAM .members { display: grid; grid-template-columns: repeat(4, 340px); gap: 26px; margin-top: 20px; }
+#TEAM .m { background: var(--white); border: 1.5px solid var(--mist); border-radius: 18px; padding: 30px 20px; text-align: center; }
+#TEAM .m b { display: block; font-size: 32px; font-weight: 700; color: var(--navy); }
+#TEAM .m span { display: block; font-size: 22px; color: var(--slate); margin-top: 10px; font-family: "JetBrains Mono", monospace; font-variant-ligatures: none; }
+#TEAM .m em { display: inline-block; font-style: normal; font-size: 18px; font-weight: 700; color: #fff; background: var(--orange); border-radius: 999px; padding: 4px 12px; margin-top: 14px; }
+#TEAM .foot { position: absolute; bottom: 80px; left: 0; right: 0; text-align: center; font-size: 24px; color: var(--slate); }
+</style>
+</head>
+<body>
+
+<!-- INTRO 3.5s -->
+<section id="INTRO" data-dur="3.5">
+  <img class="logo-top fade" style="--d:.1" src="../assets/brand/exl-logo.svg" alt="EXL">
+  <div class="center">
+    <h1 class="in" style="--d:.2">R-Pythonizer</h1>
+    <div class="rule grow" style="--d:.7"></div>
+    <p class="in" style="--d:.9">Agentic R → Python model migration, with proof of parity</p>
+  </div>
+  <div class="foot fade" style="--d:1.3">EXL × Trinity Data &amp; AI Hackathon 2026 · Challenge 4</div>
+</section>
+
+<!-- A1 11.5s -->
+<section id="A1" data-dur="11.5" data-vo="0.8">
+  <div class="grid2">
+    <div>
+      <div class="big in" style="--d:.9">20</div>
+      <div class="lbl in" style="--d:1.4"><span class="accent" style="font-weight:700">years</span> of risk models<br>written in R</div>
+    </div>
+    <div class="stage">
+      <div class="screen in" style="--d:3.4"><div class="win">
+        <div class="wbar"><i></i><i></i><i></i><span class="mono">credit_score.R · last edited 2014</span></div>
+<pre class="mono"><span class="c"># run on my laptop every quarter</span>
+fit &lt;- glm(default ~ ., family = binomial,
+           data = loans)
+write.csv(predict(fit), "Q3_scores.csv")</pre>
+      </div></div>
+      <div class="base in" style="--d:3.4"></div>
+      <div class="mail card in" style="--d:6.0"><div class="k">To: risk-team</div><div class="t">Re: Q3 scores</div><span class="f mono">Q3_scores.csv</span></div>
+      <div class="owner in" style="--d:7.0"><span class="av">MO</span>Model owner<span class="gone in" style="--d:8.3">left the bank</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- A2 11s -->
+<section id="A2" data-dur="11" data-vo="0.8">
+  <div class="eyebrow in" style="--d:.9">R in production</div>
+  <div class="limits">
+    <span class="chip in" style="--d:1.1"><span class="dot"></span>Runs in memory</span>
+    <span class="chip in" style="--d:2.4"><span class="dot"></span>One thread at a time</span>
+    <span class="chip in" style="--d:3.6"><span class="dot" style="background:var(--orange)"></span>Hard to plug into production</span>
+  </div>
+  <div class="bars">
+    <div class="r in" style="--d:5.4"><span>Python</span><span class="track"><b class="grow" style="--d:5.7;width:96%"></b></span><span class="v mono">57.9%</span></div>
+    <div class="r rr in" style="--d:8.8"><span>R</span><span class="track"><b class="grow" style="--d:9.1;width:8.1%"></b></span><span class="v mono">4.9%</span></div>
+  </div>
+  <div class="src fade" style="--d:6.2">Developers using each language · Stack Overflow Developer Survey 2025</div>
+</section>
+
+<!-- A3 16s -->
+<section id="A3" data-dur="16" data-vo="0.8">
+  <h2 class="in" style="--d:.9">Why R, not SAS?</h2>
+  <div class="cols">
+    <div class="col card in" style="--d:2.7">
+      <h3>SAS</h3>
+      <div class="big in" style="--d:6.4">−70%</div>
+      <div class="sub in" style="--d:6.6">conversion time with EXL Code Harbor</div>
+      <ul>
+        <li class="in" style="--d:3.2">One vendor's language</li>
+        <li class="in" style="--d:4.0">Migration already industrialised</li>
+      </ul>
+    </div>
+    <div class="col r card in" style="--d:9.6">
+      <h3>R · THE GAP</h3>
+      <div class="big in" style="--d:10.4">22,800+</div>
+      <div class="sub in" style="--d:10.6">open packages on CRAN</div>
+      <ul>
+        <li class="in" style="--d:12.0">Each with its own defaults</li>
+        <li class="in" style="--d:13.0">No tool proves the result</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- A4 15s -->
+<section id="A4" data-dur="15" data-vo="0.8">
+  <div class="tag">
+    <span class="eyebrow in" style="--d:.9">Same model, two languages</span>
+    <span class="pill in" style="--d:3.0">PRA SS1/23 · a rewrite is a model change</span>
+  </div>
+  <div class="panels">
+    <div class="panel card in" style="--d:1.0"><h3>R</h3>
+<pre class="mono">fit &lt;- glm(default ~ ., data = train,
+           family = binomial)</pre></div>
+    <div class="panel card in" style="--d:1.3"><h3>PYTHON</h3>
+<pre class="mono">model = <span class="u" style="--d:8.6">LogisticRegression()</span>
+model.fit(X_train, y_train)</pre></div>
+  </div>
+  <div class="chips">
+    <span class="chip in" style="--d:8.6;font-size:25px"><span class="dot" style="background:var(--orange)"></span>scikit-learn adds a penalty</span>
+    <span class="chip in" style="--d:9.6;font-size:25px"><span class="dot"></span>pandas reads more values as missing</span>
+    <span class="chip in" style="--d:10.4;font-size:25px"><span class="dot"></span>a different reference category</span>
+  </div>
+  <div class="flip">
+    <div class="card in" style="--d:11.2">
+      <div class="k">Coefficient · income (illustrative)</div>
+      <div class="v mono"><span><small>R</small>−0.41237</span><span class="accent"><small>Py</small>−0.41249</span></div>
+    </div>
+    <div class="card in" style="--d:11.8">
+      <div class="k">Applicant near the cut-off</div>
+      <div class="decision"><span>APPROVE</span><span class="arrow">→</span><span class="accent in" style="--d:12.8">DECLINE</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- A5 19s -->
+<section id="A5" data-dur="19" data-vo="0.8">
+  <div class="meet">
+    <h1 class="in" style="--d:.9;--o:6.9">R-Pythonizer</h1>
+    <div class="rule grow" style="--d:1.4"></div>
+    <p class="in" style="--d:2.2;--o:6.9">A web platform that moves statistical models<br>from R to Python, <span class="accent">with proof</span></p>
+  </div>
+  <div class="name in" style="--d:7.3">The rule is simple</div>
+  <div class="trio">
+    <div class="card in" style="--d:8.5"><div class="n">01</div><h2>AI<br>writes</h2><p>Agents read the R code and write the Python.</p></div>
+    <div class="card hl in" style="--d:10.2"><div class="n accent">02</div><h2>Code<br>proves</h2><p>Deterministic checks, no AI, decide pass or fail.</p></div>
+    <div class="card in" style="--d:11.7"><div class="n">03</div><h2>Human<br>approves</h2><p>Only a person signs off, bound to the evidence.</p></div>
+  </div>
+  <div class="scope">
+    <div class="in" style="--d:13.2"><b>Scope</b>Classical statistical models, reproduced in statsmodels</div>
+    <div class="in" style="--d:14.5"><b>Proven exact</b>Binomial GLM · Poisson GLM with exposure</div>
+    <div class="in" style="--d:15.8"><b>No faithful equivalent</b>Refused and stopped, <span class="accent">never substituted</span></div>
+  </div>
+</section>
+
+<!-- A6 16.5s -->
+<section id="A6" data-dur="16.5" data-vo="0.8">
+  <div class="flow">
+    <div class="node card in" style="--d:.9"><div class="n">1</div><h3 class="mono" style="font-size:32px">baseline.R</h3><p>Only the lines that build the target model</p><span class="arr"></span></div>
+    <div class="node card in" style="--d:1.6"><div class="n">2</div><h3>R answer key</h3><p>Run once in real R, then frozen</p><span class="arr"></span></div>
+    <div class="node card in" style="--d:4.0"><div class="n">3</div><h3>R's exact rows</h3><p>Python never re-splits the data</p><span class="arr"></span></div>
+    <div class="node card in" style="--d:6.0"><span class="lock fade" style="--d:6.5">sees names, never values</span><div class="n">4</div><h3>Python candidate</h3><p>Written by the Translator agent</p><span class="arr"></span></div>
+    <div class="node card in" style="--d:8.9;border:3px solid var(--navy)"><div class="n">5</div><h3>Parity check</h3><p>Plain code, no AI</p></div>
+  </div>
+  <div class="low">
+    <div class="formula card in" style="--d:9.3">
+      <div class="f mono">|Python − R| ≤ atol + rtol·|R|</div>
+      <p>atol 1e-8 · rtol 1e-6 by default,<br>confirmed by a human before any work starts</p>
+    </div>
+    <div class="checks">
+      <div class="in" style="--d:9.8"><span class="tick">✓</span>Converged</div>
+      <div class="in" style="--d:10.2"><span class="tick">✓</span>Coefficients</div>
+      <div class="in" style="--d:10.6"><span class="tick">✓</span>Standard errors</div>
+      <div class="in" style="--d:11.0"><span class="tick">✓</span>Every prediction</div>
+      <div class="in" style="--d:11.4"><span class="tick">✓</span>Fit statistics</div>
+      <div class="in" style="--d:11.8"><span class="tick">✓</span>Metrics</div>
+    </div>
+  </div>
+  <div class="loop">
+    <span class="pill in" style="--d:12.6">Parity fails</span><span class="sep in" style="--d:13.0">→</span>
+    <span class="pill in" style="--d:13.3;border-color:var(--navy);color:var(--navy)">Diagnostician finds the cause</span><span class="sep in" style="--d:13.9">→</span>
+    <span class="pill in" style="--d:14.2;border-color:var(--navy);color:var(--navy)">Translator repairs · up to 3 times</span>
+  </div>
+</section>
+
+<!-- A7 9s -->
+<section id="A7" data-dur="9" data-vo="0.8">
+  <h2 class="in" style="--d:.9">A perfect copy of a bad model<br>is still a <span class="mark">bad model</span>.</h2>
+  <div class="chips">
+    <span class="chip in" style="--d:3.6"><span class="dot"></span>Calibration</span>
+    <span class="chip in" style="--d:4.0"><span class="dot"></span>AUC · Gini · KS</span>
+    <span class="chip in" style="--d:4.4"><span class="dot"></span>Stability · PSI</span>
+    <span class="chip in" style="--d:4.8"><span class="dot"></span>Fairness · four-fifths rule</span>
+    <span class="chip in" style="--d:5.2"><span class="dot"></span>Assumptions</span>
+    <span class="chip in" style="--d:5.6"><span class="dot"></span>Sample size</span>
+  </div>
+  <div class="verdict">
+    <span class="b in" style="--d:6.2">Migration accepted</span><span class="ne in" style="--d:6.5">≠</span><span class="b in" style="--d:6.8">Fit for use</span>
+  </div>
+</section>
+
+<!-- A8 15.5s -->
+<section id="A8" data-dur="15.5" data-vo="0.8">
+  <div class="steps">
+    <div class="line fade" style="--d:.9;--o:6.3"></div>
+    <div class="step in" style="--d:.9;--o:6.3"><div class="c">1</div><div class="t">Data &amp; Code</div></div>
+    <div class="step in" style="--d:1.1;--o:6.3"><div class="c">2</div><div class="t">Model Specification</div></div>
+    <div class="step in" style="--d:1.3;--o:6.3"><div class="c">3</div><div class="t">R Reference Results</div></div>
+    <div class="step in" style="--d:1.5;--o:6.3"><div class="c">4</div><div class="t">Python Migration &amp; Comparison</div></div>
+    <div class="step cond in" style="--d:1.7;--o:6.3"><div class="c">5</div><div class="t">Discrepancy Analysis</div></div>
+    <div class="step in" style="--d:1.9;--o:6.3"><div class="c">6</div><div class="t">Migration Validation Report</div></div>
+    <div class="step in" style="--d:2.1;--o:6.3"><div class="c">7</div><div class="t">Code &amp; Reproducibility Package</div></div>
+  </div>
+  <div class="agents">
+    <div class="code in" style="--d:2.3;--o:6.3">code</div>
+    <div class="agent card in" style="--d:2.3;--o:6.3"><h4>Analyst</h4><p>no data rows</p></div>
+    <div class="code in" style="--d:2.3;--o:6.3">code</div>
+    <div class="agent card in" style="--d:2.5;--o:6.3"><h4>Translator</h4><p>no R values</p></div>
+    <div class="agent card in" style="--d:2.7;--o:6.3"><h4>Diagnostician</h4><p>no R values</p></div>
+    <div class="agent card in" style="--d:2.9;--o:6.3"><h4>Reporter</h4><p>no invented numbers</p></div>
+    <div class="code in" style="--d:2.9;--o:6.3">code</div>
+  </div>
+  <div class="pills">
+    <span class="chip in" style="--d:3.4;--o:6.3"><span class="dot"></span>Approvals bound to hashes</span>
+    <span class="chip in" style="--d:4.0;--o:6.3"><span class="dot"></span>Report numbers filled in by code</span>
+    <span class="chip in" style="--d:4.8;--o:6.3"><span class="dot" style="background:var(--orange)"></span><span class="mono" style="font-size:26px">verify.py</span>&nbsp;re-runs the proof</span>
+  </div>
+  <div class="bench">
+    <h2 class="in" style="--d:6.7">Fast and cheap. <span class="mark">Same verified result.</span></h2>
+    <div class="rows">
+      <div class="row head in" style="--d:7.0"><span></span><span>AI cost per migration</span><span class="cost">cost</span><span class="tm">time</span><span></span></div>
+      <div class="row gpt in" style="--d:7.2"><span class="nm">gpt-6.1-terra<em class="tag fade" style="--d:9.4">fastest</em></span><span class="track"><b class="grow" style="--d:7.6;width:3.5%"></b></span><span class="cost mono">$0.045</span><span class="tm mono">1m 24s</span><span class="ok">✓ 23/23</span></div>
+      <div class="row in" style="--d:7.4"><span class="nm">deepseek-flash</span><span class="track"><b class="grow" style="--d:7.8;width:1.8%"></b></span><span class="cost mono">$0.023</span><span class="tm mono">2m 43s</span><span class="ok">✓ 23/23</span></div>
+      <div class="row gpt in" style="--d:7.6"><span class="nm">gpt-6.1-sol</span><span class="track"><b class="grow" style="--d:8.0;width:14.5%"></b></span><span class="cost mono">$0.184</span><span class="tm mono">3m 30s</span><span class="ok">✓ 23/23</span></div>
+      <div class="row in" style="--d:7.8"><span class="nm">grok-4.7</span><span class="track"><b class="grow" style="--d:8.2;width:100%"></b></span><span class="cost mono">$1.268</span><span class="tm mono">21m 37s</span><span class="ok">✓ 23/23</span></div>
+    </div>
+    <div class="src fade" style="--d:8.6">M4 · full migration and validation · common checks passed · public list prices</div>
+  </div>
+</section>
+
+<!-- B0 3s -->
+<section id="B0" data-dur="3">
+  <div class="center">
+    <div class="eyebrow in" style="--d:.1">Live demo</div>
+    <h1 class="in" style="--d:.3">M4 · GiveMeSomeCredit</h1>
+    <p class="in" style="--d:.6">150,000 rows · 57-line R script · binomial GLM</p>
+  </div>
+</section>
+
+<!-- B6 6.5s -->
+<section id="B6" data-dur="6.5" data-vo="0.6">
+  <div class="center">
+    <h1 class="in" style="--d:.5">R-Pythonizer</h1>
+    <div class="rule grow" style="--d:1.0"></div>
+    <div class="tag in" style="--d:1.6">AI writes. <span class="accent">Code proves.</span> <span class="h">Humans approve.</span></div>
+    <img class="logo-b fade" style="--d:2.4" src="../assets/brand/exl-logo.svg" alt="EXL">
+  </div>
+</section>
+
+<!-- TEAM 5s, text from ../team.json -->
+<section id="TEAM" data-dur="5">
+  <div class="center">
+    <div class="eyebrow in" style="--d:.1">Team</div>
+    <h2 class="in" id="team-name" style="--d:.3"></h2>
+    <div class="members in" id="team-members" style="--d:.6"></div>
+  </div>
+  <div class="foot fade" style="--d:.8">EXL × Trinity Data &amp; AI Hackathon 2026 · Challenge 4</div>
+</section>
+
+<script>
+
+window.sceneReady = (async () => {
+  try {
+    const team = await (await fetch("../team.json")).json();
+    document.getElementById("team-name").textContent = team.name;
+    document.getElementById("team-members").innerHTML = team.members.map(m =>
+      `<div class="m"><b>${m.name}</b><span>${m.email}</span>${m.role ? `<em>${m.role}</em>` : ""}</div>`).join("");
+  } catch (e) {}
+  const id = new URLSearchParams(location.search).get("s") || "INTRO";
+  const s = document.getElementById(id);
+  s.classList.add("on");
+  await document.fonts.ready;
+  await Promise.all([...document.images].map(i => i.decode().catch(() => {})));
+  return { id, dur: Number(s.dataset.dur) };
+})();
+
+// Freeze every animation at time t (seconds since scene start).
+window.seek = (t) => {
+  for (const a of document.getAnimations()) { a.pause(); a.currentTime = t * 1000; }
+};
+</script>
+</body>
+</html>

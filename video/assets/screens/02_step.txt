@@ -1,0 +1,161 @@
+R-Pythonizer
+Projects
+Settings
+Data & Code
+Model Specification
+R Reference Results
+Python Migration & Comparison
+Discrepancy Analysis
+Migration Validation Report
+Code & Reproducibility Package
+M4 GiveMeSomeCredit terra
+Code & Reproducibility Package · done
+Model Specification v1 · exact parity
+MLflow experiment
+Model Specification v1
+exact parity · no passing fixture yet
+
+Logistic regression predicts the probability of SeriousDlqin2yrs for individuals represented in the credit dataset.
+
+Statistical model
+stats::glm
+Python implementation
+statsmodels.api.GLM
+Family
+binomial (logit)
+Formula
+cs_training$SeriousDlqin2yrs ~ .
+Split
+No split; all dataset rows are used for fitting.
+R packages
+—
+Statistical semantics
+Response
+SeriousDlqin2yrs binary
+Event
+SeriousDlqin2yrs coded 1; serious delinquency within two years, exact definition to be confirmed coded 1; otherwise SeriousDlqin2yrs coded 0; no recorded qualifying serious delinquency within two years
+Grouped binomial
+—
+Weights
+—
+Offset
+—
+Prediction
+probability of SeriousDlqin2yrs = 1 within two years scalar, probability
+Prediction keys
+—
+Aligned on
+row
+R prediction
+predict(model, type = 'response', newdata = newdata, na.action = na.pass)
+Evaluation metrics
+auc, gini, ks, actual_expected, log_loss, brier
+Optional metrics
+None
+R convergence check
+auto
+Convergence rationale
+—
+Tolerances
+coefficients: atol 1.000e-6, rtol 1.000e-6
+std errors: atol 1.000e-6, rtol 1.000e-6
+predictions: atol 1.000e-6, rtol 1.000e-6
+fit statistics: atol 1.000e-6, rtol 1.000e-6
+metrics: atol 1.000e-6, rtol 1.000e-6
+Preprocessing
+Remove first identifier column. X
+Remove income and dependents. MonthlyIncome, NumberOfDependents
+Encode response as factor with event 1 as second level. SeriousDlqin2yrs
+Center and scale all predictors using the entire training dataset. RevolvingUtilizationOfUnsecuredLines, age, NumberOfTime30.59DaysPastDueNotWorse, DebtRatio, NumberOfOpenCreditLinesAndLoans, NumberOfTimes90DaysLate, NumberRealEstateLoansOrLines, NumberOfTime60.89DaysPastDueNotWorse
+Financial model assessment
+Business use
+Credit delinquency risk prediction; specific business decision not stated.
+Intended population
+Individuals represented by the credit dataset; deployment population not specified.
+Sample
+150,000 labeled rows in cs-training.csv; product, channel, dates and selection criteria not provided.
+Evaluation sets
+train development All labeled training dataset rows, also used to fit and scale the model.
+Period column
+—
+Decision
+—
+Acceptance criteria
+—
+Still to provide
+Confirm exact definition of SeriousDlqin2yrs and the intended population, business use, product, channel, dates and exclusions.
+Provide independent labeled holdout or out-of-time data and its period information; cs-test.csv has no observed outcomes and is not a held-out subset of the training dataset.
+Specify business action and decision acceptance criteria including minimum events captured; notebook classifies probability strictly greater than 0.5 as 1, not greater than or equal to 0.5.
+Provide acceptance thresholds for discrimination, calibration, stability and sample suitability, and identify business-relevant subgroup columns.
+Confirm treatment of extreme predictor values and possible 96/98 delinquency-count codes.
+Confirm whether independent scaling of cs-test.csv in the notebook is intended for deployment; it differs from applying training scaling.
+baseline.R
+against givemesomecredit_logistic_notebook.R
+slice
+- 
+- # ---- notebook code cell 1 ----
+- # Importing the datasets
+- cs_training = read.csv("../input/cs-training.csv")
+- cs_test = read.csv("../input/cs-test.csv")
+- 
+- str(cs_training)
+- 
+- # Data Cleaning
++ cs_training = read.csv("inputs/cs-training.csv")
+  cs_training = cs_training[,(-1)]
+- cs_test = cs_test[,(-1)]
+- 
+- # Corelation between Dependent and INdependent Variable 
+- cor(x = cs_training$SeriousDlqin2yrs, y = cs_training)
+- 
+- # Removing insignificant Independent variables
+  cs_training$MonthlyIncome <- NULL
+  cs_training$NumberOfDependents <- NULL
+- cs_test$MonthlyIncome <- NULL
+- cs_test$NumberOfDependents <- NULL
+- 
+- #  Check and remove NA values
+- colSums(is.na(cs_training))
+- colSums(is.na(cs_test))
+- 
+- # Encoding the target feature as factor
+  cs_training$SeriousDlqin2yrs = factor(cs_training$SeriousDlqin2yrs, levels = c(0,1))
+- 
+- # Feature Scaling
+  cs_training[-1] = scale(cs_training[-1])
+- cs_test[-1] = scale(cs_test[-1])
+- 
+- # Fitting Logistic Regression to the Training set
+  RegModel = glm(formula = cs_training$SeriousDlqin2yrs ~ .,
+                 family = binomial,
+-                data = cs_training)
+- 
+- summary(RegModel)
+- 
+- # Validating Training set results
+- Prediction_Model_Training = predict(RegModel, type = 'response', newdata = cs_training[-1])
+- Training_Predictions = ifelse(Prediction_Model_Training > 0.5, 1, 0)
+- Probabilites_Training <- data.frame(Prediction_Model_Training)
+- # write.csv(Probabilites_Training, file = "Probabilites_Training.csv")
+- 
+- 
+- # Making the Confusion Matrix
+- cm_training = table(cs_training$SeriousDlqin2yrs, Training_Predictions)
+- 
+- 
+- # Fitting Logistic Regression to the Test set
+- Prediction_Model_Test = predict(RegModel, type = 'response', newdata = cs_test[-1])
+- Test_Predictions = ifelse(Prediction_Model_Test > 0.5, 1, 0)
+- 
+- 
+- # Making the Confusion Matrix
+- cm_test = table(Test_Predictions)
++                data = cs_training)
+Analyst
+
+I’ve submitted a draft spec for the binomial logistic regression predicting the probability that SeriousDlqin2yrs = 1. The expected Python implementation is statsmodels GLM, with exact migration parity.
+
+The notebook fits and evaluates on all labeled training rows; cs-test.csv has no observed outcomes, so it cannot establish independent performance. It also scales that file separately from the training data. Please provide a labeled holdout or out-of-time sample and confirm the intended scaling approach, event definition, deployment population, business action, and acceptance criteria. The notebook’s classification rule is strictly greater than 0.5; please confirm whether that is the intended decision rule.
+
+Send
+⌘↵

@@ -1,0 +1,9 @@
+[project]
+name = "video-tools"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "edge-tts==7.3.1",
+    "imageio-ffmpeg==0.8.1",
+    "playwright==1.65.2",
+]

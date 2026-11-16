@@ -1,0 +1,9 @@
+{
+  "name": "The Fantastic 4",
+  "members": [
+    {"name": "Youzhi Liu", "email": "yoliu@tcd.ie", "role": "Team leader"},
+    {"name": "Chi Thanh Do", "email": "doch@tcd.ie"},
+    {"name": "Jiaxuan Guo", "email": "guoj8@tcd.ie"},
+    {"name": "Mrunmayee", "email": "datarm@tcd.ie"}
+  ]
+}

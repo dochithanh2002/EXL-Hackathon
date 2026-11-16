@@ -1,0 +1,136 @@
+R-Pythonizer
+Projects
+Settings
+Data & Code
+Model Specification
+R Reference Results
+Python Migration & Comparison
+Discrepancy Analysis
+Migration Validation Report
+Code & Reproducibility Package
+M4 GiveMeSomeCredit terra
+Code & Reproducibility Package · done
+Model Specification v1 · exact parity
+MLflow experiment
+Code & reproducibility package
+MLflow
+Package (.zip)
+File
+model.py
+verify.py
+README.md
+report.md
+validation.json
+spec.json
+baseline.R
+harness.py
+parity.py
+verify.json
+environment/pyproject.toml
+environment/renv.lock
+environment/uv.lock
+plots/calibration-train.svg
+plots/cross-validation.svg
+plots/parity.svg
+plots/performance.svg
+plots/sensitivity-train.svg
+plots/subgroups-age-train.svg
+plots/training-curve.svg
+plots/vif.svg
+reference/coefficients.csv
+reference/design.json
+reference/fit.json
+reference/meta.json
+reference/predictions.csv
+reference/segments.csv
+reference/sessionInfo.txt
+reference/split.csv
+Details
+Package SHA-256
+d74388a4b77a08971ecfc698cc2ad6820230b601097b2746c3a6e61709f06c45
+Environment
+0034e1fe214f
+Specification hash
+9d1fe8bfe996
+model.py
+4eab3a172aa62610
+verify.py
+362e71aaeb23bacc
+README.md
+6757815f83c245dc
+report.md
+570486800c9a30e7
+validation.json
+9784815b8903663f
+spec.json
+60ec71bcc01326fb
+baseline.R
+385a3c4b80451343
+harness.py
+d52385adf9a99eb0
+parity.py
+3f6e2178ec29bc1c
+verify.json
+35bacb2636c3a951
+environment/pyproject.toml
+229976c20de300ae
+environment/renv.lock
+a7fe180b2a5ff474
+environment/uv.lock
+cd678aa332152365
+plots/calibration-train.svg
+309a64a61276c18b
+plots/cross-validation.svg
+91aaebbc30909de4
+plots/parity.svg
+2a5afbd8b33330fd
+plots/performance.svg
+0622bc36aec86776
+plots/sensitivity-train.svg
+20d2a61b160cc238
+plots/subgroups-age-train.svg
+47f2dec2805cb83e
+plots/training-curve.svg
+1f30a4caeda85591
+plots/vif.svg
+1af8d999b0eefe69
+reference/coefficients.csv
+5b716cd7598034df
+reference/design.json
+cc88a73e5a1d55d3
+reference/fit.json
+54209e78962caa3f
+reference/meta.json
+8944972a929c133a
+reference/predictions.csv
+42c7800ca15f2fd2
+reference/segments.csv
+a692645a22577c95
+reference/sessionInfo.txt
+ab48b5fbc868ef71
+reference/split.csv
+265860dab3facf5d
+M4 GiveMeSomeCredit terra
+
+stats::glm in R, migrated to Python with statsmodels.api.GLM (exact parity tier); the data scientist accepted the migration.
+
+File	
+model.py	The model: prepare, fit and predict
+report.md, plots/	Model validation report and its plots
+validation.json	The accepted parity checks against the R reference, with the model validation checks and business fitness verdict
+spec.json	The confirmed model specification, v1
+baseline.R	The R code the reference ran
+reference/	The R reference results: coefficients, predictions, R's train and test rows, subgroup values, fit statistics, design summary
+environment/	pyproject.toml and uv.lock for Python, renv.lock for R
+verify.py, parity.py, harness.py, verify.json	Rerun and compare with R
+manifest.json	SHA-256 of every file
+Rerun
+uv sync --frozen --project environment
+uv run --frozen --project environment python verify.py path/to/cs-training.csv
+
+
+cs-test.csv must be in the same directory as the dataset.
+
+verify.py checks the SHA-256 of every data file, fits model.py on R's train rows, predicts on every set R formed and repeats the parity checks against reference/: convergence, coefficient names, estimates and standard errors, alignment keys, observed values, prediction missingness and values, fit statistics and the requested evaluation metrics, each as |Python − R| ≤ atol + rtol·|R| with the spec's tolerances. Checks that were unavailable or excluded at acceptance are listed in the output.
+
+The R baseline used R 4.6.2 (2026-10-29) with the packages in environment/renv.lock (renv::restore(lockfile = "environment/renv.lock")).

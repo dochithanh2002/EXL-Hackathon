@@ -1,0 +1,42 @@
+R-Pythonizer
+Projects
+Settings
+Data & Code
+Model Specification
+R Reference Results
+Python Migration & Comparison
+Discrepancy Analysis
+Migration Validation Report
+Code & Reproducibility Package
+M4 GiveMeSomeCredit terra
+Code & Reproducibility Package · done
+Model Specification v1 · exact parity
+MLflow experiment
+Data & code
+File	Used as
+cs-training.csv	model dataset
+cs-test.csv	other data
+givemesomecredit_logistic_notebook.R	R code
+Details
+cs-training.csv
+1bd46da486a5708c58c7b01a034fae2a13b327f6f7b62ea7ba4fe3b5824b24ac
+cs-test.csv
+bab363a2a807218d32a51f5fc9668b8be7977795065edd386abc8546abaa5b78
+givemesomecredit_logistic_notebook.R
+0712d22f50e2f7685bb40999a9c967136a5f0cbeca21e8be66b76f3f9b519637
+cs-training.csv · 150,000 rows
+cs-training.csv
+cs-test.csv
+Column	R class	Missing	Distinct	Min	Mean	Max	Levels
+	integer	0	150,000	1	75000.5	150,000	
+SeriousDlqin2yrs	integer	0	2	0	0.06684	1	0 (139,974), 1 (10,026)
+RevolvingUtilizationOfUnsecuredLines	numeric	0	125,728	0	6.04844	50,708	
+age	integer	0	86	0	52.2952	109	
+NumberOfTime30-59DaysPastDueNotWorse	integer	0	16	0	0.421033	98	0 (126,018), 1 (16,033), 2 (4,598), 3 (1,754), 4 (747), 5 (342), 6 (140), 7 (54), 8 (25), 9 (12), 10 (4), 11 (1), 12 (2), 13 (1), 96 (5), 98 (264)
+DebtRatio	numeric	0	114,194	0	353.005	329,664	
+MonthlyIncome	integer	29,731	13,594	0	6670.22	3,008,750	
+NumberOfOpenCreditLinesAndLoans	integer	0	58	0	8.45276	58	
+NumberOfTimes90DaysLate	integer	0	19	0	0.265973	98	0 (141,662), 1 (5,243), 2 (1,555), 3 (667), 4 (291), 5 (131), 6 (80), 7 (38), 8 (21), 9 (19), 10 (8), 11 (5), 12 (2), 13 (4), 14 (2), 15 (2), 17 (1), 96 (5), 98 (264)
+NumberRealEstateLoansOrLines	integer	0	28	0	1.01824	54	
+NumberOfTime60-89DaysPastDueNotWorse	integer	0	13	0	0.240387	98	0 (142,396), 1 (5,731), 2 (1,118), 3 (318), 4 (105), 5 (34), 6 (16), 7 (9), 8 (2), 9 (1), 11 (1), 96 (5), 98 (264)
+NumberOfDependents	integer	3,924	13	0	0.757222	20	0 (86,902), 1 (26,316), 2 (19,522), 3 (9,483), 4 (2,862), 5 (746), 6 (158), 7 (51), 8 (24), 9 (5), 10 (5), 13 (1), 20 (1)

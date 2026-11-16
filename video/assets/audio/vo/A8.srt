@@ -1,0 +1,8 @@
+1
+00:00:00,050 --> 00:00:05,706
+Seven fixed steps, four narrow agents, zero data rows, and a script anyone can re-run.
+
+2
+00:00:05,706 --> 00:00:13,136
+We tried four AI models, and GPT-6.1 terra, fast and cheap, got the same verified result for under five cents.
+

@@ -1,0 +1,4 @@
+1
+00:00:00,050 --> 00:00:05,138
+The Analyst agent drafts the spec, and even flags what's missing, like a labelled holdout set.
+

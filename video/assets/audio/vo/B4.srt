@@ -1,0 +1,12 @@
+1
+00:00:00,050 --> 00:00:06,990
+The Translator writes Python, and twenty-five checks pass: coefficients and predictions match R to thirteen decimal places.
+
+2
+00:00:06,990 --> 00:00:08,310
+Business fitness?
+
+3
+00:00:08,310 --> 00:00:11,782
+Not established yet, and the platform tells you exactly why.
+

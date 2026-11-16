@@ -1,0 +1,73 @@
+R-Pythonizer
+Projects
+Settings
+Data & Code
+Model Specification
+R Reference Results
+Python Migration & Comparison
+Discrepancy Analysis
+Migration Validation Report
+Code & Reproducibility Package
+M4 GiveMeSomeCredit terra
+Code & Reproducibility Package · done
+Model Specification v1 · exact parity
+MLflow experiment
+R Reference Results · Model Specification v1
+MLflow
+Captured
+Nov 15, 2026, 1:41 PM
+R
+R version 4.6.2 (2026-10-29)
+Statistical model
+glm · binomial · logit
+Converged
+yes
+Fitted rows
+150,000
+Files
+coefficients.csv
+design.json
+fit.json
+meta.json
+predictions.csv
+segments.csv
+sessionInfo.txt
+split.csv
+aic
+67768.6
+bic
+67857.9
+deviance
+67750.6
+df null
+149,999
+df residual
+149,991
+dispersion
+1
+log lik
+-33875.3
+nobs
+150,000
+null deviance
+73616.2
+pearson chi2
+393931
+Details
+Id
+baseline-95d8842428
+Hash
+51e77de85bd9
+Environment
+0034e1fe214f
+Coefficients
+Term	R estimate	R std error
+(Intercept)	-2.84286	0.0120451
+RevolvingUtilizationOfUnsecuredLines	-0.0118486	0.0153867
+age	-0.451275	0.0120249
+NumberOfTime30.59DaysPastDueNotWorse	2.13774	0.0464495
+DebtRatio	-0.0407308	0.0206898
+NumberOfOpenCreditLinesAndLoans	-0.050505	0.0128608
+NumberOfTimes90DaysLate	1.97231	0.0635201
+NumberRealEstateLoansOrLines	0.0506119	0.0114565
+NumberOfTime60.89DaysPastDueNotWorse	-3.95261	0.0736167

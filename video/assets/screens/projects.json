@@ -1,0 +1,482 @@
+[
+  {
+    "id": "8d25ba45fe1c",
+    "name": "M4 GiveMeSomeCredit terra",
+    "created_at": "2026-11-15T13:39:51.682+00:00",
+    "state": {
+      "step": 7,
+      "status": "done",
+      "reason": null,
+      "detail": "",
+      "files": [
+        {
+          "role": "dataset",
+          "name": "cs-training.csv",
+          "sha256": "1bd46da486a5708c58c7b01a034fae2a13b327f6f7b62ea7ba4fe3b5824b24ac"
+        },
+        {
+          "role": "data",
+          "name": "cs-test.csv",
+          "sha256": "bab363a2a807218d32a51f5fc9668b8be7977795065edd386abc8546abaa5b78"
+        },
+        {
+          "role": "r_code",
+          "name": "givemesomecredit_logistic_notebook.R",
+          "sha256": "0712d22f50e2f7685bb40999a9c967136a5f0cbeca21e8be66b76f3f9b519637"
+        }
+      ],
+      "retry_limit": 3,
+      "drafted_version": 1,
+      "drafted_tier": "exact",
+      "drafted_proven": false,
+      "spec_version": 1,
+      "spec_tier": "exact",
+      "spec_proven": false,
+      "baseline_key": "4c0684e38949424d605138ed0c075b45a6ae964d91d95eeba4e107920b3e29d8",
+      "baseline_id": "baseline-95d8842428",
+      "candidate_hash": "4eab3a172aa626103a0ebb842f1c3e8f8294923a789175624c99cec9ac8b7a20",
+      "validation_id": "validation-a0d5336048",
+      "validation_passed": true,
+      "repairs": 0,
+      "ds_comment": null,
+      "diagnosis_id": null,
+      "approval": {
+        "spec_version": 1,
+        "baseline_id": "baseline-95d8842428",
+        "candidate_hash": "4eab3a172aa626103a0ebb842f1c3e8f8294923a789175624c99cec9ac8b7a20",
+        "validation_id": "validation-a0d5336048"
+      },
+      "report_id": "report-08fe308a38",
+      "bundle_id": "bundle-62e2873f2d"
+    }
+  },
+  {
+    "id": "3b74bc91b37b",
+    "name": "M2 Taiwan default terra",
+    "created_at": "2026-11-15T13:39:10.895+00:00",
+    "state": {
+      "step": 7,
+      "status": "done",
+      "reason": null,
+      "detail": "",
+      "files": [
+        {
+          "role": "dataset",
+          "name": "UCI_Credit_Card.csv",
+          "sha256": "a0f0ab49d6326671d6cd83be5c88dcf18007025fe9a53ecd699119c871176ca1"
+        },
+        {
+          "role": "r_code",
+          "name": "default-credit-and-credit-score-prediction.Rmd",
+          "sha256": "070defb09297c87a495c25b5b7ed76fdf11714cf0aa71bb7964005a571ae787d"
+        }
+      ],
+      "retry_limit": 3,
+      "drafted_version": 1,
+      "drafted_tier": "exact",
+      "drafted_proven": false,
+      "spec_version": 1,
+      "spec_tier": "exact",
+      "spec_proven": false,
+      "baseline_key": "8910bd0afc5447971213a7efc96b17e5a2b5f36b50cfeccec9ab00c9a19af8f9",
+      "baseline_id": "baseline-ec1388132a",
+      "candidate_hash": "77451c308e5486d48989c73dc2e359fe1e71c1db0014f2253d68286593c29779",
+      "validation_id": "validation-d9a86278ef",
+      "validation_passed": true,
+      "repairs": 0,
+      "ds_comment": null,
+      "diagnosis_id": null,
+      "approval": {
+        "spec_version": 1,
+        "baseline_id": "baseline-ec1388132a",
+        "candidate_hash": "77451c308e5486d48989c73dc2e359fe1e71c1db0014f2253d68286593c29779",
+        "validation_id": "validation-d9a86278ef"
+      },
+      "report_id": "report-aac61d938a",
+      "bundle_id": "bundle-23c8400c0f"
+    }
+  },
+  {
+    "id": "b3a4c334eb08",
+    "name": "M1 freMTPL2 terra",
+    "created_at": "2026-11-15T13:38:27.341+00:00",
+    "state": {
+      "step": 7,
+      "status": "done",
+      "reason": null,
+      "detail": "",
+      "files": [
+        {
+          "role": "dataset",
+          "name": "freMTPL2freq.csv",
+          "sha256": "6577226166e0e83efe52a431141f1ff5262a4d8fe6626c1d53912cc8943a9893"
+        },
+        {
+          "role": "data",
+          "name": "freMTPL2sev.csv",
+          "sha256": "8cf0e0d63cb252a9a5eded463e0a4bbf542cadeb938f50e064a6d43e23d1ff5c"
+        },
+        {
+          "role": "r_code",
+          "name": "legacy_glm1_notebook.R",
+          "sha256": "8ce2a047efb15bfe8d0be87ba7ddd167cea029d262139cc44fb8056f4945db08"
+        }
+      ],
+      "retry_limit": 3,
+      "drafted_version": 1,
+      "drafted_tier": "exact",
+      "drafted_proven": false,
+      "spec_version": 1,
+      "spec_tier": "exact",
+      "spec_proven": false,
+      "baseline_key": "9604682d130695ec33ab70a9dbe566f6bf103ce4e8a7440f24b50742c211628e",
+      "baseline_id": "baseline-3801edb8f0",
+      "candidate_hash": "b7d5bcfcee37eb6cea871a4768dc05b5806864e8d006136fd4d3e4d23fb3eb47",
+      "validation_id": "validation-aecc9b5990",
+      "validation_passed": true,
+      "repairs": 3,
+      "ds_comment": null,
+      "diagnosis_id": "diagnosis-4772e25a94",
+      "approval": {
+        "spec_version": 1,
+        "baseline_id": "baseline-3801edb8f0",
+        "candidate_hash": "b7d5bcfcee37eb6cea871a4768dc05b5806864e8d006136fd4d3e4d23fb3eb47",
+        "validation_id": "validation-aecc9b5990"
+      },
+      "report_id": "report-fa7af35223",
+      "bundle_id": "bundle-7c349eb18e"
+    }
+  },
+  {
+    "id": "4a359c8921bb",
+    "name": "M5 HMEQ",
+    "created_at": "2026-11-14T23:35:21.403+00:00",
+    "state": {
+      "step": 7,
+      "status": "done",
+      "reason": null,
+      "detail": "",
+      "files": [
+        {
+          "role": "dataset",
+          "name": "hmeq.csv",
+          "sha256": "2562c8a353f1ca15f5121aaf0077a141512e701a04cf837da753c895ca1ab2b1"
+        },
+        {
+          "role": "r_code",
+          "name": "hmeq_logistic_baseline.R",
+          "sha256": "c4e1641a4864b9145a4deebe07b74e01e5e7dad966757c522fd1bcb793ca1ce4"
+        }
+      ],
+      "retry_limit": 3,
+      "drafted_version": 1,
+      "drafted_tier": "exact",
+      "drafted_proven": false,
+      "spec_version": 1,
+      "spec_tier": "exact",
+      "spec_proven": false,
+      "baseline_key": "96e2ab483dfa50f4fa181e8d59c4a665ce81242a457dbf9fd23f5ac2ff6b876f",
+      "baseline_id": "baseline-d1b5836a58",
+      "candidate_hash": "125fcac02c329125a5746fda5fd75041d96e2b69e811133a9a2c7e89aa31c138",
+      "validation_id": "validation-c0b97df29b",
+      "validation_passed": true,
+      "repairs": 0,
+      "ds_comment": null,
+      "diagnosis_id": null,
+      "approval": {
+        "spec_version": 1,
+        "baseline_id": "baseline-d1b5836a58",
+        "candidate_hash": "125fcac02c329125a5746fda5fd75041d96e2b69e811133a9a2c7e89aa31c138",
+        "validation_id": "validation-c0b97df29b"
+      },
+      "report_id": "report-fa0ce5a212",
+      "bundle_id": "bundle-c824efe205"
+    }
+  },
+  {
+    "id": "630675876e0e",
+    "name": "M1 GLM1 terra-sol",
+    "created_at": "2026-11-14T22:49:56.182+00:00",
+    "state": {
+      "step": 7,
+      "status": "done",
+      "reason": null,
+      "detail": "",
+      "files": [
+        {
+          "role": "dataset",
+          "name": "freMTPL2freq.csv",
+          "sha256": "6577226166e0e83efe52a431141f1ff5262a4d8fe6626c1d53912cc8943a9893"
+        },
+        {
+          "role": "data",
+          "name": "freMTPL2sev.csv",
+          "sha256": "8cf0e0d63cb252a9a5eded463e0a4bbf542cadeb938f50e064a6d43e23d1ff5c"
+        },
+        {
+          "role": "r_code",
+          "name": "legacy_glm1_notebook.R",
+          "sha256": "8ce2a047efb15bfe8d0be87ba7ddd167cea029d262139cc44fb8056f4945db08"
+        }
+      ],
+      "retry_limit": 3,
+      "drafted_version": 1,
+      "drafted_tier": "exact",
+      "drafted_proven": false,
+      "spec_version": 1,
+      "spec_tier": "exact",
+      "spec_proven": false,
+      "baseline_key": "dee8340826ccabbf8893de0658f60a6441bf8ef695502e3224077acaa948c3b9",
+      "baseline_id": "baseline-6d48c8af65",
+      "candidate_hash": "4bc14f5d0fd3ccde30ab5814b93c74409956b4ce5e6d7c55b75bc8fd3f95800a",
+      "validation_id": "validation-68731c7d2e",
+      "validation_passed": true,
+      "repairs": 0,
+      "ds_comment": null,
+      "diagnosis_id": null,
+      "approval": {
+        "spec_version": 1,
+        "baseline_id": "baseline-6d48c8af65",
+        "candidate_hash": "4bc14f5d0fd3ccde30ab5814b93c74409956b4ce5e6d7c55b75bc8fd3f95800a",
+        "validation_id": "validation-68731c7d2e"
+      },
+      "report_id": "report-b805a4b568",
+      "bundle_id": "bundle-9390587a9f"
+    }
+  },
+  {
+    "id": "6848343e7401",
+    "name": "M4 GMSC Deepseek",
+    "created_at": "2026-11-14T16:56:10.153+00:00",
+    "state": {
+      "step": 2,
+      "status": "awaiting_ds",
+      "reason": "spec_drafted",
+      "detail": "",
+      "files": [
+        {
+          "role": "dataset",
+          "name": "cs-training.csv",
+          "sha256": "1bd46da486a5708c58c7b01a034fae2a13b327f6f7b62ea7ba4fe3b5824b24ac"
+        },
+        {
+          "role": "data",
+          "name": "cs-test.csv",
+          "sha256": "bab363a2a807218d32a51f5fc9668b8be7977795065edd386abc8546abaa5b78"
+        },
+        {
+          "role": "r_code",
+          "name": "givemesomecredit_logistic_notebook.R",
+          "sha256": "0712d22f50e2f7685bb40999a9c967136a5f0cbeca21e8be66b76f3f9b519637"
+        }
+      ],
+      "retry_limit": 3,
+      "drafted_version": 1,
+      "drafted_tier": "exact",
+      "drafted_proven": false,
+      "spec_version": null,
+      "spec_tier": null,
+      "spec_proven": null,
+      "baseline_key": null,
+      "baseline_id": null,
+      "candidate_hash": null,
+      "validation_id": null,
+      "validation_passed": null,
+      "repairs": 0,
+      "ds_comment": null,
+      "diagnosis_id": null,
+      "approval": null,
+      "report_id": null,
+      "bundle_id": null
+    }
+  },
+  {
+    "id": "5b63db111b0d",
+    "name": "M3 ULB fraud \u2014 Chrome E2E",
+    "created_at": "2026-11-14T15:29:47.733+00:00",
+    "state": {
+      "step": 2,
+      "status": "awaiting_ds",
+      "reason": "analyst_replied",
+      "detail": "",
+      "files": [
+        {
+          "role": "dataset",
+          "name": "creditcard.csv",
+          "sha256": "76274b691b16a6c49d3f159c883398e03ccd6d1ee12d9d8ee38f4b4b98551a89"
+        },
+        {
+          "role": "r_code",
+          "name": "credit-card-fraud-detection-with-rf-auc-0-93.Rmd",
+          "sha256": "f9eff9bd1ad93c09dcc50ec22b16aea6fa5a41d2819293fdba527165de92a549"
+        }
+      ],
+      "retry_limit": 3,
+      "drafted_version": 1,
+      "drafted_tier": "unsupported",
+      "drafted_proven": false,
+      "spec_version": null,
+      "spec_tier": null,
+      "spec_proven": null,
+      "baseline_key": null,
+      "baseline_id": null,
+      "candidate_hash": null,
+      "validation_id": null,
+      "validation_passed": null,
+      "repairs": 0,
+      "ds_comment": null,
+      "diagnosis_id": null,
+      "approval": null,
+      "report_id": null,
+      "bundle_id": null
+    }
+  },
+  {
+    "id": "3ca662265c14",
+    "name": "M2 Taiwan default \u2014 Chrome E2E",
+    "created_at": "2026-11-14T14:03:59.254+00:00",
+    "state": {
+      "step": 7,
+      "status": "done",
+      "reason": null,
+      "detail": "",
+      "files": [
+        {
+          "role": "dataset",
+          "name": "UCI_Credit_Card.csv",
+          "sha256": "a0f0ab49d6326671d6cd83be5c88dcf18007025fe9a53ecd699119c871176ca1"
+        },
+        {
+          "role": "r_code",
+          "name": "default-credit-and-credit-score-prediction.Rmd",
+          "sha256": "070defb09297c87a495c25b5b7ed76fdf11714cf0aa71bb7964005a571ae787d"
+        }
+      ],
+      "retry_limit": 3,
+      "drafted_version": 1,
+      "drafted_tier": "exact",
+      "drafted_proven": false,
+      "spec_version": 1,
+      "spec_tier": "exact",
+      "spec_proven": false,
+      "baseline_key": "58addd3f905cddc7605e4b063c5aa080fd66d155137d8b8fed77f307444fed1d",
+      "baseline_id": "baseline-65753ca83a",
+      "candidate_hash": "13ad4645ec6c70002625bab1485292e55090622e05b9d9a4f6982629b4e52536",
+      "validation_id": "validation-ca9e2134ef",
+      "validation_passed": true,
+      "repairs": 0,
+      "ds_comment": null,
+      "diagnosis_id": null,
+      "approval": {
+        "spec_version": 1,
+        "baseline_id": "baseline-65753ca83a",
+        "candidate_hash": "13ad4645ec6c70002625bab1485292e55090622e05b9d9a4f6982629b4e52536",
+        "validation_id": "validation-ca9e2134ef"
+      },
+      "report_id": "report-6177f36743",
+      "bundle_id": "bundle-d47ad1d43a"
+    }
+  },
+  {
+    "id": "d7a30983afd0",
+    "name": "M1 freMTPL2 \u2014 Chrome E2E",
+    "created_at": "2026-11-14T14:03:32.601+00:00",
+    "state": {
+      "step": 7,
+      "status": "done",
+      "reason": null,
+      "detail": "",
+      "files": [
+        {
+          "role": "dataset",
+          "name": "freMTPL2freq.csv",
+          "sha256": "6577226166e0e83efe52a431141f1ff5262a4d8fe6626c1d53912cc8943a9893"
+        },
+        {
+          "role": "data",
+          "name": "freMTPL2sev.csv",
+          "sha256": "8cf0e0d63cb252a9a5eded463e0a4bbf542cadeb938f50e064a6d43e23d1ff5c"
+        },
+        {
+          "role": "r_code",
+          "name": "legacy_glm1_notebook.R",
+          "sha256": "8ce2a047efb15bfe8d0be87ba7ddd167cea029d262139cc44fb8056f4945db08"
+        }
+      ],
+      "retry_limit": 3,
+      "drafted_version": 2,
+      "drafted_tier": "exact",
+      "drafted_proven": false,
+      "spec_version": 2,
+      "spec_tier": "exact",
+      "spec_proven": false,
+      "baseline_key": "af563864abb83fb857c64490c6fbe38977ccf0db5f9250f65438f0f6c514933c",
+      "baseline_id": "baseline-d20514accc",
+      "candidate_hash": "69c5107e89c701b1428e0e139a2b56e6d66c43db93182fe0e0b2a804fcfcb568",
+      "validation_id": "validation-4f7a77cfcc",
+      "validation_passed": true,
+      "repairs": 1,
+      "ds_comment": null,
+      "diagnosis_id": "diagnosis-1e17429063",
+      "approval": {
+        "spec_version": 2,
+        "baseline_id": "baseline-d20514accc",
+        "candidate_hash": "69c5107e89c701b1428e0e139a2b56e6d66c43db93182fe0e0b2a804fcfcb568",
+        "validation_id": "validation-4f7a77cfcc"
+      },
+      "report_id": "report-0120280c22",
+      "bundle_id": "bundle-64ddf58b9d"
+    }
+  },
+  {
+    "id": "268e7876674e",
+    "name": "M4 GiveMeSomeCredit \u2014 Chrome E2E",
+    "created_at": "2026-11-14T14:02:55.314+00:00",
+    "state": {
+      "step": 7,
+      "status": "done",
+      "reason": null,
+      "detail": "",
+      "files": [
+        {
+          "role": "dataset",
+          "name": "cs-training.csv",
+          "sha256": "1bd46da486a5708c58c7b01a034fae2a13b327f6f7b62ea7ba4fe3b5824b24ac"
+        },
+        {
+          "role": "data",
+          "name": "cs-test.csv",
+          "sha256": "bab363a2a807218d32a51f5fc9668b8be7977795065edd386abc8546abaa5b78"
+        },
+        {
+          "role": "r_code",
+          "name": "givemesomecredit_logistic_notebook.R",
+          "sha256": "0712d22f50e2f7685bb40999a9c967136a5f0cbeca21e8be66b76f3f9b519637"
+        }
+      ],
+      "retry_limit": 3,
+      "drafted_version": 1,
+      "drafted_tier": "exact",
+      "drafted_proven": false,
+      "spec_version": 1,
+      "spec_tier": "exact",
+      "spec_proven": false,
+      "baseline_key": "d2439b105334d5cd61e967e1c7adde55b9f6b188ea8fbe3dc0535946a92ddbd2",
+      "baseline_id": "baseline-4274d02246",
+      "candidate_hash": "8f21c9dce23432032ed6fdb7bd806cf7db1a8763a4a245b498272f92c48a0dcd",
+      "validation_id": "validation-b8b209df33",
+      "validation_passed": true,
+      "repairs": 0,
+      "ds_comment": null,
+      "diagnosis_id": null,
+      "approval": {
+        "spec_version": 1,
+        "baseline_id": "baseline-4274d02246",
+        "candidate_hash": "8f21c9dce23432032ed6fdb7bd806cf7db1a8763a4a245b498272f92c48a0dcd",
+        "validation_id": "validation-b8b209df33"
+      },
+      "report_id": "report-98dcd5dea5",
+      "bundle_id": "bundle-bfef1497fc"
+    }
+  }
+]

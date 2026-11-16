@@ -1,0 +1,12 @@
+1
+00:00:00,050 --> 00:00:01,923
+So why R, and not SAS?
+
+2
+00:00:01,923 --> 00:00:08,807
+SAS migration is already industrialised: EXL's own Code Harbor cut conversion time by seventy percent.
+
+3
+00:00:08,807 --> 00:00:13,958
+R is the gap: twenty-two thousand open packages, each with its own defaults.
+

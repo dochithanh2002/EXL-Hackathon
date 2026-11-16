@@ -1,0 +1,12 @@
+1
+00:00:00,050 --> 00:00:02,766
+For twenty years, risk models were built in R.
+
+2
+00:00:02,766 --> 00:00:07,268
+A statistician writes the script, runs it on their own laptop, and emails the numbers.
+
+3
+00:00:07,268 --> 00:00:09,482
+It works, until that person leaves.
+

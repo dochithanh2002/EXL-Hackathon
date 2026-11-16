@@ -1,0 +1,12 @@
+1
+00:00:00,050 --> 00:00:03,194
+R runs the model once and freezes an answer key.
+
+2
+00:00:03,194 --> 00:00:08,125
+Python gets R's exact rows, and the AI never sees R's numbers, so it can't cheat.
+
+3
+00:00:08,125 --> 00:00:14,027
+Then plain code checks every coefficient and prediction, and if anything fails, an agent finds out why.
+

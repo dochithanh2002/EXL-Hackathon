@@ -1,0 +1,17 @@
+R-Pythonizer
+Projects
+Settings
+Data & Code
+Model Specification
+R Reference Results
+Python Migration & Comparison
+Discrepancy Analysis
+Migration Validation Report
+Code & Reproducibility Package
+M4 GiveMeSomeCredit terra
+Code & Reproducibility Package · done
+Model Specification v1 · exact parity
+MLflow experiment
+Discrepancy analysis · 0 of 3 repair attempts used
+Attempt	Parity	Failed checks	DS	Root cause
+0	passed		accepted	

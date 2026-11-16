@@ -1,0 +1,65 @@
+{
+  "id": "8d25ba45fe1c",
+  "name": "M4 GiveMeSomeCredit terra",
+  "state": {
+    "step": 7,
+    "status": "done",
+    "reason": null,
+    "detail": "",
+    "files": [
+      {
+        "role": "dataset",
+        "name": "cs-training.csv",
+        "sha256": "1bd46da486a5708c58c7b01a034fae2a13b327f6f7b62ea7ba4fe3b5824b24ac"
+      },
+      {
+        "role": "data",
+        "name": "cs-test.csv",
+        "sha256": "bab363a2a807218d32a51f5fc9668b8be7977795065edd386abc8546abaa5b78"
+      },
+      {
+        "role": "r_code",
+        "name": "givemesomecredit_logistic_notebook.R",
+        "sha256": "0712d22f50e2f7685bb40999a9c967136a5f0cbeca21e8be66b76f3f9b519637"
+      }
+    ],
+    "retry_limit": 3,
+    "drafted_version": 1,
+    "drafted_tier": "exact",
+    "drafted_proven": false,
+    "spec_version": 1,
+    "spec_tier": "exact",
+    "spec_proven": false,
+    "baseline_key": "4c0684e38949424d605138ed0c075b45a6ae964d91d95eeba4e107920b3e29d8",
+    "baseline_id": "baseline-95d8842428",
+    "candidate_hash": "4eab3a172aa626103a0ebb842f1c3e8f8294923a789175624c99cec9ac8b7a20",
+    "validation_id": "validation-a0d5336048",
+    "validation_passed": true,
+    "repairs": 0,
+    "ds_comment": null,
+    "diagnosis_id": null,
+    "approval": {
+      "spec_version": 1,
+      "baseline_id": "baseline-95d8842428",
+      "candidate_hash": "4eab3a172aa626103a0ebb842f1c3e8f8294923a789175624c99cec9ac8b7a20",
+      "validation_id": "validation-a0d5336048"
+    },
+    "report_id": "report-08fe308a38",
+    "bundle_id": "bundle-62e2873f2d"
+  },
+  "running_job": null,
+  "decisions": [
+    {
+      "at": "2026-11-15T13:47:09.469+00:00",
+      "decision": "approved",
+      "comment": null,
+      "bindings": {
+        "spec_version": 1,
+        "baseline_id": "baseline-95d8842428",
+        "candidate_hash": "4eab3a172aa626103a0ebb842f1c3e8f8294923a789175624c99cec9ac8b7a20",
+        "validation_id": "validation-a0d5336048"
+      },
+      "void": false
+    }
+  ]
+}

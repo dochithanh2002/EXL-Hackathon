@@ -1,0 +1,7 @@
+# Rebuilt by tools/render.py and tools/assemble.py
+assets/scenes/
+export/*
+!export/R-Pythonizer_demo.mp4
+!export/R-Pythonizer_demo.srt
+# Identical copies of the viewport captures
+assets/screens/*_full.png

@@ -1,0 +1,16 @@
+1
+00:00:00,050 --> 00:00:04,583
+R runs in memory, one thread at a time, and it's hard to plug into production.
+
+2
+00:00:04,583 --> 00:00:07,974
+Meanwhile, fifty-eight percent of developers use Python.
+
+3
+00:00:07,974 --> 00:00:08,576
+R?
+
+4
+00:00:08,576 --> 00:00:09,224
+Five.
+

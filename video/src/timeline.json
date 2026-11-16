@@ -1,0 +1,21 @@
+[
+  {"clip": "INTRO"},
+  {"clip": "A1", "vo": "A1", "at": 0.8},
+  {"clip": "A2", "vo": "A2", "at": 0.8},
+  {"clip": "A3", "vo": "A3", "at": 0.8},
+  {"clip": "A4", "vo": "A4", "at": 0.8},
+  {"clip": "A5", "vo": "A5", "at": 0.8},
+  {"clip": "A6", "vo": "A6", "at": 0.8},
+  {"clip": "A7", "vo": "A7", "at": 0.8},
+  {"clip": "A8", "vo": "A8", "at": 0.8},
+  {"clip": "B0"},
+  {"clip": "B1a", "vo": "B1", "at": 0.5},
+  {"clip": "B1b"},
+  {"clip": "B2", "vo": "B2", "at": 0.4},
+  {"clip": "B3", "vo": "B3", "at": 0.4},
+  {"clip": "B4", "vo": "B4", "at": 0.3},
+  {"clip": "B5a", "vo": "B5", "at": 0.3},
+  {"clip": "B5b"},
+  {"clip": "B6", "vo": "B6", "at": 0.6},
+  {"clip": "TEAM"}
+]

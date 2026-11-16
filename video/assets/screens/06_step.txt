@@ -1,0 +1,279 @@
+R-Pythonizer
+Projects
+Settings
+Data & Code
+Model Specification
+R Reference Results
+Python Migration & Comparison
+Discrepancy Analysis
+Migration Validation Report
+Code & Reproducibility Package
+M4 GiveMeSomeCredit terra
+Code & Reproducibility Package · done
+Model Specification v1 · exact parity
+MLflow experiment
+MLflow
+report.md
+M4 GiveMeSomeCredit terra: Model Validation Report
+	
+Statistical model	stats::glm → statsmodels.api.GLM
+Parity tier	exact (no passing fixture yet)
+Model specification	v1
+Migration	accepted 2026-11-15T13:47:09.469+00:00; 25 of 25 required checks passed
+Business fitness	not established
+Scope
+
+Logistic regression predicts the probability of SeriousDlqin2yrs for individuals represented in the credit dataset. The R code in givemesomecredit_logistic_notebook.R fits stats::glm; the migration reproduces it in Python with statsmodels.api.GLM.
+
+The model is fitted on cs-training.csv (SHA-256 1bd46da486a5), with cs-test.csv. It predicts SeriousDlqin2yrs, a binary response, as probability of SeriousDlqin2yrs = 1 within two years, for Credit delinquency risk prediction; specific business decision not stated..
+
+Set	Role	Rows	Description
+train	development	150000	All labeled training dataset rows, also used to fit and scale the model.
+Key findings
+All 25 required parity checks passed, including coefficients, predictions and training metrics; the data scientist accepted the migration. This establishes agreement with the R reference on the checked evidence, not business fitness. [validation-a0d5336048, decision-6]
+Business fitness is not established: calibration, stability and decision performance were only partially executed, and those checks and the executed sample suitability check have no specified criteria. [evaluation]
+On development data, the executed baseline comparison found model AUC of 0.693695 versus 0.5 for the intercept-only baseline; decision performance has no specified acceptance criterion. [evaluation]
+The assumption screens executed: the maximum variance inflation factor was 91.2902, while the separation screen found no extreme predictions or R fitted-probability warning. Subgroup and sensitivity checks also executed. [evaluation]
+Model and data semantics
+	
+Target	Logistic regression predicts the probability of SeriousDlqin2yrs for individuals represented in the credit dataset.
+Response	SeriousDlqin2yrs (binary)
+Formula	cs_training$SeriousDlqin2yrs ~ .
+R convergence check	auto
+Convergence rationale	Standard estimator status
+Optional metrics	None
+Event	SeriousDlqin2yrs coded 1; serious delinquency within two years, exact definition to be confirmed, coded 1; otherwise SeriousDlqin2yrs coded 0; no recorded qualifying serious delinquency within two years
+Prediction	scalar, probability: probability of SeriousDlqin2yrs = 1 within two years; aligned on row
+Business use	Credit delinquency risk prediction; specific business decision not stated.
+Intended population	Individuals represented by the credit dataset; deployment population not specified.
+Sample	150,000 labeled rows in cs-training.csv; product, channel, dates and selection criteria not provided.
+Criteria	None stated
+Validation plan
+Check	Planned	Rationale
+Baseline comparison	yes	Compare risk predictions with an intercept-only event-rate baseline.
+Calibration	yes	Event probabilities require calibration; development-only assessment is optimistic.
+Subgroup performance	yes	Investigate variation across age bands; business-relevant segments require confirmation.
+Stability	yes	Cross-validation assesses sensitivity to training rows; independent temporal evidence is unavailable.
+Sensitivity	yes	Assess predicted risk response to shifts in numeric predictors, including potential extreme-value effects.
+Model assumptions	yes	Screen for separation and multicollinearity in binary logistic regression.
+Sample suitability	always	Enough events, or observations, for each parameter the model estimates.
+Decision performance	always	How well the model ranks events, and the decisions it makes at the business threshold.
+Migration acceptance
+
+Does the Python code reproduce the R reference? Each value is compared as |Python − R| ≤ atol + rtol·|R|; the ratio is the worst element's |Python − R| / (atol + rtol·|R|).
+
+Parity results
+
+25 of 25 required checks passed.
+
+Check	Status	Max |Δ|	atol	rtol	Ratio to tolerance
+R reference fit converged	pass				yes
+Python fit converged	pass				yes
+coefficient names missing or extra	pass				0 (expected 0)
+coefficient estimates	pass	1.199e-14	1.000e-06	1.000e-06	4.034e-09
+coefficient standard errors	pass	1.960e-16	1.000e-06	1.000e-06	1.931e-10
+alignment keys only on one side	pass				0 (expected 0)
+observed values differing	pass				0 (expected 0)
+prediction missingness differing	pass				0 (expected 0)
+predictions	pass	1.410e-14	1.000e-06	1.000e-06	9.714e-09
+valid predictions on train	pass				150000 (expected at least 1)
+fit nobs differs	pass				0 (expected 0)
+fit df_residual differs	pass				0 (expected 0)
+fit deviance	pass	2.910e-11	1.000e-06	1.000e-06	4.296e-10
+fit null_deviance	pass	4.366e-11	1.000e-06	1.000e-06	5.930e-10
+fit dispersion	pass	0	1.000e-06	1.000e-06	0
+fit pearson_chi2	pass	1.804e-09	1.000e-06	1.000e-06	4.581e-09
+fit log_lik	pass	3.638e-11	1.000e-06	1.000e-06	1.074e-09
+fit aic	pass	2.910e-11	1.000e-06	1.000e-06	4.295e-10
+fit bic	pass	2.910e-11	1.000e-06	1.000e-06	4.289e-10
+auc on train	pass	0	1.000e-06	1.000e-06	0
+gini on train	pass	0	1.000e-06	1.000e-06	0
+ks on train	pass	0	1.000e-06	1.000e-06	0
+actual_expected on train	pass	3.109e-15	1.000e-06	1.000e-06	1.554e-09
+log_loss on train	pass	0	1.000e-06	1.000e-06	0
+brier on train	pass	1.388e-17	1.000e-06	1.000e-06	1.312e-11
+Evaluation metrics compared
+Set	Metric	R	Python
+train	actual_expected	1	1
+train	auc	0.693695	0.693695
+train	brier	0.0576798	0.0576798
+train	gini	0.38739	0.38739
+train	ks	0.312844	0.312844
+train	log_loss	0.225835	0.225835
+Coefficients
+Term	R estimate	Python estimate	Ratio	R std error	Python std error	Ratio
+(Intercept)	-2.84285873	-2.84285873	9.245e-10	0.01204509083	0.01204509083	6.856e-12
+RevolvingUtilizationOfUnsecuredLines	-0.01184862079	-0.01184862079	8.435e-10	0.01538674288	0.01538674288	1.931e-10
+age	-0.4512748245	-0.4512748245	7.650e-11	0.01202492124	0.01202492124	8.571e-12
+NumberOfTime30.59DaysPastDueNotWorse	2.137743157	2.137743157	1.981e-09	0.0464495062	0.0464495062	3.979e-11
+DebtRatio	-0.04073079247	-0.04073079247	2.334e-10	0.02068976969	0.02068976969	4.419e-11
+NumberOfOpenCreditLinesAndLoans	-0.05050499864	-0.05050499864	3.897e-10	0.01286076357	0.01286076357	2.398e-11
+NumberOfTimes90DaysLate	1.972306582	1.972306582	4.034e-09	0.06352006063	0.06352006063	1.174e-10
+NumberRealEstateLoansOrLines	0.05061194846	0.05061194846	7.529e-10	0.01145648499	0.01145648499	1.715e-12
+NumberOfTime60.89DaysPastDueNotWorse	-3.952610702	-3.952610702	1.614e-09	0.07361666841	0.07361666841	2.585e-11
+Skipped or unavailable checks
+
+Every parity check was computed.
+
+Acceptance decision
+
+The data scientist accepted the migration at 2026-11-15T13:47:09.469+00:00: 25 of 25 required checks passed. This acceptance attests that the Python code reproduces the R reference within the agreed tolerances. It is not a statement that the model is fit for business use, which the model validation below addresses.
+
+Model validation
+
+Is the model fit for its business use? The platform ran each check on the R reference's and the Python candidate's predictions and judged the specification's criteria on the Python candidate. Each check states how far it ran and, separately, what its criterion concluded.
+
+Baseline comparison
+
+Executed. Compare risk predictions with an intercept-only event-rate baseline.
+
+Set	Metric	R	Python	Constant	Python vs constant
+train	actual expected	1	1	1	NA
+train	auc	0.693695	0.693695	0.5	0.193695
+train	brier	0.0576798	0.0576798	0.0623724	0.0752352
+train	gini	0.38739	0.38739	0	0.38739
+train	ks	0.312844	0.312844	0	0.312844
+train	log loss	0.225835	0.225835	0.245387	0.0796782
+Calibration
+
+Partially executed. Event probabilities require calibration; development-only assessment is optimistic. Needs an independent evaluation set: calibration is measured on the development set only.
+
+Criterion: no criterion. The specification states no max_calibration_deviation. Computed on train: max deviation 0.
+
+Set	Output	Model	Observed / expected	Slope	Intercept	Largest decile gap
+train	value	python	1	1	1.429e-13	0.053817
+train	value	r	1	1	1.415e-13	0.053817
+Subgroup performance
+
+Executed. Investigate variation across age bands; business-relevant segments require confirmation.
+
+numeric columns are cut at quintiles of the development set; categorical columns keep their 12 largest levels and fold the rest into Other
+
+Column	Group	Set	Rows	Observed / expected	log loss	AUC
+age	Q1 (below -0.900036)	train	29017	0.949771	0.325961	0.634413
+age	Q2 (-0.900036 to below -0.290769)	train	29721	1.04525	0.277251	0.64668
+age	Q3 (-0.290769 to below 0.250801)	train	29257	1.13744	0.249209	0.647137
+age	Q4 (0.250801 to below 0.860067)	train	30812	0.970547	0.176195	0.662073
+age	Q5 (0.860067 and above)	train	31193	0.826445	0.110817	0.642196
+Stability
+
+Partially executed. Cross-validation assesses sensitivity to training rows; independent temporal evidence is unavailable. Needs a holdout or out-of-time evaluation set, or a period column with at least two periods.
+
+Criterion: no criterion. The specification states no max_psi.
+
+folds are assigned by a hash of the data-row number; each refit reuses prepare()'s frames, so preprocessing fitted on all rows is not refitted per fold
+
+Quantity	Mean / estimate	SD across folds	Range	Reference
+actual expected, 5 folds	1.00019	0.0231152	0.972067 – 1.02473	1
+auc, 5 folds	0.693139	0.0100856	0.680899 – 0.70384	0.693695
+brier, 5 folds	0.0577054	0.00116671	0.056002 – 0.0587596	0.0576798
+gini, 5 folds	0.386279	0.0201704	0.361798 – 0.407679	0.38739
+ks, 5 folds	0.316438	0.0141539	0.299482 – 0.329954	0.312844
+log loss, 5 folds	0.225998	0.00386734	0.22114 – 0.229589	0.225835
+RevolvingUtilizationOfUnsecuredLines	-0.0118486	0.0155153	relative 1.30946	0 sign changes
+DebtRatio	-0.0407308	0.0303722	relative 0.74568	0 sign changes
+NumberRealEstateLoansOrLines	0.0506119	0.0114068	relative 0.225377	0 sign changes
+NumberOfOpenCreditLinesAndLoans	-0.050505	0.00468939	relative 0.0928501	0 sign changes
+NumberOfTimes90DaysLate	1.97231	0.0815238	relative 0.0413342	0 sign changes
+deviance by iteration	67750.6		7 recorded	R: 6 iterations
+Sensitivity
+
+Executed. Assess predicted risk response to shifts in numeric predictors, including potential extreme-value effects.
+
+each column moves by shift_sd training standard deviations in the frames the Python model reads; changes are unweighted means over rows
+
+Column	Set	Shift	Mean change, down	Mean change, up
+DebtRatio	train	203.782	2.381e-04	-2.373e-04
+RevolvingUtilizationOfUnsecuredLines	train	24.9755	6.919e-05	-6.912e-05
+age	train	1.47719	0.00268181	-0.00258679
+Model assumptions
+
+Executed. Screen for separation and multicollinearity in binary logistic regression.
+
+Assumption	Model	Results
+multicollinearity	python	condition number 439.69; max vif 91.2902
+separation	python	extreme prediction share 0; max abs estimate 3.95261
+separation	r	extreme prediction share 0; fitted probabilities warning no
+Sample suitability
+
+Executed. Enough events, or observations, for each parameter the model estimates.
+
+Criterion: no criterion. The specification states no min_events_per_parameter. Computed on train: per parameter 1114.
+
+Set	Role	Rows	Valid	Events	Event rate / mean
+train	development	150000	150000	10026	0.06684
+per parameter	the smaller of events and non-events	9			1114
+Decision performance
+
+Partially executed. How well the model ranks events, and the decisions it makes at the business threshold. Needs the decision threshold and the action it triggers; an independent evaluation set: decision performance is measured on development data only.
+
+Criterion: no criterion. The specification states no min_auc, min_events_captured. Computed on train: auc 0.693695.
+
+Set	Model	AUC	Gini	KS	Flagged share	Event rate flagged	Events captured
+train	Python	0.693695	0.38739	0.312844	NA	NA	NA
+train	R	0.693695	0.38739	0.312844	NA	NA	NA
+Missing evidence
+Calibration: an independent evaluation set: calibration is measured on the development set only
+Calibration: no acceptance criterion (max_calibration_deviation) in the specification
+Stability: a holdout or out-of-time evaluation set, or a period column with at least two periods
+Stability: no acceptance criterion (max_psi) in the specification
+Sample suitability: no acceptance criterion (min_events_per_parameter) in the specification
+Decision performance: the decision threshold and the action it triggers
+Decision performance: an independent evaluation set: decision performance is measured on development data only
+Decision performance: no acceptance criterion (min_auc, min_events_captured) in the specification
+Still to provide: Confirm exact definition of SeriousDlqin2yrs and the intended population, business use, product, channel, dates and exclusions.
+Still to provide: Provide independent labeled holdout or out-of-time data and its period information; cs-test.csv has no observed outcomes and is not a held-out subset of the training dataset.
+Still to provide: Specify business action and decision acceptance criteria including minimum events captured; notebook classifies probability strictly greater than 0.5 as 1, not greater than or equal to 0.5.
+Still to provide: Provide acceptance thresholds for discrimination, calibration, stability and sample suitability, and identify business-relevant subgroup columns.
+Still to provide: Confirm treatment of extreme predictor values and possible 96/98 delinquency-count codes.
+Still to provide: Confirm whether independent scaling of cs-test.csv in the notebook is intended for deployment; it differs from applying training scaling.
+Business fitness
+
+Not established. The verdict reads the criterion outcomes on the Python candidate and the checks' execution: a criterion not met decides it; otherwise every stated criterion must be met and every check that applies must have run. It is judged separately from the migration's acceptance.
+
+Calibration: partially executed (needs an independent evaluation set: calibration is measured on the development set only)
+Calibration: no criterion for max_calibration_deviation
+Stability: partially executed (needs a holdout or out-of-time evaluation set, or a period column with at least two periods)
+Stability: no criterion for max_psi
+Sample suitability: no criterion for min_events_per_parameter
+Decision performance: partially executed (needs the decision threshold and the action it triggers; an independent evaluation set: decision performance is measured on development data only)
+Decision performance: no criterion for min_auc, min_events_captured
+Limitations
+Calibration and decision performance were measured only on development data, while temporal stability could not be assessed without an independent holdout, out-of-time set or suitable period information. The supplied test file has no observed outcomes. [evaluation, spec-v1]
+Cross-validation reused preprocessing fitted on all rows, so it does not assess the full preprocessing and fitting process independently within each fold. [evaluation]
+The intended deployment population, business decision and exact event definition remain unconfirmed; age bands may not represent the business-relevant subgroups. [spec-v1, evaluation]
+Recommendations
+Obtain independent labeled holdout or out-of-time data with period information, then complete calibration, stability and decision-performance assessment. [evaluation, spec-v1]
+Specify acceptance criteria for calibration, stability, sample suitability, discrimination and events captured, along with the business decision threshold and associated action. [evaluation, spec-v1]
+Investigate the observed multicollinearity and confirm the treatment of extreme predictor values and delinquency-count codes; confirm whether independent test-set scaling is intended for deployment. [evaluation, spec-v1, candidate-e08b0fdecd]
+Confirm the event definition, intended population and business use, and identify business-relevant subgroups for assessment. [spec-v1, evaluation]
+Appendix: reproducibility
+	
+Spec hash	9d1fe8bfe996
+R reference	baseline-95d8842428, R version 4.6.2 (2026-10-29)
+Candidate	candidate-e08b0fdecd 4eab3a172aa6, code generated by cpr-lacc2 / gpt-6.1-terra
+Validation	validation-a0d5336048
+Environment	0034e1fe214f
+Attempts
+Attempt	Candidate	Validation	Failed checks	Diagnosis	DS
+0	candidate-e08b0fdecd	validation-a0d5336048			accepted
+Inputs
+File	Role	SHA-256
+cs-training.csv	dataset	1bd46da486a5708c58c7b01a034fae2a13b327f6f7b62ea7ba4fe3b5824b24ac
+cs-test.csv	data	bab363a2a807218d32a51f5fc9668b8be7977795065edd386abc8546abaa5b78
+givemesomecredit_logistic_notebook.R	r_code	0712d22f50e2f7685bb40999a9c967136a5f0cbeca21e8be66b76f3f9b519637
+Evidence
+Id	Kind	Hash
+baseline-95d8842428	R reference	97a19b4bf8f9
+candidate-e08b0fdecd	candidate	91dca037134c
+validation-a0d5336048	validation	b09233a41216
+Figures
+Figure	File	SHA-256
+Parity checks	plots/parity.svg	2a5afbd8b333
+Model performance	plots/performance.svg	0622bc36aec8
+Calibration on train	plots/calibration-train.svg	309a64a61276
+age on train	plots/subgroups-age-train.svg	47f2dec2805c
+Python fit by iteration	plots/training-curve.svg	1f30a4caeda8
+Cross-validated performance	plots/cross-validation.svg	91aaebbc3090
+Sensitivity on train	plots/sensitivity-train.svg	20d2a61b160c
+Variance inflation factors	plots/vif.svg	1af8d999b0ee
